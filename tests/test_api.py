@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -10,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from tenderpulse.ai.gigachat import GeneratedArguments
 from tenderpulse.api import create_app
-from tenderpulse.domain.models import ProcurementRecord, SourceCode
+from tenderpulse.domain.models import LifecycleStatus, ProcurementRecord, RecordKind, SourceCode
 from tenderpulse.live_ingestion import LiveSourceResult
 from tenderpulse.persistence.models import Base
 from tenderpulse.persistence.repository import ProcurementRepository
@@ -221,6 +222,48 @@ def test_source_freshness_keeps_missing_runs_explicitly_unknown(
     assert [item["source"] for item in response.json()] == ["ted", "eis", "usaspending"]
     assert all(item["last_status"] == "unknown" for item in response.json())
     assert all(item["last_success_observed_at"] is None for item in response.json())
+
+
+def test_award_outcome_api_exposes_winner_amount_buyer_and_raw_evidence(
+    it_notice: ProcurementRecord,
+) -> None:
+    award = it_notice.model_copy(
+        update={
+            "source": SourceCode.USA_SPENDING,
+            "source_record_id": "CONT_AWD_001",
+            "kind": RecordKind.AWARD,
+            "lifecycle": LifecycleStatus.AWARDED,
+            "buyer_name": "Department of Health",
+            "supplier_names": ("Lab Systems Inc.",),
+            "lots": (
+                it_notice.lots[0].model_copy(
+                    update={"amount": Decimal("125000.50"), "currency": "USD"}
+                ),
+            ),
+            "evidence": it_notice.evidence.model_copy(update={"raw_sha256": "f" * 64}),
+        }
+    )
+    client = _client((award,))
+
+    response = client.get("/api/analytics/award-outcomes")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "record_source": "usaspending",
+            "record_source_id": "CONT_AWD_001",
+            "title": award.title,
+            "buyer_name": "Department of Health",
+            "supplier_names": ["Lab Systems Inc."],
+            "winner_status": "found",
+            "amount": "125000.50",
+            "currency": "USD",
+            "amount_status": "found",
+            "observed_at": "2026-08-08T00:00:00Z",
+            "raw_sha256": "f" * 64,
+            "source_url": award.evidence.source_url,
+        }
+    ]
 
 
 def test_existing_demo_profile_can_be_versioned_but_third_profile_is_rejected(

@@ -28,6 +28,7 @@ flowchart LR
   DB --> DBT["dbt marts"] --> API
   API --> Giga["GigaChat adapter"]
   API --> Alerts["Alert outbox"]
+  Alerts --> Hook["Opt-in HTTPS webhook"]
 ```
 
 ## Инварианты
@@ -37,6 +38,8 @@ flowchart LR
 - Один и тот же content hash идемпотентен; изменение значимых полей закрывает предыдущую SCD2-версию.
 - `source_published_at`, `observed_at` и `ingested_at` — разные поля и не подменяют друг друга.
 - Unknown сохраняется явно. Парсер не угадывает валюту, deadline, winner или crosswalk классификатора.
+- Organization identity source-scoped: точное нормализованное имя переиспользуется внутри source, но
+  межисточниковый merge требует отдельного устойчивого identifier/evidence.
 - Запуск по умолчанию ≤100 records/source, hard limit ≤500; полная выгрузка требует нового решения.
 - LLM не создаёт facts: его claims имеют prompt/model/input hash, citations и validation status.
 - Все внешние URL зафиксированы adapter config; пользователь не может превратить ingestion в SSRF.
@@ -86,8 +89,11 @@ flowchart LR
 - HTTP source timeout — 30 секунд на запрос; повтор возможен только для idempotent read с bounded backoff.
 - `0 records` допустим только вместе с подтверждённым успешным source response и параметрами запроса.
 - Partial record не удаляется, но его validation issues и недоступные поля видны downstream.
-- Alert dispatcher MVP — идемпотентный канал `in_app`; email/webhook destinations пока не определены.
+- Alert dispatcher всегда создаёт идемпотентный `in_app` event. Опциональный HTTPS webhook отправляет
+  тот же snapshot со стабильным `Idempotency-Key`; каждая попытка сохраняет только destination hash,
+  HTTP status/error class и retry state, без URL и response body.
 
 ## Значимые решения
 
 - [ADR-001: platform and data boundaries](decisions/ADR-001-platform-and-data-boundaries.md).
+- [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md).

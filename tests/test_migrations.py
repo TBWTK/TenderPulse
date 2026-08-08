@@ -18,9 +18,13 @@ def test_initial_migration_creates_lineage_schema(tmp_path: Path) -> None:
     assert {
         "alembic_version",
         "ai_extraction_attempts",
+        "alert_delivery_attempts",
         "alert_events",
         "company_profiles",
         "ingestion_runs",
+        "organization_aliases",
+        "organizations",
+        "procurement_organization_links",
         "procurement_records",
         "procurement_versions",
         "raw_artifacts",

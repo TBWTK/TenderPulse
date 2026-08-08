@@ -22,6 +22,7 @@ from tenderpulse.domain.matching import Recommendation, TenderMatcher
 from tenderpulse.domain.models import LifecycleStatus, ProcurementRecord, RecordKind, SourceCode
 from tenderpulse.ingestion_models import IngestionRunView, SourceFreshnessView
 from tenderpulse.live_ingestion import LiveSourceResult
+from tenderpulse.outcomes import AwardOutcomeView
 from tenderpulse.persistence.ai_repository import AIExtractionRepository
 from tenderpulse.persistence.alert_repository import AlertRepository
 from tenderpulse.persistence.ingestion_repository import IngestionRepository
@@ -234,6 +235,10 @@ def create_app(
     def source_freshness(session: SessionDep) -> tuple[SourceFreshnessView, ...]:
         return IngestionRepository(session).source_freshness(now=now())
 
+    @app.get("/api/analytics/award-outcomes", response_model=list[AwardOutcomeView])
+    def award_outcomes(session: SessionDep) -> tuple[AwardOutcomeView, ...]:
+        return ProcurementRepository(session).list_award_outcomes()
+
     @app.post("/api/alerts/sync/{profile_slug}", response_model=list[AlertView])
     def sync_alerts(profile_slug: str, session: SessionDep) -> tuple[AlertView, ...]:
         try:
@@ -301,6 +306,7 @@ def create_app(
             "freshness": IngestionRepository(session).source_freshness(now=now()),
             "runs": IngestionRepository(session).list_runs(limit=6),
             "top_buyers": buyers.most_common(5),
+            "award_outcomes": repository.list_award_outcomes()[:5],
             "ai_enabled": evidence_generator is not None,
             "alerts": (
                 AlertRepository(session).list_for_profile(selected.slug) if selected else ()

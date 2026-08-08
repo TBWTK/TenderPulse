@@ -31,3 +31,7 @@ class Settings(BaseSettings):
     source_record_limit: int = Field(default=100, ge=1, le=500)
     ted_lookback_days: int = Field(default=14, ge=1, le=90)
     usa_lookback_days: int = Field(default=365, ge=1, le=731)
+
+    alert_webhook_url: SecretStr | None = None
+    alert_webhook_timeout_seconds: float = Field(default=10.0, ge=1.0, le=30.0)
+    alert_webhook_max_attempts: int = Field(default=5, ge=1, le=20)

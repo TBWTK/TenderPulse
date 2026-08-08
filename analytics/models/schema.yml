@@ -27,6 +27,54 @@ sources:
                     field: id
           - name: raw_sha256
             tests: [not_null]
+      - name: organizations
+        columns:
+          - name: id
+            tests: [not_null, unique]
+          - name: source
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [ted, eis, usaspending]
+          - name: normalized_name
+            tests: [not_null]
+      - name: organization_aliases
+        columns:
+          - name: id
+            tests: [not_null, unique]
+          - name: organization_id
+            tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('app', 'organizations')
+                    field: id
+      - name: procurement_organization_links
+        columns:
+          - name: id
+            tests: [not_null, unique]
+          - name: organization_id
+            tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('app', 'organizations')
+                    field: id
+          - name: record_version_id
+            tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('app', 'procurement_versions')
+                    field: id
+          - name: role
+            tests:
+              - accepted_values:
+                  arguments:
+                    values: [buyer, supplier]
+          - name: raw_sha256
+            tests: [not_null]
 
 models:
   - name: stg_current_procurement_records
@@ -48,4 +96,33 @@ models:
       - name: source
         tests: [not_null]
       - name: buyer_name
+        tests: [not_null]
+  - name: mart_award_outcomes
+    columns:
+      - name: outcome_key
+        tests: [not_null, unique]
+      - name: record_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('app', 'procurement_records')
+                field: id
+      - name: source
+        tests: [not_null]
+      - name: source_record_id
+        tests: [not_null]
+      - name: source_lot_id
+        tests: [not_null]
+      - name: raw_sha256
+        tests: [not_null]
+  - name: mart_organization_activity
+    columns:
+      - name: organization_id
+        tests: [not_null, unique]
+      - name: source
+        tests: [not_null]
+      - name: canonical_name
+        tests: [not_null]
+      - name: normalized_name
         tests: [not_null]

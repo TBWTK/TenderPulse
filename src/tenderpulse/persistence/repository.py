@@ -7,8 +7,16 @@ from sqlalchemy.orm import Session
 
 from tenderpulse.domain.history import ChangeKind, ChangeResult, RecordVersion
 from tenderpulse.domain.models import ProcurementRecord, SourceCode
+from tenderpulse.domain.organizations import (
+    display_organization_name,
+    normalize_organization_name,
+)
+from tenderpulse.outcomes import AwardOutcomeView, build_award_outcome
 from tenderpulse.persistence.models import (
     CompanyProfileRow,
+    OrganizationAliasRow,
+    OrganizationRow,
+    ProcurementOrganizationLinkRow,
     ProcurementRecordRow,
     ProcurementVersionRow,
 )
@@ -39,6 +47,29 @@ class ProcurementRepository:
             ProcurementRecord.model_validate(row.payload)
             for row in self._session.scalars(statement)
         )
+
+    def list_award_outcomes(self) -> tuple[AwardOutcomeView, ...]:
+        records = (record for record in self.list_current_records() if record.kind.value == "award")
+        return tuple(
+            sorted(
+                (build_award_outcome(record) for record in records),
+                key=lambda outcome: outcome.observed_at,
+                reverse=True,
+            )
+        )
+
+    def backfill_organization_links(self, *, at: datetime) -> int:
+        _require_aware(at)
+        created = 0
+        statement = select(ProcurementVersionRow).order_by(
+            ProcurementVersionRow.valid_from,
+            ProcurementVersionRow.record_id,
+            ProcurementVersionRow.version,
+        )
+        for version_row in self._session.scalars(statement):
+            record = ProcurementRecord.model_validate(version_row.payload)
+            created += self._sync_organizations(record, version_row, at=at)
+        return created
 
     def lineage(
         self,
@@ -142,6 +173,7 @@ class ProcurementRepository:
             version_row = self._new_version_row(record_row, record, 1, fingerprint, at)
             self._session.add(version_row)
             self._session.flush()
+            self._sync_organizations(record, version_row, at=at)
             return ChangeResult(ChangeKind.CREATED, self._to_version(version_row))
 
         current_statement = select(ProcurementVersionRow).where(
@@ -152,6 +184,7 @@ class ProcurementRepository:
         if current is None:
             raise RuntimeError(f"record {record.natural_key} has no current version")
         if current.canonical_fingerprint == fingerprint:
+            self._sync_organizations(record, current, at=at)
             return ChangeResult(ChangeKind.UNCHANGED, self._to_version(current))
         current_from = _aware(current.valid_from)
         if at <= current_from:
@@ -164,7 +197,91 @@ class ProcurementRepository:
         version_row = self._new_version_row(record_row, record, next_version, fingerprint, at)
         self._session.add(version_row)
         self._session.flush()
+        self._sync_organizations(record, version_row, at=at)
         return ChangeResult(ChangeKind.UPDATED, self._to_version(version_row))
+
+    def _sync_organizations(
+        self,
+        record: ProcurementRecord,
+        version_row: ProcurementVersionRow,
+        *,
+        at: datetime,
+    ) -> int:
+        created_links = 0
+        names: list[tuple[str, int, str]] = []
+        if record.buyer_name and record.buyer_name.strip():
+            names.append(("buyer", 0, record.buyer_name))
+        seen_suppliers: set[str] = set()
+        for supplier_name in record.supplier_names:
+            display = display_organization_name(supplier_name)
+            if display in seen_suppliers:
+                continue
+            seen_suppliers.add(display)
+            names.append(("supplier", len(seen_suppliers) - 1, display))
+
+        for role, ordinal, source_name in names:
+            display = display_organization_name(source_name)
+            normalized = normalize_organization_name(display)
+            organization = self._session.scalar(
+                select(OrganizationRow).where(
+                    OrganizationRow.source == record.source.value,
+                    OrganizationRow.normalized_name == normalized,
+                )
+            )
+            if organization is None:
+                organization = OrganizationRow(
+                    source=record.source.value,
+                    canonical_name=display,
+                    normalized_name=normalized,
+                    created_at=at,
+                )
+                self._session.add(organization)
+                self._session.flush()
+
+            alias = self._session.scalar(
+                select(OrganizationAliasRow).where(
+                    OrganizationAliasRow.organization_id == organization.id,
+                    OrganizationAliasRow.alias_name == display,
+                )
+            )
+            if alias is None:
+                alias = OrganizationAliasRow(
+                    organization_id=organization.id,
+                    alias_name=display,
+                    normalized_alias=normalized,
+                    created_at=at,
+                )
+                self._session.add(alias)
+                self._session.flush()
+
+            existing_link = self._session.scalar(
+                select(ProcurementOrganizationLinkRow).where(
+                    ProcurementOrganizationLinkRow.record_version_id == version_row.id,
+                    ProcurementOrganizationLinkRow.role == role,
+                    ProcurementOrganizationLinkRow.ordinal == ordinal,
+                )
+            )
+            if existing_link is None:
+                self._session.add(
+                    ProcurementOrganizationLinkRow(
+                        record_version_id=version_row.id,
+                        organization_id=organization.id,
+                        alias_id=alias.id,
+                        role=role,
+                        ordinal=ordinal,
+                        source_name=display,
+                        raw_sha256=record.evidence.raw_sha256,
+                    )
+                )
+                created_links += 1
+            elif (
+                existing_link.organization_id != organization.id
+                or existing_link.alias_id != alias.id
+                or existing_link.source_name != display
+                or existing_link.raw_sha256 != record.evidence.raw_sha256
+            ):
+                raise RuntimeError("organization link conflicts with immutable record version")
+        return created_links
 
     @staticmethod
     def _new_version_row(

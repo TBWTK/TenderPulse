@@ -35,8 +35,10 @@ TenderPulse превращает ограниченные, регулярно о
   и evidence каждого match.
 - Два синтетических демонстрационных профиля: IT/data-интегратор и поставщик медицинского/
   лабораторного оборудования. Они не представляют реальные компании.
-- Веб-интерфейс профиля, аналитики, рекомендаций и управляемой дозагрузки; idempotent in-app alerts
-  без автоматической подачи заявки. Email/webhook не входят в текущий локальный MVP.
+- Веб-интерфейс профиля, аналитики, рекомендаций и управляемой дозагрузки; idempotent in-app alerts и
+  opt-in HTTPS webhook с журналом попыток. Внешняя отправка выключена по умолчанию.
+- Source-scoped identity покупателей/поставщиков: исходные aliases и SCD2/raw evidence сохраняются;
+  одинаковое имя из разных источников не считается доказанным merge.
 
 ### Явно не входит в MVP
 
@@ -65,3 +67,4 @@ TenderPulse превращает ограниченные, регулярно о
 - [Модель угроз](SECURITY.md)
 - [Запуск и эксплуатация](RUNBOOK.md)
 - [ADR-001: platform and data boundaries](decisions/ADR-001-platform-and-data-boundaries.md)
+- [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md)

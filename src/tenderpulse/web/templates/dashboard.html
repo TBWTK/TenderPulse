@@ -155,6 +155,15 @@
             {% else %}<p class="muted-copy">История заказчиков появится после загрузки.</p>{% endfor %}
           </div>
           <p class="panel-note">Это наблюдаемая активность, не вероятность победы. Outcome-данные USAspending используются отдельно от active notices.</p>
+          <div class="outcome-list">
+            <div class="panel-head"><div><span class="eyebrow">Результаты</span><h3>Последние контракты</h3></div><span class="badge">raw linked</span></div>
+            {% for outcome in award_outcomes %}
+            <a class="outcome-row" href="{{ outcome.source_url }}" target="_blank" rel="noreferrer" title="raw SHA {{ outcome.raw_sha256 }}">
+              <span><b>{{ outcome.supplier_names|join(', ') if outcome.supplier_names else 'победитель unknown' }}</b><small>{{ outcome.buyer_name or 'заказчик unknown' }}</small></span>
+              <strong>{% if outcome.amount_status.value == 'found' %}{{ outcome.amount }} {{ outcome.currency }}{% else %}{{ outcome.amount_status.value }}{% endif %}</strong>
+            </a>
+            {% else %}<p class="muted-copy">Результаты появятся после bounded USAspending загрузки.</p>{% endfor %}
+          </div>
         </article>
 
         <article class="panel" id="loading">

@@ -66,6 +66,7 @@ select, input, textarea { color: var(--ink); background: white; border: 1px soli
 .alert-strip > div { padding: 7px; }.alert-strip > div strong { display: block; margin-top: 5px; font-size: 12px; }
 .alert-item { min-width: 0; padding: 10px 12px; text-align: left; color: var(--ink); background: var(--card); border: 0; border-left: 3px solid var(--coral); border-radius: 6px; cursor: pointer; }
 .alert-item.read { opacity: .58; border-left-color: var(--line); }.alert-item span { display: block; margin-bottom: 4px; color: var(--muted); font: 8px var(--mono); }.alert-item b { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 10px; }
+.outcome-list { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }.outcome-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; color: var(--ink); border-bottom: 1px solid var(--line); text-decoration: none; }.outcome-row span, .outcome-row small { display: block; }.outcome-row small { margin-top: 3px; color: var(--muted); }.outcome-row strong { white-space: nowrap; font-family: var(--mono); }
 .dot.recommended { background: var(--mint-strong); }.dot.review { margin-left: 8px; background: var(--amber); }
 .opportunity-list { display: grid; gap: 10px; }
 .opportunity { display: grid; grid-template-columns: 90px 1fr 150px; min-height: 196px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }

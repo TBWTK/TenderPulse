@@ -23,7 +23,8 @@ payloads, пользовательские файлы/поля, LLM output и UR
 | Prompt injection | source text is data, no LLM tools, structured schema and citations | semantic manipulation remains possible |
 | Poisoned/changed source | raw hash, source locator, SCD2 diff, validation issues | source itself may publish wrong facts |
 | Cross-company leakage | local single-tenant MVP; no public deployment | missing auth/RBAC blocks public use |
-| Alert duplication | transactional outbox + idempotency key | channel-specific delivery ambiguity |
+| Alert duplication | transactional outbox + stable webhook `Idempotency-Key` + attempt history | receiver must implement deduplication |
+| Webhook secret/SSRF | opt-in config only, HTTPS validation, destination stored only as SHA-256, no response body | host operator controls egress target; query-token rotation is external |
 | XML entity attack | DTD/entity resolution disabled, ZIP size/member limits | parser/library vulnerabilities |
 
 ## Deployment boundary

@@ -6,8 +6,10 @@ import threading
 from collections.abc import Callable
 from typing import Protocol
 
+import httpx
 from sqlalchemy import select
 
+from tenderpulse.alert_delivery import WebhookAlertDispatcher, WebhookDeliveryView
 from tenderpulse.alerts import AlertService
 from tenderpulse.ingestion import IngestionCoordinator
 from tenderpulse.live_ingestion import LiveIngestionService
@@ -49,8 +51,9 @@ def main() -> None:
     signal.signal(signal.SIGTERM, request_stop)
     signal.signal(signal.SIGINT, request_stop)
     logger.info(
-        "worker_started live_ingestion_enabled=%s interval_seconds=%s",
+        "worker_started live_ingestion_enabled=%s webhook_enabled=%s interval_seconds=%s",
         settings.live_ingestion_enabled,
+        settings.alert_webhook_url is not None,
         settings.ingestion_interval_seconds,
     )
 
@@ -69,15 +72,28 @@ def main() -> None:
     def run_cycle() -> None:
         with factory() as session:
             session.execute(select(1))
-        if service is None:
-            raise RuntimeError("live ingestion service missing while scheduler is enabled")
-        results = service.run_cycle(
-            limit=settings.source_record_limit,
-            ted_lookback_days=settings.ted_lookback_days,
-            usa_lookback_days=settings.usa_lookback_days,
+        results = (
+            service.run_cycle(
+                limit=settings.source_record_limit,
+                ted_lookback_days=settings.ted_lookback_days,
+                usa_lookback_days=settings.usa_lookback_days,
+            )
+            if service is not None
+            else ()
         )
         with factory.begin() as session:
             new_alerts = AlertService(session, now=utc_now).sync_all()
+            webhook_deliveries: tuple[WebhookDeliveryView, ...] = ()
+            if settings.alert_webhook_url is not None:
+                with httpx.Client() as client:
+                    webhook_deliveries = WebhookAlertDispatcher(
+                        session,
+                        client=client,
+                        webhook_url=settings.alert_webhook_url.get_secret_value(),
+                        now=utc_now,
+                        max_attempts=settings.alert_webhook_max_attempts,
+                        timeout_seconds=settings.alert_webhook_timeout_seconds,
+                    ).dispatch_pending()
         for result in results:
             logger.info(
                 "ingestion_cycle source=%s status=%s run_id=%s record_count=%s error_code=%s",
@@ -88,9 +104,16 @@ def main() -> None:
                 result.error_code,
             )
         logger.info("alert_sync new_deliveries=%s", len(new_alerts))
+        if settings.alert_webhook_url is not None:
+            logger.info(
+                "webhook_alert_dispatch attempts=%s delivered=%s failed=%s",
+                len(webhook_deliveries),
+                sum(delivery.status == "delivered" for delivery in webhook_deliveries),
+                sum(delivery.status == "failed" for delivery in webhook_deliveries),
+            )
 
     run_scheduled_loop(
-        enabled=settings.live_ingestion_enabled,
+        enabled=settings.live_ingestion_enabled or settings.alert_webhook_url is not None,
         interval_seconds=settings.ingestion_interval_seconds,
         stopped=stopped,
         run_cycle=run_cycle,

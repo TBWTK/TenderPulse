@@ -7,6 +7,7 @@ from alembic import command
 from alembic.config import Config
 
 from tenderpulse.bootstrap import seed_demo
+from tenderpulse.persistence.repository import ProcurementRepository
 from tenderpulse.runtime import create_database, create_raw_store, utc_now
 from tenderpulse.settings import Settings
 
@@ -29,6 +30,9 @@ def _project_root() -> Path:
 
 def init_db(settings: Settings) -> None:
     command.upgrade(_alembic_config(settings.database_url), "head")
+    _, factory = create_database(settings)
+    with factory.begin() as session:
+        ProcurementRepository(session).backfill_organization_links(at=utc_now())
 
 
 def seed(settings: Settings) -> None:

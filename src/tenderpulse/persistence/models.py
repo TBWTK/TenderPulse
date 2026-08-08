@@ -85,6 +85,50 @@ class ProcurementVersionRow(Base):
     procurement_record: Mapped[ProcurementRecordRow] = relationship(back_populates="versions")
 
 
+class OrganizationRow(Base):
+    __tablename__ = "organizations"
+    __table_args__ = (UniqueConstraint("source", "normalized_name"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    source: Mapped[str] = mapped_column(String(32), index=True)
+    canonical_name: Mapped[str] = mapped_column(String(1024))
+    normalized_name: Mapped[str] = mapped_column(String(1024), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class OrganizationAliasRow(Base):
+    __tablename__ = "organization_aliases"
+    __table_args__ = (UniqueConstraint("organization_id", "alias_name"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    alias_name: Mapped[str] = mapped_column(String(1024))
+    normalized_alias: Mapped[str] = mapped_column(String(1024), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ProcurementOrganizationLinkRow(Base):
+    __tablename__ = "procurement_organization_links"
+    __table_args__ = (UniqueConstraint("record_version_id", "role", "ordinal"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    record_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("procurement_versions.id", ondelete="CASCADE"), index=True
+    )
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="RESTRICT"), index=True
+    )
+    alias_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization_aliases.id", ondelete="RESTRICT"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(32), index=True)
+    ordinal: Mapped[int] = mapped_column(Integer)
+    source_name: Mapped[str] = mapped_column(String(1024))
+    raw_sha256: Mapped[str] = mapped_column(String(64), index=True)
+
+
 class CompanyProfileRow(Base):
     __tablename__ = "company_profiles"
     __table_args__ = (UniqueConstraint("slug", "version"),)
@@ -137,3 +181,25 @@ class AlertEventRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AlertDeliveryAttemptRow(Base):
+    __tablename__ = "alert_delivery_attempts"
+    __table_args__ = (
+        UniqueConstraint("alert_event_id", "channel", "destination_sha256", "attempt_number"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    alert_event_id: Mapped[UUID] = mapped_column(
+        ForeignKey("alert_events.id", ondelete="CASCADE"), index=True
+    )
+    channel: Mapped[str] = mapped_column(String(32), index=True)
+    destination_sha256: Mapped[str] = mapped_column(String(64), index=True)
+    attempt_number: Mapped[int] = mapped_column(Integer)
+    idempotency_key: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    retryable: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

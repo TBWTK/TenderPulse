@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import Select
 
 from tenderpulse.alert_models import AlertView
 from tenderpulse.domain.matching import Recommendation
@@ -87,21 +88,17 @@ class AlertRepository:
 
     def list_for_profile(self, profile_slug: str) -> tuple[AlertView, ...]:
         statement = (
-            select(
-                AlertEventRow,
-                CompanyProfileRow,
-                ProcurementVersionRow,
-                ProcurementRecordRow,
-            )
-            .join(CompanyProfileRow, AlertEventRow.profile_id == CompanyProfileRow.id)
-            .join(
-                ProcurementVersionRow,
-                AlertEventRow.record_version_id == ProcurementVersionRow.id,
-            )
-            .join(ProcurementRecordRow, ProcurementVersionRow.record_id == ProcurementRecordRow.id)
+            self._context_statement()
             .where(CompanyProfileRow.slug == profile_slug)
             .order_by(AlertEventRow.created_at.desc(), AlertEventRow.id)
         )
+        return tuple(
+            self._to_view(alert, profile, version, record)
+            for alert, profile, version, record in self._session.execute(statement).all()
+        )
+
+    def list_all(self) -> tuple[AlertView, ...]:
+        statement = self._context_statement().order_by(AlertEventRow.created_at, AlertEventRow.id)
         return tuple(
             self._to_view(alert, profile, version, record)
             for alert, profile, version, record in self._session.execute(statement).all()
@@ -122,7 +119,15 @@ class AlertRepository:
     ) -> (
         tuple[AlertEventRow, CompanyProfileRow, ProcurementVersionRow, ProcurementRecordRow] | None
     ):
-        statement = (
+        statement = self._context_statement().where(AlertEventRow.id == alert_id)
+        result = self._session.execute(statement).one_or_none()
+        return result._tuple() if result is not None else None
+
+    @staticmethod
+    def _context_statement() -> Select[
+        tuple[AlertEventRow, CompanyProfileRow, ProcurementVersionRow, ProcurementRecordRow]
+    ]:
+        return (
             select(
                 AlertEventRow,
                 CompanyProfileRow,
@@ -135,10 +140,7 @@ class AlertRepository:
                 AlertEventRow.record_version_id == ProcurementVersionRow.id,
             )
             .join(ProcurementRecordRow, ProcurementVersionRow.record_id == ProcurementRecordRow.id)
-            .where(AlertEventRow.id == alert_id)
         )
-        result = self._session.execute(statement).one_or_none()
-        return result._tuple() if result is not None else None
 
     @staticmethod
     def _to_view(

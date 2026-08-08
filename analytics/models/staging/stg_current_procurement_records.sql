@@ -7,6 +7,8 @@ select
     v.payload ->> 'lifecycle' as lifecycle,
     v.payload ->> 'title' as title,
     v.payload ->> 'buyer_name' as buyer_name,
+    v.payload -> 'supplier_names' as supplier_names,
+    v.payload -> 'lots' as lots,
     nullif(v.payload ->> 'published_at', '')::timestamptz as published_at,
     (v.payload ->> 'observed_at')::timestamptz as observed_at,
     nullif(v.payload ->> 'deadline_at', '')::timestamptz as deadline_at,

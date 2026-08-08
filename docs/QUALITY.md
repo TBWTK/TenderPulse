@@ -18,6 +18,12 @@ updated: 2026-08-08
 - [x] GigaChat malformed output/unsupported citations fail validation and known transport failures remain visible.
 - [x] Empty requirement/deadline categories carry explicit `found`/`not_present`/`unknown` coverage status.
 - [x] A validated AI result is cached by record/input/prompt/model and reconstructable from stored hashes.
+- [x] Buyer/supplier normalization is source-scoped, preserves aliases/raw/version links and backfills all
+  existing SCD2 versions without guessing cross-source identity.
+- [x] Award outcome projection exposes buyer, winner, amount/currency and raw evidence; partial or
+  mixed-currency lots do not become a false total.
+- [x] Opt-in webhook uses a stable idempotency key, retries only retryable failures and stores attempts
+  without destination URL or response body.
 
 ## Regression gates
 
@@ -29,6 +35,7 @@ updated: 2026-08-08
 - [x] Server-rendered dashboard and API product flows pass integration tests; browser visual QA was not requested.
 - [x] Live TED/USA/GigaChat smokes are bounded and record no secret values; live EIS remains blocked.
 - [x] In-app alert replay is idempotent and new record/profile versions produce distinct events.
+- [x] Alembic `0004..0005`, organization/outcome marts and 48 dbt data tests pass on Docker PostgreSQL.
 
 ## Verification commands
 

@@ -17,14 +17,16 @@ updated: 2026-08-08
 | Procurement record | общий lifecycle container | normalizer | UUID + source natural key |
 | Notice version | SCD2-снимок notice | normalizer | record UUID + version number |
 | Lot | предмет, CPV/OKPD2/PSC, сумма, deadline | normalizer | source lot ID or explicit synthetic key |
-| Organization | buyer/supplier identity | identity service | UUID |
-| Organization alias/identifier | исходное имя, INN/UEI/VAT и evidence | identity service | UUID |
+| Organization | source-scoped buyer/supplier identity | identity projection | UUID + source + normalized name |
+| Organization alias | исходная форма имени | identity projection | UUID + organization + alias |
+| Procurement organization link | роль/порядок и raw evidence конкретной SCD2-версии | identity projection | record version + role + ordinal |
 | Award | результат, winner, amount, dates | normalizer | source award ID |
 | Company profile | capabilities, codes, geography, constraints | company service | UUID + version |
 | AI extraction attempt | validated/rejected/failed claims + model/prompt/hashes | extraction service | UUID + record version |
 | Recommendation | score, decision, gaps and freshness | matcher | profile version + record version |
 | Match evidence | feature, weight, value, citation | matcher | UUID |
 | Alert event | idempotent in-app delivery snapshot | dispatcher | profile version + record version + channel + policy |
+| Alert delivery attempt | webhook status/retry evidence without destination/response content | dispatcher | alert + destination hash + attempt |
 
 ## Lifecycle и версии
 
@@ -42,6 +44,10 @@ updated: 2026-08-08
    статус `validated` только после проверки schema, coverage status и verbatim citations.
 9. In-app alert создаётся один раз на сочетание profile version, record version, channel и policy version;
    `read_at` меняет только состояние inbox, но не recommendation evidence.
+10. Buyer/supplier alias создаёт source-scoped organization и immutable link к record version/raw SHA.
+    Штатный `init-db` идемпотентно backfill-ит ссылки для уже существующей истории.
+11. Webhook attempt использует стабильный idempotency key. `2xx` завершает delivery; transport/429/5xx
+    допускают bounded retry, остальные `4xx` остаются terminal failed.
 
 `source_published_at` принадлежит источнику, `observed_at` — момент видимости ответу adapter-а,
 `ingested_at` — commit в TenderPulse. Freshness считается по всем трём и показывает unknown отдельно.
@@ -55,7 +61,8 @@ updated: 2026-08-08
 - GigaChat claim хранит model, prompt version, input hash, output hash, citations и validation result.
 - CPV, ОКПД2 и PSC не считаются эквивалентными. Crosswalk — отдельный versioned evidence set; при его
   отсутствии используются независимые profile tags/keywords с явным меньшим confidence.
-- Organization merge без устойчивого identifier остаётся `candidate`; совпадение имени не является фактом.
+- Organization merge между source без устойчивого identifier не выполняется; совпадение имени остаётся
+  только кандидатом для будущего evidence-backed resolution.
 
 ## Data flow
 

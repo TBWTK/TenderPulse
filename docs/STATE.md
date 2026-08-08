@@ -9,25 +9,29 @@ updated: 2026-08-08
 
 ## Active objective
 
-Закрыть Quality & handoff: подтвердить, что документация совпадает с работающим Docker MVP,
-зафиксировать оставшиеся ограничения и создать воспроизводимый Git checkpoint в `origin/main`.
+Закрыть сквозной normalization/outcomes/alerts slice: сделать source-scoped SSOT покупателей и
+поставщиков, показать прослеживаемые результаты контрактов и подготовить opt-in внешний alert delivery,
+не ослабляя bounded ingestion и правило explicit unknown.
 
 ## Acceptance criteria
 
-- [x] Full pytest/coverage, Ruff, mypy, dbt, Compose health и project-control gates проходят после
-  последней миграции и EIS upload projection.
-- [x] Live TED, USAspending и GigaChat evidence smokes имеют bounded параметры и сохранённый audit trail.
-- [x] `.env` и credentials исключены из Git; staged files проходят secret-pattern audit.
-- [x] Runbook, state, roadmap, data/security/quality docs совпадают с фактическими API и Docker defaults.
-- [ ] Git checkpoint создан и отправлен в пустой `origin/main` без force/перезаписи чужой истории.
+- [x] Buyer/supplier aliases нормализуются одним модулем, сохраняют source/raw/version evidence и не
+  объединяются между источниками без устойчивого identifier.
+- [x] Current award outcomes доступны через API, dbt mart и dashboard с winner, amount/currency, buyer и
+  raw SHA; отсутствующие или конфликтующие суммы остаются явно unknown/conflicting.
+- [x] Внешний webhook alert выключен по умолчанию, использует idempotency key и сохраняет отдельные
+  delivered/failed attempts без response body или secret destination.
+- [x] Full pytest/coverage, Ruff, mypy, dbt, Compose health и project-control gates проходят после новых
+  миграций; документация совпадает с реализацией.
+- [ ] Локальный Git checkpoint создан; отправка в `origin/main` выполнена только после явного разрешения.
 
 ## Current verified state
 
 - Foundation vertical slice реализован: immutable content-addressed raw, ingestion runs, canonical records,
   SCD2 versions, два профиля, matcher, lineage/recommendations API, Alembic, dbt и Docker Compose.
-- `pytest`: 79 passed, branch coverage 86.16%; Ruff format/lint и strict mypy прошли 08.08.2026.
+- `pytest`: 89 passed, branch coverage 86.79%; Ruff format/lint и strict mypy прошли 08.08.2026.
 - Docker health подтверждён для API, worker, PostgreSQL/pgvector и MinIO; init migration/seed завершился с 0.
-- dbt 1.12: 3 models + 18 data tests, `PASS=21 WARN=0 ERROR=0` на PostgreSQL Docker.
+- dbt 1.12: 5 models + 48 data tests, `PASS=53 WARN=0 ERROR=0` на PostgreSQL Docker.
 - GigaChat evidence v2 реализован через forced function call и явные coverage statuses; все claims требуют
   verbatim citation из canonical evidence fields. Validated/rejected/failed attempts сохраняются отдельно.
 - 08.08.2026 live GigaChat smoke на TED `497954-2026` прошёл с TLS verification: модель
@@ -35,11 +39,18 @@ updated: 2026-08-08
 - TED/USAspending live transport связан с scheduler и ручным allowlisted API. Два одинаковых TED
   запуска дали один raw hash и оставили `records=6/current_versions=6/total_versions=6`.
 - USAspending bounded live cycle сохранил 2 awards; TED bounded cycle сохранил 2 notices.
-- Server-rendered dashboard на `127.0.0.1:8010` вернул HTTP 200 (20 508 bytes), показывает два профиля,
-  recommendations, freshness, buyer activity, controls, AI evidence и in-app alerts.
+- Server-rendered dashboard на `127.0.0.1:8010` вернул HTTP 200 (22 461 bytes), показывает два профиля,
+  recommendations, freshness, buyer/outcome analytics, controls, AI evidence и in-app alerts.
 - ЕИС manual fallback принимает XML/ZIP до 10 MiB, ограничивает members/uncompressed bytes/records,
   отклоняет DTD/ENTITY/path traversal и связывает records с hash всего загруженного package.
-- Alembic migrations `0001..0003` создают lineage, AI attempts и idempotent in-app alert outbox.
+- Alembic migrations `0001..0005` создают lineage, AI attempts, organization identity, in-app outbox и
+  webhook delivery attempts. Текущий Docker revision — `0005_webhook_alert_delivery`.
+- Organization backfill на существующем PostgreSQL создал 10 source-scoped entities и 11 links по всем
+  сохранённым версиям; повторный запуск идемпотентен.
+- `GET /api/analytics/award-outcomes` вернул три реальных USAspending awards с buyer, winner,
+  amount/currency, source URL и raw SHA; dashboard показывает тот же current projection.
+- Webhook dispatcher проверен через HTTP mock: `2xx`, retryable `503`, replay и URL validation; реальная
+  внешняя отправка не выполнялась, `ALERT_WEBHOOK_URL` по умолчанию не задан.
 - Project-control data profile создан; локальный root commit `2e6f1df` создан на `main` после staged secret
   audit. Push в `origin/main` ожидает отдельного явного разрешения на внешний data egress.
 - 08.08.2026 официальный TED v3 smoke вернул актуальные records с provenance links; endpoint
@@ -57,6 +68,10 @@ updated: 2026-08-08
   service, API endpoints, settings и Docker live verification.
 - Product projection: profile version API, responsive dashboard, analytics/freshness, live/manual loading,
   safe EIS upload, alert outbox/read state, migration `0003` и integration tests.
+- Identity/outcome projection: единый Unicode normalizer, aliases/version links, historical backfill,
+  award API/UI и dbt marts, миграция `0004` и ADR-002.
+- Delivery projection: opt-in HTTPS webhook, stable idempotency key, bounded retry/audit, настройки,
+  runbook/security projection и миграция `0005`.
 - `certs/russian_trusted_root_ca_pem.crt`: проверенный локальный CA bundle для opt-in интеграций.
 
 ## Decisions made
@@ -64,11 +79,12 @@ updated: 2026-08-08
 - USAspending используется как outcome/history enrichment, не как источник активных notices.
 - MVP использует hybrid lakehouse: immutable S3 raw + PostgreSQL/pgvector canonical/serving + dbt marts.
 - Source-specific payloads не протекают в matching/API; downstream читает canonical model.
+- Межисточниковая organization identity не выводится из совпадения имени; решение закреплено в ADR-002.
 
 ## Next exact step
 
-После явного разрешения пользователя выполнить `git push -u origin main`, проверить remote ref и закрыть
-Quality & handoff checkpoint.
+Создать локальный Git checkpoint после staged secret audit. Push в `origin/main` остаётся отдельным
+внешним действием и выполняется только после явного разрешения пользователя.
 
 ## Blockers
 

@@ -23,7 +23,8 @@ Web/API доступен только на `http://127.0.0.1:8010`; PostgreSQL �
 
 Init container применяет все Alembic migrations, загружает три небольших demo fixtures, два
 синтетических профиля и создаёт in-app alerts. Повторный init идемпотентен для canonical versions и
-alerts, но сохраняет новый ingestion run как свидетельство повтора.
+alerts, но сохраняет новый ingestion run как свидетельство повтора. После migrations он также
+идемпотентно восстанавливает organization links для всех ранее сохранённых SCD2-версий.
 
 ## Управление данными
 
@@ -33,6 +34,7 @@ alerts, но сохраняет новый ingestion run как свидетел
 - Manual ЕИС: `POST /api/ingestion/eis-upload`, `.xml`/`.zip`, максимум 10 MiB. ZIP ограничен 50
   members, 20 MiB uncompressed и 500 records; DTD/ENTITY и unsafe paths запрещены.
 - Runs/freshness: `GET /api/ingestion/runs`, `GET /api/analytics/source-freshness`.
+- Результаты контрактов: `GET /api/analytics/award-outcomes`; winner/amount имеют явный coverage status.
 - Lineage: `GET /api/records/{source}/{source_record_id}/lineage`.
 
 Для регулярного TED/USA цикла:
@@ -47,6 +49,22 @@ USA_LOOKBACK_DAYS=365
 
 Worker выполняет первый цикл сразу после старта, затем ждёт interval. При `false` внешних source
 вызовов нет. Live ЕИС scheduler отсутствует: официальный transport/layout не подтверждён.
+
+## Alerts
+
+In-app outbox работает всегда и не вызывает внешние системы. Для opt-in доставки задайте:
+
+```dotenv
+ALERT_WEBHOOK_URL=https://internal.example/tenderpulse
+ALERT_WEBHOOK_TIMEOUT_SECONDS=10
+ALERT_WEBHOOK_MAX_ATTEMPTS=5
+```
+
+Разрешён только HTTPS URL без embedded credentials и fragment. При заданном URL worker запускается
+даже если live ingestion выключен, отправляет pending alerts со стабильным `Idempotency-Key` и повторяет
+только transport/429/5xx failures. БД хранит destination SHA-256, HTTP status и error class; URL,
+response body и возможный token из query string в audit/log не записываются. Получатель обязан уважать
+`Idempotency-Key`, потому что сбой между HTTP 2xx и DB commit может привести к повторной попытке.
 
 ## GigaChat
 
@@ -69,4 +87,5 @@ docker compose down
 
 `docker compose down` сохраняет named volumes. Удаление volumes не входит в обычную остановку и
 является destructive operation. До public deployment обязательны auth/RBAC, CSRF, tenant isolation,
-durable command queue, backup/restore test и внешний alert channel.
+durable command queue и backup/restore test. Для публичного webhook дополнительно нужны egress allowlist,
+destination rotation procedure и receiver authentication policy.
