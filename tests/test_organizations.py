@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from tenderpulse.domain.history import ChangeKind
 from tenderpulse.domain.models import ProcurementRecord, SourceCode
 from tenderpulse.domain.organizations import normalize_organization_name
 from tenderpulse.persistence.models import (
@@ -96,6 +98,37 @@ def test_organization_links_preserve_version_and_role_evidence(
         ("supplier", "Backup Supplier LLC"),
     ]
     assert all(link.raw_sha256 == it_notice.evidence.raw_sha256 for link in links)
+
+
+def test_canonical_replay_with_new_raw_keeps_original_version_link_evidence(
+    it_notice: ProcurementRecord,
+) -> None:
+    session = _session()
+    repository = ProcurementRepository(session)
+    first_at = datetime(2026, 8, 8, tzinfo=UTC)
+    replay_at = datetime(2026, 8, 9, tzinfo=UTC)
+    repository.apply_records((it_notice,), at=first_at)
+    replay = it_notice.model_copy(
+        update={
+            "observed_at": replay_at,
+            "evidence": it_notice.evidence.model_copy(
+                update={
+                    "raw_sha256": "b" * 64,
+                    "ingestion_run_id": UUID("00000000-0000-0000-0000-000000000002"),
+                }
+            ),
+        }
+    )
+
+    result = repository.apply_records((replay,), at=replay_at)[0]
+    session.commit()
+
+    links = tuple(session.scalars(select(ProcurementOrganizationLinkRow)))
+    lineage = repository.lineage(it_notice.source, it_notice.source_record_id)
+    assert result.kind is ChangeKind.UNCHANGED
+    assert len(lineage) == 1
+    assert lineage[0].record.evidence.raw_sha256 == it_notice.evidence.raw_sha256
+    assert [link.raw_sha256 for link in links] == [it_notice.evidence.raw_sha256]
 
 
 def test_backfill_repairs_links_for_every_existing_scd2_version(

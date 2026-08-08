@@ -344,6 +344,7 @@ def test_dashboard_renders_product_data(it_notice: ProcurementRecord) -> None:
     assert 'name="countries"' in response.text
     assert 'name="min_amount"' in response.text
     assert 'name="max_amount"' in response.text
+    assert "текущих версий обоих профилей" in response.text
 
 
 def test_dashboard_renders_persisted_ai_requirements_deadlines_and_citations(

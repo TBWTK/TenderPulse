@@ -9,29 +9,29 @@ updated: 2026-08-08
 
 ## Active objective
 
-Закрыть product-input/evidence slice: дать компании полноценно описывать оба MVP-профиля через UI,
-сохранять каждое изменение новой версией и показывать извлечённые GigaChat requirements/deadlines с
-coverage status, gaps и citations непосредственно в рекомендации.
+Устранить последний SSOT-разрыв поиска: следующий manual/scheduled live-ingestion должен строить
+bounded TED/USAspending query из текущих активных версий двух профилей в PostgreSQL, а не из
+скомпилированного demo seed, и сохранять эти фильтры в provenance ingestion run.
 
 ## Acceptance criteria
 
-- [x] Dashboard редактирует name, capabilities, keywords, CPV/OKPD2/PSC prefixes, countries и budget
-  bounds для каждого из ровно двух профилей; PUT создаёт следующую immutable version.
-- [x] Company-profile contract нормализует whitespace/case, удаляет дубликаты и явно отклоняет пустые
-  capabilities/keywords, неизвестные classification systems, неверные country codes и budget range.
-- [x] Изменённый профиль немедленно влияет на deterministic recommendations и создаёт отдельный alert
-  snapshot только для новой profile version.
-- [x] Последний AI extraction attempt для current record version отображается в dashboard: status,
-  requirements/deadlines coverage, claims, gaps и verbatim citations; reload не теряет evidence.
-- [x] UI обновляет evidence безопасными DOM text nodes; full regression/dbt/Compose и server-rendered/API
-  QA проходят, документация согласована. In-app browser не открыл loopback из-за client policy, поэтому
-  его визуальный smoke заменён проверяемыми HTML/API/asset-контрактами и не считается product evidence.
+- [x] `LiveIngestionService` получает ровно две текущие active profile versions через DB-backed provider;
+  demo seed не является runtime authority после bootstrap.
+- [x] TED CPV prefixes и USAspending keywords следующего цикла отражают profile update без рестарта API
+  или worker; union детерминированно дедуплицирован.
+- [x] Неожиданное число/дубликаты active profiles останавливают цикл до внешнего fetch с явной ошибкой.
+- [x] Persisted ingestion-run parameters содержат фактически использованные profile-driven filters,
+  поэтому область поиска можно восстановить вместе с raw SHA и run ID.
+- [x] Canonically unchanged record из нового raw response не перепривязывает immutable version и
+  organization links к другому SHA; новый run/raw остаётся отдельным свидетельством replay.
+- [ ] Full regression, dbt, Docker runtime, project-control audit, документация и локальный Git checkpoint
+  согласованы; первая публикация в `origin/main` остаётся отдельным approval-gated действием.
 
 ## Current verified state
 
 - Foundation vertical slice реализован: immutable content-addressed raw, ingestion runs, canonical records,
   SCD2 versions, два профиля, matcher, lineage/recommendations API, Alembic, dbt и Docker Compose.
-- `pytest`: 115 passed, branch coverage 86.49%; Ruff format/lint и strict mypy прошли 08.08.2026.
+- `pytest`: 121 passed, branch coverage 86.57%; Ruff format/lint и strict mypy прошли 08.08.2026.
 - Docker health подтверждён для API, worker, PostgreSQL/pgvector и MinIO; init migration/seed завершился с 0.
 - dbt 1.12: 5 models + 48 data tests, `PASS=53 WARN=0 ERROR=0` на PostgreSQL Docker.
 - GigaChat evidence v2 реализован через forced function call и явные coverage statuses; все claims требуют
@@ -53,6 +53,17 @@ coverage status, gaps и citations непосредственно в реком�
   v3; второй `init` также сохранил v3 вместо реактивации seed v1.
 - Dashboard runtime smoke после schema upgrade показал TED `497954-2026` с сохранёнными coverage
   `requirements: unknown` и `deadlines: found`, без server error и потери citations при reload.
+- Profile-driven Docker smoke без рестарта переключил scope с temporary `it-data-integrator` v4
+  (`CPV=[99,33,38]`, USA keywords начинаются с `quantum`, profile versions `4/1`) на восстановленную v5
+  (`CPV=[48,72,33,38]`, исходные keyword unions, versions `5/1`). V5 run IDs:
+  TED `0ddcce68-8b02-4a59-b778-2a70c61a7868`, USA `3f1c9f81-0e24-4aa1-96b0-5627748d88dc`;
+  оба succeeded с limit 1 и raw SHA, все четыре Compose services healthy.
+- Первый v4 TED request с намеренно неподдержанным CPV `99` сохранился как typed `ted_http_400`, в то
+  время как USA того же цикла succeeded; источник не превратил ошибку в пустой success.
+- PostgreSQL completion audit после smoke: 11 ЕИС + 5 TED current notices, 3 USA awards; 19/19 records
+  имеют lots, 5 classifications, 16 geography; 18 organizations/18 aliases, 19 buyer + 3 supplier links,
+  2 validated AI attempts и 6 delivered alerts. dbt marts содержат 3 freshness, 15 buyer, 3 outcome и
+  18 organization rows; active profiles ровно `it-data-integrator:v5` и `medlab-supplier:v1`.
 - ЕИС live connector читает официальный RSS одной страницы (44-ФЗ, ≤50 records, ≤31 days) через
   проверенную root + issuing CA цепочку. Manual fallback принимает XML/ZIP до 10 MiB, ограничивает
   members/uncompressed bytes/records и связывает records с hash всего package.
@@ -98,6 +109,8 @@ coverage status, gaps и citations непосредственно в реком�
 - Product-input/evidence projection: полный versioned profile editor, нормализация/валидация matching
   input, seed-preservation invariant, current-record evidence cards, safe DOM rendering и миграция `0006`.
 - Analytics config projection: dbt default port contract-tested against Docker Compose (`5433`).
+- Search-scope projection: DB-backed current-profile provider для API/worker, profile versions в run
+  provenance и immutable organization-link replay semantics при новом raw envelope.
 - `certs/russian_trusted_root_ca_pem.crt` и `certs/russian_trusted_sub_ca_pem.crt`: проверенная локальная
   TLS chain для GigaChat/ЕИС без `verify=false`.
 
@@ -112,8 +125,8 @@ coverage status, gaps и citations непосредственно в реком�
 
 ## Next exact step
 
-После явного разрешения пользователя отправить накопленные commits в `origin/main`, проверить remote
-SHA и закрыть Quality & handoff stage.
+Выполнить project-control audit и staged secret scan, сохранить profile-driven ingestion slice локальным
+Git checkpoint; затем ждать явного разрешения на первую публикацию `origin/main`.
 
 ## Blockers
 
@@ -125,6 +138,8 @@ SHA и закрыть Quality & handoff stage.
 - Production auth/RBAC, автоматическая подача заявки и юридическая гарантия требований.
 - SAM.gov, прогноз вероятности победы и обучение собственной модели.
 - Создание третьего MVP-профиля и ingest произвольных офисных документов компании.
+- Произвольный user-provided source URL или неограниченный ad-hoc query вне allowlisted profile-driven
+  TED/ЕИС/USA adapters.
 
 ## Verification
 

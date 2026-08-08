@@ -9,7 +9,7 @@ from uuid import UUID
 
 from tenderpulse.domain.models import SourceCode
 from tenderpulse.ingestion import IngestionCoordinator
-from tenderpulse.profiles import load_demo_profiles
+from tenderpulse.profiles import CompanyProfile
 from tenderpulse.sources.eis import parse_eis_package
 from tenderpulse.sources.eis_rss import EIS_RSS_URL, EisRssQuery, parse_eis_rss
 from tenderpulse.sources.http import FetchResult, SourceFetchError
@@ -44,10 +44,12 @@ class LiveIngestionService:
         coordinator: IngestionCoordinator,
         source_client: SourceClient,
         *,
+        profiles: Callable[[], tuple[CompanyProfile, ...]],
         now: Callable[[], datetime],
     ) -> None:
         self._coordinator = coordinator
         self._source_client = source_client
+        self._profiles = profiles
         self._now = now
 
     def run_cycle(
@@ -64,7 +66,12 @@ class LiveIngestionService:
         ),
     ) -> tuple[LiveSourceResult, ...]:
         today = self._now().date()
-        profiles = load_demo_profiles()
+        profiles = self._profiles()
+        if len(profiles) != 2 or len({profile.slug for profile in profiles}) != 2:
+            raise RuntimeError(
+                "live ingestion requires exactly two distinct active company profiles"
+            )
+        profile_versions = {profile.slug: profile.version for profile in profiles}
         cpv_prefixes = tuple(
             dict.fromkeys(
                 prefix
@@ -93,9 +100,9 @@ class LiveIngestionService:
             limit=min(limit, 50),
         )
         runners = {
-            SourceCode.TED: lambda: self._run_ted(ted_query),
+            SourceCode.TED: lambda: self._run_ted(ted_query, profile_versions),
             SourceCode.EIS: lambda: self._run_eis(eis_query),
-            SourceCode.USA_SPENDING: lambda: self._run_usaspending(usa_query),
+            SourceCode.USA_SPENDING: lambda: self._run_usaspending(usa_query, profile_versions),
         }
         unsupported = tuple(source for source in sources if source not in runners)
         if unsupported:
@@ -118,8 +125,16 @@ class LiveIngestionService:
         )
         return LiveSourceResult(SourceCode.EIS, "succeeded", result.run_id, result.record_count)
 
-    def _run_ted(self, query: TedQuery) -> LiveSourceResult:
-        parameters = _parameters(query, endpoint=TED_SEARCH_URL)
+    def _run_ted(
+        self,
+        query: TedQuery,
+        profile_versions: dict[str, int],
+    ) -> LiveSourceResult:
+        parameters = _parameters(
+            query,
+            endpoint=TED_SEARCH_URL,
+            profile_versions=profile_versions,
+        )
         try:
             fetched = self._source_client.fetch_ted(query)
         except SourceFetchError as error:
@@ -133,8 +148,16 @@ class LiveIngestionService:
         )
         return LiveSourceResult(SourceCode.TED, "succeeded", result.run_id, result.record_count)
 
-    def _run_usaspending(self, query: USAspendingQuery) -> LiveSourceResult:
-        parameters = _parameters(query, endpoint=USA_SPENDING_SEARCH_URL)
+    def _run_usaspending(
+        self,
+        query: USAspendingQuery,
+        profile_versions: dict[str, int],
+    ) -> LiveSourceResult:
+        parameters = _parameters(
+            query,
+            endpoint=USA_SPENDING_SEARCH_URL,
+            profile_versions=profile_versions,
+        )
         try:
             fetched = self._source_client.fetch_usaspending(query)
         except SourceFetchError as error:
@@ -187,10 +210,13 @@ def _parameters(
     query: TedQuery | EisRssQuery | USAspendingQuery,
     *,
     endpoint: str,
+    profile_versions: dict[str, int] | None = None,
 ) -> dict[str, object]:
     payload = query.model_dump(mode="json")
     payload["endpoint"] = endpoint
     payload["mode"] = "live_bounded"
+    if profile_versions is not None:
+        payload["profile_versions"] = profile_versions
     return payload
 
 

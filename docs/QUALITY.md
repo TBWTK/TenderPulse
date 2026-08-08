@@ -12,6 +12,8 @@ updated: 2026-08-08
 - [x] `IT Integrator` ranks a software/data notice above unrelated medical/construction fixtures and lists feature evidence.
 - [x] `MedLab Supplier` ranks a medical/lab notice above unrelated IT/construction fixtures and lists feature evidence.
 - [x] A changed source payload creates version 2 and preserves version 1; an identical replay is a no-op.
+- [x] A canonically unchanged record inside a different raw response keeps the original immutable
+  version/organization-link SHA while the new ingestion run retains its own raw evidence.
 - [x] A recommendation can be reconstructed from profile version, record version, raw SHA and match evidence.
 - [x] Missing deadline/amount/winner appears as `unknown`/gap and never as zero, epoch or inferred organization.
 - [x] Live ЕИС RSS, manual ЕИС XML/ZIP and bounded TED/USA queries share the same canonical downstream contract.
@@ -29,6 +31,8 @@ updated: 2026-08-08
 - [x] Replaying bootstrap preserves the current user profile version instead of reactivating demo v1.
 - [x] Dashboard reload projects the latest current-record AI attempt with coverage, claims, gaps and
   citations; client updates use DOM text nodes and never inject source/LLM text through `innerHTML`.
+- [x] Each new live cycle reads current DB profile versions, deterministically deduplicates TED CPV/USA
+  keyword scope, persists versions/filters and fails before fetch unless exactly two distinct profiles exist.
 
 ## Regression gates
 
@@ -44,6 +48,8 @@ updated: 2026-08-08
 - [x] Alembic `0004..0006`, legacy AI coverage migration, organization/outcome marts and 48 dbt data
   tests pass on Docker PostgreSQL.
 - [x] dbt's default local port is contract-tested against the Docker Compose published port.
+- [x] Runtime wiring reopens a DB session on every profile-provider call, so API/worker need no restart
+  after a profile update.
 
 ## Verification commands
 

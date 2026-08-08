@@ -40,6 +40,11 @@ alerts, но сохраняет новый ingestion run как свидетел
 - Профили: dashboard редактирует name, capabilities, keywords, CPV/OKPD2/PSC, countries и budget bounds;
   `PUT /api/profiles/{slug}` обязан передавать следующую version. В MVP остаётся ровно два slug-а.
 
+Следующий manual или scheduled cycle перечитывает current versions без рестарта. Union CPV prefixes
+обоих профилей ограничивает TED, union keywords — USAspending; ЕИС RSS использует свой фиксированный
+bounded query. `GET /api/ingestion/runs` возвращает фактические filters и `profile_versions`. Если active
+profiles не ровно два или slug-и дублируются, цикл завершается ошибкой до обращения к источнику.
+
 Для регулярного TED/ЕИС/USA цикла:
 
 ```dotenv

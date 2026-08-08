@@ -8,6 +8,8 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from tenderpulse.ai.gigachat import GigaChatClient
+from tenderpulse.persistence.repository import ProcurementRepository
+from tenderpulse.profiles import CompanyProfile
 from tenderpulse.raw_store import MemoryRawStore, RawStore, S3RawStore
 from tenderpulse.settings import Settings
 from tenderpulse.sources.http import OfficialSourceClient
@@ -20,6 +22,16 @@ def utc_now() -> datetime:
 def create_database(settings: Settings) -> tuple[Engine, sessionmaker[Session]]:
     engine = create_engine(settings.database_url, pool_pre_ping=True)
     return engine, sessionmaker(engine, expire_on_commit=False)
+
+
+def create_profile_provider(
+    session_factory: sessionmaker[Session],
+) -> Callable[[], tuple[CompanyProfile, ...]]:
+    def current_profiles() -> tuple[CompanyProfile, ...]:
+        with session_factory() as session:
+            return ProcurementRepository(session).list_profiles()
+
+    return current_profiles
 
 
 def create_raw_store(settings: Settings) -> RawStore:

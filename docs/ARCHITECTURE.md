@@ -10,7 +10,8 @@ updated: 2026-08-08
 ## Контекст
 
 TenderPulse запускается одним Docker Compose project. Web/API принимает профиль и управляемые
-ingestion-запросы. Worker обращается только к allowlisted source adapters, сохраняет исходный ответ
+ingestion-запросы. Перед каждым циклом API/worker перечитывает две active profile versions из PostgreSQL;
+их CPV/keywords задают bounded scope TED/USA. Worker обращается только к allowlisted source adapters, сохраняет исходный ответ
 в S3-compatible object storage и одной транзакцией регистрирует hash/run. Нормализатор пишет
 canonical сущности и SCD2-версии в PostgreSQL; dbt строит проверяемые marts. Matcher использует
 структурированные признаки и при наличии конфигурации GigaChat добавляет строго валидированное
@@ -36,6 +37,8 @@ flowchart LR
 - Raw payload после регистрации не изменяется; identity — `sha256(content)` и source locator.
 - Canonical record не существует без `source`, `source_record_id`, `ingestion_run_id` и raw evidence.
 - Один и тот же content hash идемпотентен; изменение значимых полей закрывает предыдущую SCD2-версию.
+- Новый raw response с тем же canonical fingerprint создаёт auditable run/raw, но не перепривязывает
+  существующую record version или organization links к новому SHA.
 - `source_published_at`, `observed_at` и `ingested_at` — разные поля и не подменяют друг друга.
 - Unknown сохраняется явно. Парсер не угадывает валюту, deadline, winner или crosswalk классификатора.
 - Organization identity source-scoped: точное нормализованное имя переиспользуется внутри source, но
@@ -45,6 +48,8 @@ flowchart LR
 - LLM не создаёт facts: его claims имеют prompt/model/input hash, citations и validation status.
 - Company profile изменяется только добавлением следующей immutable version; bootstrap добавляет
   отсутствующие demo-профили, но никогда не реактивирует seed поверх пользовательской версии.
+- Runtime source scope читает те же current DB profiles, что matcher/alerts; `load_demo_profiles` допустим
+  только для bootstrap/fixtures. Неожиданное число или дубликаты active profiles останавливают fetch.
 - Dashboard читает последний extraction attempt только для текущей record version. Payload migration
   добавляет явный coverage status старым attempts, не превращая отсутствие evidence в `not_present`.
 - Все внешние URL зафиксированы adapter config; пользователь не может превратить ingestion в SSRF.
@@ -78,7 +83,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  Filter["Профиль + bounded filter"] --> Fetch["Source adapter"]
+  Filter["Current DB profiles + bounded filter"] --> Fetch["Source adapter"]
   Fetch --> Hash["Raw bytes + SHA-256"] --> Validate["Contract validation"]
   Validate --> Normalize["Canonical mapping"] --> Version["SCD2 compare/write"]
   Version --> Match["Deterministic features"] --> Extract["Optional GigaChat evidence"]

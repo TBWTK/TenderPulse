@@ -183,7 +183,6 @@ class ProcurementRepository:
         if current is None:
             raise RuntimeError(f"record {record.natural_key} has no current version")
         if current.canonical_fingerprint == fingerprint:
-            self._sync_organizations(record, current, at=at)
             return ChangeResult(ChangeKind.UNCHANGED, self._to_version(current))
         current_from = _aware(current.valid_from)
         if at <= current_from:

@@ -36,6 +36,8 @@ updated: 2026-08-08
    валидный RSS channel является успешным run с `0 records`; пустые bytes, битая/неожиданная schema — нет.
 4. Natural key source-а связывается с procurement record. Равный canonical content hash ничего не
    меняет; новый hash закрывает `valid_to` предыдущей версии и открывает следующую.
+   Если изменился только raw response envelope, но canonical fingerprint record-а равен, текущая версия
+   и её organization links сохраняют исходный raw SHA; новый ingestion run/raw фиксирует replay отдельно.
 5. `current` view выбирает открытую версию. Historical marts читают все версии и runs.
 6. Recommendation привязана к точным версиям профиля/record и пересчитывается при изменении любой.
 7. Raw и history в MVP не удаляются автоматически. Политика retention появится только с измеренным
@@ -51,6 +53,8 @@ updated: 2026-08-08
 12. Profile PUT принимает только следующую версию, нормализует и дедуплицирует matching-поля, закрывает
     прежнюю активную версию и сохраняет новую. Demo seed создаёт только отсутствующий slug и не меняет
     уже существующую активную пользовательскую версию; одновременно активна ровно одна версия slug-а.
+    Каждый следующий live cycle перечитывает обе active versions: TED получает union CPV prefixes,
+    USAspending — union keywords; `profile_versions` и итоговые filters сохраняются в request parameters run-а.
 13. Начиная с Alembic `0006`, каждый сохранённый AI payload имеет явные `requirements_status` и
     `deadlines_status`. Для legacy payload непустая категория становится `found`, пустая — `unknown`;
     миграция не утверждает `not_present` без доказательства модели.

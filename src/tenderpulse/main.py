@@ -7,6 +7,7 @@ from tenderpulse.runtime import (
     create_database,
     create_gigachat_client,
     create_official_source_client,
+    create_profile_provider,
     create_raw_store,
     utc_now,
 )
@@ -17,6 +18,7 @@ engine, session_factory = create_database(settings)
 ingestion_runner = LiveIngestionService(
     IngestionCoordinator(session_factory, create_raw_store(settings), now=utc_now),
     create_official_source_client(settings),
+    profiles=create_profile_provider(session_factory),
     now=utc_now,
 )
 app = create_app(

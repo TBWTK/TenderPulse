@@ -37,6 +37,8 @@ TenderPulse превращает ограниченные, регулярно о
   лабораторного оборудования. Они не представляют реальные компании.
 - Веб-интерфейс редактирует все matching-поля ровно двух профилей; каждое сохранение создаёт новую
   версию, немедленно пересчитывает рекомендации и не перезаписывается повторным demo seed.
+- Каждый новый manual/scheduled цикл перечитывает эти active versions из PostgreSQL: их CPV prefixes
+  ограничивают TED, keywords — USAspending, а использованные версии и фильтры сохраняются в run provenance.
 - Карточка рекомендации показывает последний AI attempt для текущей версии notice: coverage
   requirements/deadlines, claims, gaps и verbatim citations. Idempotent in-app alerts и opt-in HTTPS
   webhook ведут журнал попыток; внешняя отправка выключена по умолчанию.

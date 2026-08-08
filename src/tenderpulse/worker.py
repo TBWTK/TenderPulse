@@ -16,6 +16,7 @@ from tenderpulse.live_ingestion import LiveIngestionService
 from tenderpulse.runtime import (
     create_database,
     create_official_source_client,
+    create_profile_provider,
     create_raw_store,
     utc_now,
 )
@@ -70,6 +71,7 @@ def main() -> None:
                 now=utc_now,
             ),
             create_official_source_client(settings),
+            profiles=create_profile_provider(factory),
             now=utc_now,
         )
 
