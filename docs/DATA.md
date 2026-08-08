@@ -32,8 +32,8 @@ updated: 2026-08-08
 
 1. Adapter создаёт `ingestion_run`, фиксирует query/filter/limit/cursor и получает bytes.
 2. Bytes записываются под content-addressed key; БД получает SHA-256, media type, source URL и timestamps.
-3. Contract validator либо передаёт record нормализатору, либо сохраняет typed rejection; пустые/битые
-   ответы не становятся успешными records.
+3. Contract validator либо передаёт record нормализатору, либо сохраняет typed rejection. Пустой
+   валидный RSS channel является успешным run с `0 records`; пустые bytes, битая/неожиданная schema — нет.
 4. Natural key source-а связывается с procurement record. Равный canonical content hash ничего не
    меняет; новый hash закрывает `valid_to` предыдущей версии и открывает следующую.
 5. `current` view выбирает открытую версию. Historical marts читают все версии и runs.
@@ -79,5 +79,5 @@ flowchart LR
 | Source | Natural key | Active opportunity | Outcome/history | Known MVP risk |
 | --- | --- | --- | --- | --- |
 | TED | publication number + procedure/lot IDs | yes | result notices, sometimes incomplete winner | multilingual arrays and lot alignment |
-| ЕИС | registry/notice/contract number | yes | protocols/contracts | changing XML namespaces/packages and TLS chain |
+| ЕИС | 19-digit registry number | yes, live RSS 44-ФЗ | bounded XML/ZIP protocols/contracts | RSS omits CPV/deadline; issuing CA and layouts can rotate |
 | USAspending | generated award ID / PIID | no | yes | time filters apply to transactions, not notice lifecycle |

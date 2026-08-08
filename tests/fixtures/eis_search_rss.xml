@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Результаты поиска в реестре заказов и закупок</title>
+    <link>/epz/order/extendedsearch/results.html?fz44=on</link>
+    <description>Результаты поиска</description>
+    <item>
+      <title>Запрос котировок в электронной форме №0345300035126000286</title>
+      <link>https://zakupki.gov.ru/epz/order/notice/zk20/view/common-info.html?regNumber=0345300035126000286</link>
+      <description>&lt;strong&gt;Наименование объекта закупки: &lt;/strong&gt;Поставка медицинских изделий&lt;br/&gt;&lt;strong&gt;Наименование Заказчика: &lt;/strong&gt;ГБУЗ ДЕМО БОЛЬНИЦА&lt;br/&gt;&lt;strong&gt;Начальная цена контракта: &lt;/strong&gt;96882.20&lt;strong&gt; Валюта: &lt;/strong&gt;Российский рубль&lt;br/&gt;&lt;strong&gt;Размещено: &lt;/strong&gt;07.08.2026&lt;br/&gt;&lt;strong&gt;Обновлено: &lt;/strong&gt;07.08.2026&lt;br/&gt;&lt;strong&gt;Этап размещения: &lt;/strong&gt;Подача заявок&lt;br/&gt;&lt;strong&gt;Идентификационный код закупки (ИКЗ): &lt;/strong&gt;262470200270447020100100250013250244&lt;br/&gt;</description>
+      <pubDate>Fri, 07 Aug 2026 20:11:02 GMT</pubDate>
+      <author>ГБУЗ ДЕМО БОЛЬНИЦА</author>
+    </item>
+    <item>
+      <title>Электронный аукцион №0123456789012345678</title>
+      <link>https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0123456789012345678</link>
+      <description>&lt;strong&gt;Наименование объекта закупки: &lt;/strong&gt;null&lt;br/&gt;&lt;strong&gt;Наименование Заказчика: &lt;/strong&gt;ФКУ ДЕМО&lt;br/&gt;&lt;strong&gt;Начальная цена контракта: &lt;/strong&gt;100.00&lt;strong&gt; Валюта: &lt;/strong&gt;Неизвестная валюта&lt;br/&gt;&lt;strong&gt;Размещено: &lt;/strong&gt;06.08.2026&lt;br/&gt;&lt;strong&gt;Этап размещения: &lt;/strong&gt;Размещение отменено&lt;br/&gt;</description>
+      <pubDate>Thu, 06 Aug 2026 12:00:00 GMT</pubDate>
+      <author>ФКУ ДЕМО</author>
+    </item>
+  </channel>
+</rss>

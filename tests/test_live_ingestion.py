@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from importlib.resources import files
+from pathlib import Path
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -28,6 +29,12 @@ class FixtureSourceClient:
             content_type="application/json",
         )
 
+    def fetch_eis(self, query) -> FetchResult:
+        return FetchResult(
+            raw=(Path(__file__).parent / "fixtures" / "eis_search_rss.xml").read_bytes(),
+            content_type="application/rss+xml",
+        )
+
 
 class FailingTedClient(FixtureSourceClient):
     def fetch_ted(self, query) -> FetchResult:
@@ -44,7 +51,7 @@ def _factory() -> sessionmaker[Session]:
     return sessionmaker(engine, expire_on_commit=False)
 
 
-def test_live_cycle_ingests_bounded_ted_and_usaspending_data() -> None:
+def test_live_cycle_ingests_bounded_ted_eis_and_usaspending_data() -> None:
     factory = _factory()
 
     def now() -> datetime:
@@ -60,10 +67,11 @@ def test_live_cycle_ingests_bounded_ted_and_usaspending_data() -> None:
 
     assert [(result.source.value, result.status, result.record_count) for result in results] == [
         ("ted", "succeeded", 2),
+        ("eis", "succeeded", 2),
         ("usaspending", "succeeded", 1),
     ]
     with factory() as session:
-        assert len(ProcurementRepository(session).list_current_records()) == 3
+        assert len(ProcurementRepository(session).list_current_records()) == 5
         request_parameters = session.scalars(
             select(IngestionRunRow.request_parameters).order_by(IngestionRunRow.source)
         ).all()
@@ -86,6 +94,7 @@ def test_known_fetch_failure_is_persisted_and_other_source_continues() -> None:
 
     assert [(result.source.value, result.status) for result in results] == [
         ("ted", "failed"),
+        ("eis", "succeeded"),
         ("usaspending", "succeeded"),
     ]
     with factory() as session:

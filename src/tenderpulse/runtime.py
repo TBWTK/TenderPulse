@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from tenderpulse.ai.gigachat import GigaChatClient
 from tenderpulse.raw_store import MemoryRawStore, RawStore, S3RawStore
 from tenderpulse.settings import Settings
+from tenderpulse.sources.http import OfficialSourceClient
 
 
 def utc_now() -> datetime:
@@ -47,6 +48,10 @@ def create_gigachat_client(settings: Settings) -> GigaChatClient | None:
         oauth_url=settings.gigachat_oauth_url,
         api_base_url=settings.gigachat_api_base_url,
     )
+
+
+def create_official_source_client(settings: Settings) -> OfficialSourceClient:
+    return OfficialSourceClient(eis_ca_files=(settings.eis_root_ca_file, settings.eis_sub_ca_file))
 
 
 Now = Callable[[], datetime]

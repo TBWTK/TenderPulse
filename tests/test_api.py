@@ -179,9 +179,10 @@ def test_bounded_manual_ingestion_trigger_and_run_projection(it_notice: Procurem
     response = client.post(
         "/api/ingestion/run",
         json={
-            "sources": ["ted"],
+            "sources": ["ted", "eis"],
             "limit": 25,
             "ted_lookback_days": 10,
+            "eis_lookback_days": 3,
             "usa_lookback_days": 30,
         },
     )
@@ -191,9 +192,10 @@ def test_bounded_manual_ingestion_trigger_and_run_projection(it_notice: Procurem
     assert response.json()[0]["record_count"] == 3
     assert runner.calls == [
         {
-            "sources": ("ted",),
+            "sources": ("ted", "eis"),
             "limit": 25,
             "ted_lookback_days": 10,
+            "eis_lookback_days": 3,
             "usa_lookback_days": 30,
         }
     ]

@@ -29,26 +29,34 @@ alerts, но сохраняет новый ingestion run как свидетел
 ## Управление данными
 
 - Dashboard: `GET /`.
-- Ограниченная live-загрузка: `POST /api/ingestion/run`; источники только `ted` и `usaspending`, limit
-  `1..500`, URL нельзя передать снаружи.
+- Ограниченная live-загрузка: `POST /api/ingestion/run`; источники `ted`, `eis`, `usaspending`, общий
+  limit `1..500`, URL нельзя передать снаружи. ЕИС независимо ограничивает ответ первыми 50 records.
 - Manual ЕИС: `POST /api/ingestion/eis-upload`, `.xml`/`.zip`, максимум 10 MiB. ZIP ограничен 50
   members, 20 MiB uncompressed и 500 records; DTD/ENTITY и unsafe paths запрещены.
 - Runs/freshness: `GET /api/ingestion/runs`, `GET /api/analytics/source-freshness`.
 - Результаты контрактов: `GET /api/analytics/award-outcomes`; winner/amount имеют явный coverage status.
 - Lineage: `GET /api/records/{source}/{source_record_id}/lineage`.
 
-Для регулярного TED/USA цикла:
+Для регулярного TED/ЕИС/USA цикла:
 
 ```dotenv
 LIVE_INGESTION_ENABLED=true
 INGESTION_INTERVAL_SECONDS=3600
 SOURCE_RECORD_LIMIT=100
 TED_LOOKBACK_DAYS=14
+EIS_LOOKBACK_DAYS=7
 USA_LOOKBACK_DAYS=365
+GIGACHAT_CA_BUNDLE_FILE=/app/certs/russian_trusted_root_ca_pem.crt
+EIS_ROOT_CA_FILE=/app/certs/russian_trusted_root_ca_pem.crt
+EIS_SUB_CA_FILE=/app/certs/russian_trusted_sub_ca_pem.crt
 ```
 
 Worker выполняет первый цикл сразу после старта, затем ждёт interval. При `false` внешних source
-вызовов нет. Live ЕИС scheduler отсутствует: официальный transport/layout не подтверждён.
+вызовов нет. Live ЕИС использует только `https://zakupki.gov.ru/epz/order/extendedsearch/rss.html`,
+44-ФЗ, первую страницу, интервал `1..31` день и максимум 50 records; `Referer`/URL извне не принимаются.
+RSS не содержит полного набора CPV/deadline/result details, поэтому эти поля остаются `unknown`, пока
+они не подтверждены отдельным evidence. При ротации upstream certificate обновите issuing CA только
+после проверки issuer/expiry/fingerprint и повторите certificate tests; `verify=false` запрещён.
 
 ## Alerts
 

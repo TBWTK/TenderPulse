@@ -11,6 +11,7 @@ from tenderpulse.domain.models import SourceCode
 from tenderpulse.ingestion import IngestionCoordinator
 from tenderpulse.profiles import load_demo_profiles
 from tenderpulse.sources.eis import parse_eis_package
+from tenderpulse.sources.eis_rss import EIS_RSS_URL, EisRssQuery, parse_eis_rss
 from tenderpulse.sources.http import FetchResult, SourceFetchError
 from tenderpulse.sources.ted import TED_SEARCH_URL, TedQuery, parse_ted_response
 from tenderpulse.sources.usaspending import (
@@ -24,6 +25,8 @@ class SourceClient(Protocol):
     def fetch_ted(self, query: TedQuery) -> FetchResult: ...
 
     def fetch_usaspending(self, query: USAspendingQuery) -> FetchResult: ...
+
+    def fetch_eis(self, query: EisRssQuery) -> FetchResult: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +56,12 @@ class LiveIngestionService:
         limit: int,
         ted_lookback_days: int,
         usa_lookback_days: int,
-        sources: tuple[SourceCode, ...] = (SourceCode.TED, SourceCode.USA_SPENDING),
+        eis_lookback_days: int = 7,
+        sources: tuple[SourceCode, ...] = (
+            SourceCode.TED,
+            SourceCode.EIS,
+            SourceCode.USA_SPENDING,
+        ),
     ) -> tuple[LiveSourceResult, ...]:
         today = self._now().date()
         profiles = load_demo_profiles()
@@ -79,8 +87,14 @@ class LiveIngestionService:
             keywords=keywords,
             limit=limit,
         )
+        eis_query = EisRssQuery(
+            published_from=today - timedelta(days=eis_lookback_days),
+            published_to=today,
+            limit=min(limit, 50),
+        )
         runners = {
             SourceCode.TED: lambda: self._run_ted(ted_query),
+            SourceCode.EIS: lambda: self._run_eis(eis_query),
             SourceCode.USA_SPENDING: lambda: self._run_usaspending(usa_query),
         }
         unsupported = tuple(source for source in sources if source not in runners)
@@ -139,6 +153,21 @@ class LiveIngestionService:
             result.record_count,
         )
 
+    def _run_eis(self, query: EisRssQuery) -> LiveSourceResult:
+        parameters = _parameters(query, endpoint=EIS_RSS_URL)
+        try:
+            fetched = self._source_client.fetch_eis(query)
+        except SourceFetchError as error:
+            return self._record_fetch_failure(SourceCode.EIS, parameters, error)
+        result = self._coordinator.ingest(
+            source=SourceCode.EIS,
+            raw=fetched.raw,
+            content_type=fetched.content_type,
+            parser=partial(parse_eis_rss, limit=query.limit),
+            request_parameters=parameters,
+        )
+        return LiveSourceResult(SourceCode.EIS, "succeeded", result.run_id, result.record_count)
+
     def _record_fetch_failure(
         self,
         source: SourceCode,
@@ -154,7 +183,11 @@ class LiveIngestionService:
         return LiveSourceResult(source, "failed", run_id, 0, error.code)
 
 
-def _parameters(query: TedQuery | USAspendingQuery, *, endpoint: str) -> dict[str, object]:
+def _parameters(
+    query: TedQuery | EisRssQuery | USAspendingQuery,
+    *,
+    endpoint: str,
+) -> dict[str, object]:
     payload = query.model_dump(mode="json")
     payload["endpoint"] = endpoint
     payload["mode"] = "live_bounded"

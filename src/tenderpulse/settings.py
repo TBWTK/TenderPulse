@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     gigachat_client_id: SecretStr | None = None
     gigachat_scope: str = "GIGACHAT_API_PERS"
     gigachat_ca_bundle_file: Path = Path("certs/russian_trusted_root_ca_pem.crt")
+    eis_root_ca_file: Path = Path("certs/russian_trusted_root_ca_pem.crt")
+    eis_sub_ca_file: Path = Path("certs/russian_trusted_sub_ca_pem.crt")
     gigachat_model: str = "GigaChat-2"
     gigachat_oauth_url: str = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     gigachat_api_base_url: str = "https://api.giga.chat/v1"
@@ -30,6 +32,7 @@ class Settings(BaseSettings):
     ingestion_interval_seconds: int = Field(default=3600, ge=60)
     source_record_limit: int = Field(default=100, ge=1, le=500)
     ted_lookback_days: int = Field(default=14, ge=1, le=90)
+    eis_lookback_days: int = Field(default=7, ge=1, le=31)
     usa_lookback_days: int = Field(default=365, ge=1, le=731)
 
     alert_webhook_url: SecretStr | None = None

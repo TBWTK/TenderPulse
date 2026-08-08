@@ -13,9 +13,13 @@ from tenderpulse.alert_delivery import WebhookAlertDispatcher, WebhookDeliveryVi
 from tenderpulse.alerts import AlertService
 from tenderpulse.ingestion import IngestionCoordinator
 from tenderpulse.live_ingestion import LiveIngestionService
-from tenderpulse.runtime import create_database, create_raw_store, utc_now
+from tenderpulse.runtime import (
+    create_database,
+    create_official_source_client,
+    create_raw_store,
+    utc_now,
+)
 from tenderpulse.settings import Settings
-from tenderpulse.sources.http import OfficialSourceClient
 
 logger = logging.getLogger("tenderpulse.worker")
 
@@ -65,7 +69,7 @@ def main() -> None:
                 create_raw_store(settings),
                 now=utc_now,
             ),
-            OfficialSourceClient(),
+            create_official_source_client(settings),
             now=utc_now,
         )
 
@@ -76,6 +80,7 @@ def main() -> None:
             service.run_cycle(
                 limit=settings.source_record_limit,
                 ted_lookback_days=settings.ted_lookback_days,
+                eis_lookback_days=settings.eis_lookback_days,
                 usa_lookback_days=settings.usa_lookback_days,
             )
             if service is not None

@@ -26,8 +26,8 @@ TenderPulse превращает ограниченные, регулярно о
 ### MVP
 
 - TED Search API: актуальные и result notices по узким временным/CPV-фильтрам.
-- ЕИС: ограниченные XML/ZIP-пакеты извещений и результатов; ручная дозагрузка является
-  поддерживаемым fallback, пока live-канал не подтверждён в Docker.
+- ЕИС: актуальные notices 44-ФЗ из официального bounded RSS; ограниченные XML/ZIP-пакеты остаются
+  поддерживаемым fallback для исторических извещений и результатов.
 - USAspending: исторические федеральные contract awards, получатели и суммы. Это источник
   результатов, а не активных закупок США.
 - Не более 100 записей на источник за один запуск по умолчанию и не более 500 по явному запросу.
@@ -52,7 +52,7 @@ TenderPulse превращает ограниченные, регулярно о
 | Источник | Роль | Официальный контракт | MVP-режим |
 | --- | --- | --- | --- |
 | TED | notices и результаты ЕС | [Search API v3](https://docs.ted.europa.eu/api/latest/search.html) | anonymous POST, date/CPV filters |
-| ЕИС | notices, протоколы и контракты РФ | [ЕИС](https://zakupki.gov.ru/) | XML/ZIP packages, bounded import |
+| ЕИС | notices, протоколы и контракты РФ | [RSS расширенного поиска](https://zakupki.gov.ru/epz/order/extendedsearch/rss.html) | live 44-ФЗ RSS + bounded XML/ZIP import |
 | USAspending | contract awards США | [API endpoints](https://api.usaspending.gov/docs/endpoints) | anonymous award search |
 | GigaChat | structured extraction/explanation | [REST API](https://developers.sber.ru/docs/ru/gigachat/api/reference/rest/gigachat-api) | optional, cached evidence, no CI calls |
 
@@ -68,3 +68,4 @@ TenderPulse превращает ограниченные, регулярно о
 - [Запуск и эксплуатация](RUNBOOK.md)
 - [ADR-001: platform and data boundaries](decisions/ADR-001-platform-and-data-boundaries.md)
 - [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md)
+- [ADR-003: official ЕИС RSS and TLS boundary](decisions/ADR-003-eis-rss-and-tls-boundary.md)

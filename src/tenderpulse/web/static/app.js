@@ -20,6 +20,7 @@ ingestionForm?.addEventListener('submit', async (event) => {
         sources,
         limit: Number(data.get('limit')),
         ted_lookback_days: Number(data.get('ted_days')),
+        eis_lookback_days: Number(data.get('eis_days')),
         usa_lookback_days: Number(data.get('usa_days')),
       }),
     });

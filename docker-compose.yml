@@ -46,6 +46,8 @@ services:
       S3_SECRET_KEY: tenderpulse-local-only
       S3_BUCKET: tenderpulse-raw
       GIGACHAT_CA_BUNDLE_FILE: /app/certs/russian_trusted_root_ca_pem.crt
+      EIS_ROOT_CA_FILE: /app/certs/russian_trusted_root_ca_pem.crt
+      EIS_SUB_CA_FILE: /app/certs/russian_trusted_sub_ca_pem.crt
     depends_on:
       db:
         condition: service_healthy

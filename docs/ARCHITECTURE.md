@@ -21,7 +21,7 @@ flowchart LR
   Company["Компания / тендерный специалист"] --> Web["Web UI"] --> API["FastAPI"]
   Operator["Оператор / scheduler"] --> Worker["Ingestion worker"]
   Worker --> TED["TED Search API"]
-  Worker --> EIS["ЕИС XML/ZIP"]
+  Worker --> EIS["ЕИС RSS 44-ФЗ / XML/ZIP"]
   Worker --> USA["USAspending awards"]
   Worker --> Raw[("S3 raw evidence")]
   Worker --> DB[("PostgreSQL + pgvector")]
@@ -40,7 +40,8 @@ flowchart LR
 - Unknown сохраняется явно. Парсер не угадывает валюту, deadline, winner или crosswalk классификатора.
 - Organization identity source-scoped: точное нормализованное имя переиспользуется внутри source, но
   межисточниковый merge требует отдельного устойчивого identifier/evidence.
-- Запуск по умолчанию ≤100 records/source, hard limit ≤500; полная выгрузка требует нового решения.
+- Запуск по умолчанию ≤100 records/source, hard limit ≤500; live ЕИС дополнительно ограничен 50 records
+  и 31 днём. Полная выгрузка требует нового решения.
 - LLM не создаёт facts: его claims имеют prompt/model/input hash, citations и validation status.
 - Все внешние URL зафиксированы adapter config; пользователь не может превратить ingestion в SSRF.
 - TLS verification не отключается, секреты не логируются и не попадают в raw artifacts.
@@ -88,6 +89,8 @@ flowchart LR
 - Foundation рассчитан на 2 профиля и сотни, не миллионы, records. Порог пересмотра указан в ADR-001.
 - HTTP source timeout — 30 секунд на запрос; повтор возможен только для idempotent read с bounded backoff.
 - `0 records` допустим только вместе с подтверждённым успешным source response и параметрами запроса.
+- ЕИС adapter принимает только RSS 2.0 с фиксированного HTTPS host, одной страницы 44-ФЗ и размера до
+  2 MiB. Root + issuing CA проверяются локально; отключение TLS verification запрещено.
 - Partial record не удаляется, но его validation issues и недоступные поля видны downstream.
 - Alert dispatcher всегда создаёт идемпотентный `in_app` event. Опциональный HTTPS webhook отправляет
   тот же snapshot со стабильным `Idempotency-Key`; каждая попытка сохраняет только destination hash,
@@ -97,3 +100,4 @@ flowchart LR
 
 - [ADR-001: platform and data boundaries](decisions/ADR-001-platform-and-data-boundaries.md).
 - [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md).
+- [ADR-003: official ЕИС RSS and TLS boundary](decisions/ADR-003-eis-rss-and-tls-boundary.md).

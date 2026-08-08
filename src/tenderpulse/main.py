@@ -6,17 +6,17 @@ from tenderpulse.live_ingestion import LiveIngestionService
 from tenderpulse.runtime import (
     create_database,
     create_gigachat_client,
+    create_official_source_client,
     create_raw_store,
     utc_now,
 )
 from tenderpulse.settings import Settings
-from tenderpulse.sources.http import OfficialSourceClient
 
 settings = Settings()
 engine, session_factory = create_database(settings)
 ingestion_runner = LiveIngestionService(
     IngestionCoordinator(session_factory, create_raw_store(settings), now=utc_now),
-    OfficialSourceClient(),
+    create_official_source_client(settings),
     now=utc_now,
 )
 app = create_app(

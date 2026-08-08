@@ -39,6 +39,7 @@ class IngestionRunner(Protocol):
         *,
         limit: int,
         ted_lookback_days: int,
+        eis_lookback_days: int,
         usa_lookback_days: int,
         sources: tuple[SourceCode, ...],
     ) -> tuple[LiveSourceResult, ...]: ...
@@ -47,9 +48,14 @@ class IngestionRunner(Protocol):
 
 
 class ManualIngestionCommand(BaseModel):
-    sources: tuple[SourceCode, ...] = (SourceCode.TED, SourceCode.USA_SPENDING)
+    sources: tuple[SourceCode, ...] = (
+        SourceCode.TED,
+        SourceCode.EIS,
+        SourceCode.USA_SPENDING,
+    )
     limit: int = Field(default=100, ge=1, le=500)
     ted_lookback_days: int = Field(default=14, ge=1, le=90)
+    eis_lookback_days: int = Field(default=7, ge=1, le=31)
     usa_lookback_days: int = Field(default=365, ge=1, le=731)
 
     @field_validator("sources")
@@ -57,9 +63,13 @@ class ManualIngestionCommand(BaseModel):
     def validate_live_sources(cls, sources: tuple[SourceCode, ...]) -> tuple[SourceCode, ...]:
         if not sources:
             raise ValueError("at least one source is required")
-        unsupported = set(sources) - {SourceCode.TED, SourceCode.USA_SPENDING}
+        unsupported = set(sources) - {
+            SourceCode.TED,
+            SourceCode.EIS,
+            SourceCode.USA_SPENDING,
+        }
         if unsupported:
-            raise ValueError("live ingestion supports TED and USAspending only")
+            raise ValueError("live ingestion supports TED, EIS and USAspending only")
         return tuple(dict.fromkeys(sources))
 
 
@@ -202,6 +212,7 @@ def create_app(
             sources=command.sources,
             limit=command.limit,
             ted_lookback_days=command.ted_lookback_days,
+            eis_lookback_days=command.eis_lookback_days,
             usa_lookback_days=command.usa_lookback_days,
         )
 

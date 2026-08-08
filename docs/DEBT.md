@@ -15,5 +15,5 @@ updated: 2026-08-08
 
 Невыполненный acceptance criterion является незавершённой работой, а не техдолгом.
 
-Live ЕИС и public deployment controls — незавершённые capability, а не техдолг; они остаются в
-`STATE.md`, `ROADMAP.md` и `SECURITY.md`.
+Public deployment controls — незавершённая capability, а не техдолг; она остаётся в `STATE.md`,
+`ROADMAP.md` и `SECURITY.md`.

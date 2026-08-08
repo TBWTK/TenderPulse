@@ -18,7 +18,7 @@ payloads, пользовательские файлы/поля, LLM output и UR
 | Угроза | Контроль MVP | Остаточный риск |
 | --- | --- | --- |
 | Secret leakage | `.env` ignored, redaction, tokens only in memory, no config endpoint | host/container admin access |
-| TLS interception | checked-in public root CA, verification always on, expiry/fingerprint test | upstream chain rotation |
+| TLS interception | checked-in public root + issuing CA, verification always on, fingerprint tests and documented expiry | upstream chain rotation |
 | SSRF | fixed adapter base URLs, validated object keys, no user-provided fetch URL | compromised official source |
 | Prompt injection | source text is data, no LLM tools, structured schema and citations | semantic manipulation remains possible |
 | Poisoned/changed source | raw hash, source locator, SCD2 diff, validation issues | source itself may publish wrong facts |
@@ -39,3 +39,9 @@ payloads, пользовательские файлы/поля, LLM output и UR
 Ожидаемый SHA-256 fingerprint:
 `D2:6D:2D:02:31:B7:C3:9F:92:CC:73:85:12:BA:54:10:35:19:E4:40:5D:68:B5:BD:70:3E:97:88:CA:8E:CF:31`.
 Его срок истекает 27.02.2032. Отключение TLS verification не является fallback.
+
+`certs/russian_trusted_sub_ca_pem.crt` — публичный issuing CA `Russian Trusted Sub CA` для текущей
+цепочки `*.zakupki.gov.ru`. Ожидаемый SHA-256 fingerprint:
+`21:55:78:50:36:C9:00:DB:B5:F1:BB:2A:15:69:C8:0C:55:59:5B:D6:BF:94:86:7A:29:BB:DD:BC:7D:88:A3:F2`;
+срок действия — до 19.07.2029. Сертификат получен из AIA leaf-сертификата ЕИС и проверен указанным
+root. Любая замена требует проверки chain, fingerprint/expiry tests и live smoke.
