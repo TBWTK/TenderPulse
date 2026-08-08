@@ -9,23 +9,17 @@ updated: 2026-08-08
 
 ## Active objective
 
-Устранить последний SSOT-разрыв поиска: следующий manual/scheduled live-ingestion должен строить
-bounded TED/USAspending query из текущих активных версий двух профилей в PostgreSQL, а не из
-скомпилированного demo seed, и сохранять эти фильтры в provenance ingestion run.
+Завершить Quality & handoff: после отдельного явного разрешения опубликовать проверенную clean-ветку
+`main` в `origin/main`, проверить remote SHA и только после этого закрыть полную проектную цель.
 
 ## Acceptance criteria
 
-- [x] `LiveIngestionService` получает ровно две текущие active profile versions через DB-backed provider;
-  demo seed не является runtime authority после bootstrap.
-- [x] TED CPV prefixes и USAspending keywords следующего цикла отражают profile update без рестарта API
-  или worker; union детерминированно дедуплицирован.
-- [x] Неожиданное число/дубликаты active profiles останавливают цикл до внешнего fetch с явной ошибкой.
-- [x] Persisted ingestion-run parameters содержат фактически использованные profile-driven filters,
-  поэтому область поиска можно восстановить вместе с raw SHA и run ID.
-- [x] Canonically unchanged record из нового raw response не перепривязывает immutable version и
-  organization links к другому SHA; новый run/raw остаётся отдельным свидетельством replay.
-- [ ] Full regression, dbt, Docker runtime, project-control audit, документация и локальный Git checkpoint
-  согласованы; первая публикация в `origin/main` остаётся отдельным approval-gated действием.
+- [x] Все явные MVP-capabilities сопоставлены с code/test/runtime/data evidence; 121 tests, dbt 53/53,
+  bounded live smokes, Docker health и PostgreSQL completion audit проходят.
+- [x] Product/architecture/data/UI/docs projections согласованы, staged secret scan прошёл, `.env`
+  ignored, локальные feature checkpoints созданы на `main`.
+- [ ] Пользователь явно разрешил внешний data egress; `main` отправлен в `origin/main`, remote SHA совпал
+  с локальным HEAD и GitHub handoff проверен.
 
 ## Current verified state
 
@@ -85,6 +79,9 @@ bounded TED/USAspending query из текущих активных версий 
 - Проверенный product-input/evidence slice сохранён локальным commit `e6934e0`: полный versioned profile
   editor, seed preservation, current-record AI evidence, migration `0006` и dbt port contract. Staged
   secret scan прошёл, `.env` остался ignored.
+- Проверенный profile-driven ingestion slice сохранён локальным commit `f54458e`: current DB profiles
+  стали runtime SSOT для TED/USA scope, run provenance хранит profile versions, immutable replay conflict
+  устранён; staged secret scan прошёл.
 - 08.08.2026 официальный TED v3 smoke вернул актуальные records с provenance links; endpoint
   anonymous и поддерживает bounded pagination/iteration.
 - 08.08.2026 официальный USAspending smoke вернул contract awards; источник не содержит активные notices.
@@ -125,8 +122,8 @@ bounded TED/USAspending query из текущих активных версий 
 
 ## Next exact step
 
-Выполнить project-control audit и staged secret scan, сохранить profile-driven ingestion slice локальным
-Git checkpoint; затем ждать явного разрешения на первую публикацию `origin/main`.
+После явного разрешения пользователя выполнить `git push -u origin main`, получить remote SHA и сверить
+его с локальным HEAD; без разрешения не передавать содержимое репозитория наружу.
 
 ## Blockers
 
