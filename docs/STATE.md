@@ -23,8 +23,8 @@ checkpoint без несанкционированной внешней отпр
   ручному API и dashboard; bounded XML/ZIP upload остаётся независимым fallback для истории.
 - [x] Два последовательных live-запуска доказали одинаковый raw SHA и отсутствие лишней SCD2-версии;
   pytest/coverage, Ruff, mypy, dbt, Compose health и project-control gates проходят.
-- [x] Локальный Git checkpoint готовится с secret scan; push в `origin/main` остаётся только после
-  отдельного явного разрешения пользователя.
+- [x] Локальный Git checkpoint `04509ec` создан после secret scan; push в `origin/main` остаётся только
+  после отдельного явного разрешения пользователя.
 
 ## Current verified state
 
@@ -62,6 +62,8 @@ checkpoint без несанкционированной внешней отпр
   audit. Push в `origin/main` ожидает отдельного явного разрешения на внешний data egress.
 - Проверенный normalization/outcomes/alerts slice сохранён локальным commit `74b36e8`; staged secret scan
   не нашёл credentials/private keys, `.env` остаётся ignored.
+- Проверенный live ЕИС slice сохранён локальным commit `04509ec`; staged secret scan не нашёл
+  credentials/private keys, публичный issuing CA не содержит private key.
 - 08.08.2026 официальный TED v3 smoke вернул актуальные records с provenance links; endpoint
   anonymous и поддерживает bounded pagination/iteration.
 - 08.08.2026 официальный USAspending smoke вернул contract awards; источник не содержит активные notices.
@@ -97,9 +99,9 @@ checkpoint без несанкционированной внешней отпр
 
 ## Next exact step
 
-Создать локальный EIS checkpoint после финального secret scan. После отдельного явного разрешения
-пользователя выполнить `git push -u origin main`, проверить remote ref и зафиксировать опубликованный
-checkpoint. До такого разрешения никаких внешних Git writes не выполнять.
+После отдельного явного разрешения пользователя выполнить `git push -u origin main`, проверить remote
+ref и зафиксировать опубликованный checkpoint. До такого разрешения никаких внешних Git writes не
+выполнять.
 
 ## Blockers
 
