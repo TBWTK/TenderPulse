@@ -1,0 +1,57 @@
+[
+  {
+    "slug": "it-data-integrator",
+    "version": 1,
+    "name": "Northstar Data Integration",
+    "capabilities": [
+      "data engineering and analytics platforms",
+      "cloud migration and managed IT services",
+      "machine learning and cybersecurity integration"
+    ],
+    "positive_keywords": [
+      "data",
+      "analytics",
+      "cloud",
+      "machine learning",
+      "software",
+      "кибербезопасность",
+      "информационные технологии"
+    ],
+    "classification_prefixes": {
+      "CPV": ["48", "72"],
+      "OKPD2": ["58.29", "62", "63.11"],
+      "PSC": ["D3", "DA", "R4"]
+    },
+    "countries": ["DE", "FR", "IT", "SE", "US", "RU"],
+    "min_amount": "50000",
+    "max_amount": "5000000"
+  },
+  {
+    "slug": "medlab-supplier",
+    "version": 1,
+    "name": "MedLab Supply Cooperative",
+    "capabilities": [
+      "laboratory analyzers and diagnostic reagents",
+      "medical devices and consumables",
+      "installation, calibration and staff training"
+    ],
+    "positive_keywords": [
+      "medical",
+      "laboratory",
+      "diagnostic",
+      "reagent",
+      "orthopaedic",
+      "медицин",
+      "лаборатор",
+      "реагент"
+    ],
+    "classification_prefixes": {
+      "CPV": ["33", "38"],
+      "OKPD2": ["21", "26.60", "32.50"],
+      "PSC": ["65"]
+    },
+    "countries": ["DE", "FR", "IT", "SE", "US", "RU"],
+    "min_amount": "10000",
+    "max_amount": "10000000"
+  }
+]

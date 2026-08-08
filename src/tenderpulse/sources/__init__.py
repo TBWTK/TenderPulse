@@ -1,0 +1,1 @@
+"""Allowlisted procurement source adapters."""

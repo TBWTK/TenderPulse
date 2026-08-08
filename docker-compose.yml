@@ -1,0 +1,87 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: tenderpulse
+      POSTGRES_USER: tenderpulse
+      POSTGRES_PASSWORD: tenderpulse-local-only
+    ports:
+      - "127.0.0.1:${TENDERPULSE_DB_PORT:-5433}:5432"
+    volumes:
+      - tenderpulse_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tenderpulse -d tenderpulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: tenderpulse-local
+      MINIO_ROOT_PASSWORD: tenderpulse-local-only
+    ports:
+      - "127.0.0.1:${TENDERPULSE_MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - tenderpulse_minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  init:
+    build: .
+    command: ["python", "-m", "tenderpulse.cli", "init-and-seed"]
+    env_file:
+      - .env
+    environment: &app_environment
+      DATABASE_URL: postgresql+psycopg://tenderpulse:tenderpulse-local-only@db:5432/tenderpulse
+      RAW_STORE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: tenderpulse-local
+      S3_SECRET_KEY: tenderpulse-local-only
+      S3_BUCKET: tenderpulse-raw
+      GIGACHAT_CA_BUNDLE_FILE: /app/certs/russian_trusted_root_ca_pem.crt
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: .
+    env_file:
+      - .env
+    environment: *app_environment
+    ports:
+      - "127.0.0.1:${TENDERPULSE_PORT:-8010}:8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["python", "-m", "tenderpulse.worker"]
+    env_file:
+      - .env
+    environment: *app_environment
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 10s
+      timeout: 4s
+      start_period: 5s
+      retries: 3
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  tenderpulse_postgres:
+  tenderpulse_minio:

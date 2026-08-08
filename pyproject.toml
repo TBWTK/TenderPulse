@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tenderpulse"
+version = "0.1.0"
+description = "Traceable procurement lakehouse and explainable tender matching"
+readme = "docs/README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "alembic>=1.15,<2",
+  "boto3>=1.37,<2",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "jinja2>=3.1,<4",
+  "pgvector>=0.3,<1",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic-settings>=2.8,<3",
+  "python-multipart>=0.0.20,<1",
+  "sqlalchemy>=2.0,<3",
+  "tenacity>=9,<10",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+analytics = ["dbt-postgres>=1.9,<2"]
+dev = [
+  "mypy>=1.15,<2",
+  "pytest>=8.3,<10",
+  "pytest-cov>=6,<8",
+  "respx>=0.22,<1",
+  "ruff>=0.11,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tenderpulse"]
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers"
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+  "integration: requires Docker services",
+  "live_source: performs a bounded read against an official source",
+  "live_llm: consumes external GigaChat tokens",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["tenderpulse"]
+
+[tool.coverage.run]
+source = ["tenderpulse"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

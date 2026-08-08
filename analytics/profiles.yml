@@ -1,0 +1,12 @@
+tenderpulse:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_HOST', 'localhost') }}"
+      port: "{{ env_var('DBT_PORT', '5432') | int }}"
+      user: "{{ env_var('DBT_USER', 'tenderpulse') }}"
+      password: "{{ env_var('DBT_PASSWORD', 'tenderpulse-local-only') }}"
+      dbname: "{{ env_var('DBT_DBNAME', 'tenderpulse') }}"
+      schema: analytics
+      threads: 2

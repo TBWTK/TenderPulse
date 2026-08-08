@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<exp:export
+  xmlns:exp="http://zakupki.gov.ru/oos/export/1"
+  xmlns:oos="http://zakupki.gov.ru/oos/types/1">
+  <exp:fcsNotificationEF>
+    <oos:purchaseNumber>0123456789026000001</oos:purchaseNumber>
+    <oos:docPublishDate>2026-08-05T10:00:00+03:00</oos:docPublishDate>
+    <oos:purchaseObjectInfo>Поставка лабораторных реагентов</oos:purchaseObjectInfo>
+    <oos:customer>
+      <oos:fullName>ГБУЗ Демонстрационная больница</oos:fullName>
+    </oos:customer>
+    <oos:lot>
+      <oos:lotNumber>1</oos:lotNumber>
+      <oos:maxPrice>1500000.00</oos:maxPrice>
+      <oos:currency><oos:code>RUB</oos:code></oos:currency>
+    </oos:lot>
+  </exp:fcsNotificationEF>
+</exp:export>

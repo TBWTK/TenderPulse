@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="TenderPulse — объяснимый поиск государственных закупок">
+  <title>TenderPulse · Лента возможностей</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+  <script defer src="{{ url_for('static', path='/app.js') }}"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail">
+      <a class="brand" href="/" aria-label="TenderPulse, на главную">
+        <span class="brand-mark">TP</span>
+        <span><strong>TenderPulse</strong><small>procurement intelligence</small></span>
+      </a>
+
+      <nav class="nav" aria-label="Разделы">
+        <a class="active" href="#opportunities"><span>01</span> Возможности</a>
+        <a href="#analytics"><span>02</span> Аналитика</a>
+        <a href="#profile"><span>03</span> Профиль</a>
+        <a href="#loading"><span>04</span> Загрузка данных</a>
+      </nav>
+
+      <section class="rail-section" aria-labelledby="freshness-title">
+        <div class="section-kicker" id="freshness-title">Источники</div>
+        <div class="source-list">
+          {% for item in freshness %}
+          <div class="source-row">
+            <span class="pulse {{ 'ok' if item.last_status == 'succeeded' else 'muted' }}"></span>
+            <div><strong>{{ item.source.value|upper }}</strong><small>{{ item.last_status }}</small></div>
+            <time>
+              {% if item.age_seconds is not none %}
+                {{ (item.age_seconds / 3600)|round(1) }} ч
+              {% else %}—{% endif %}
+            </time>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <div class="rail-footer">
+        <span class="safety-dot"></span>
+        <div><strong>Локальный контур</strong><small>raw + lineage включены</small></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Рабочее пространство / 08 августа 2026</div>
+          <h1>Лента возможностей</h1>
+        </div>
+        <label class="profile-switch">
+          <span>Профиль компании</span>
+          <select id="profile-switch" aria-label="Выберите профиль компании">
+            {% for item in profiles %}
+            <option value="{{ item.slug }}" {{ 'selected' if selected and item.slug == selected.slug else '' }}>
+              {{ item.name }} · v{{ item.version }}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+      </header>
+
+      <section class="hero" id="opportunities">
+        <div>
+          <div class="eyebrow mint">Объяснимый AI-поиск</div>
+          <h2>Закупки, где у компании есть <em>проверяемое преимущество.</em></h2>
+          <p>Каждый балл ведёт к CPV, фразе, географии и сохранённому raw SHA. Неизвестное остаётся неизвестным.</p>
+        </div>
+        <div class="hero-signal" aria-label="Число рекомендованных закупок">
+          <span>{{ '%02d'|format(recommended_count) }}</span>
+          <small>рекомендовано<br>сейчас</small>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Ключевые показатели">
+        <article><span class="metric-index">A</span><strong>{{ opportunity_count }}</strong><p>активных возможностей</p></article>
+        <article><span class="metric-index">B</span><strong>{{ record_count }}</strong><p>canonical records</p></article>
+        <article><span class="metric-index">C</span><strong>{{ profiles|length }}</strong><p>версируемых профиля</p></article>
+        <article><span class="metric-index">D</span><strong>500</strong><p>жёсткий лимит / запуск</p></article>
+      </section>
+
+      <div class="section-head">
+        <div><span class="eyebrow">Приоритетная очередь</span><h2>Рекомендации для {{ selected.name if selected else 'профиля' }}</h2></div>
+        <div class="legend"><span class="dot recommended"></span> рекомендовано <span class="dot review"></span> проверить</div>
+      </div>
+
+      <section class="alert-strip" aria-label="Последние alerts">
+        <div><span class="eyebrow">In-app alerts</span><strong>{{ alerts|selectattr('read_at', 'none')|list|length }} непрочитано</strong></div>
+        {% for alert in alerts[:3] %}
+        <button class="alert-item {{ 'read' if alert.read_at else '' }}" data-alert="{{ alert.id }}">
+          <span>{{ alert.record_source.value|upper }} · {{ (alert.score * 100)|int }}%</span>
+          <b>{{ alert.title }}</b>
+        </button>
+        {% else %}
+        <button class="button ghost" id="sync-alerts" data-profile="{{ selected.slug if selected else '' }}">Сформировать alerts</button>
+        {% endfor %}
+      </section>
+
+      <section class="opportunity-list">
+        {% for item in cards %}
+        {% set recommendation = item.recommendation %}
+        {% set record = item.record %}
+        <article class="opportunity {{ recommendation.decision.value }}">
+          <div class="score-block">
+            <span class="score">{{ (recommendation.score * 100)|int }}</span>
+            <small>match<br>score</small>
+          </div>
+          <div class="opportunity-body">
+            <div class="meta-line">
+              <span class="source-tag">{{ record.source.value|upper }}</span>
+              <span>{{ record.source_record_id }}</span>
+              <span>{{ record.countries|join(' · ') if record.countries else 'география unknown' }}</span>
+              <span>{{ record.deadline_at.strftime('%d.%m.%Y %H:%M') if record.deadline_at else 'срок unknown' }}</span>
+            </div>
+            <h3><a href="{{ record.evidence.source_url }}" target="_blank" rel="noreferrer">{{ record.title }}</a></h3>
+            <p class="buyer">{{ record.buyer_name or 'Заказчик не указан' }}</p>
+            <div class="evidence-row">
+              {% for reason in recommendation.reasons %}
+              <span><b>+{{ (reason.contribution * 100)|int }}</b> {{ reason.code }} · {{ reason.matched_values|join(', ') }}</span>
+              {% endfor %}
+              {% for gap in recommendation.gaps %}<span class="gap">{{ gap.value }}</span>{% endfor %}
+            </div>
+            <details>
+              <summary>Прослеживаемость</summary>
+              <div class="trace-grid">
+                <span>raw SHA</span><code>{{ record.evidence.raw_sha256 }}</code>
+                <span>ingest run</span><code>{{ record.evidence.ingestion_run_id }}</code>
+                <span>source</span><a href="{{ record.evidence.source_url }}" target="_blank" rel="noreferrer">официальная запись ↗</a>
+              </div>
+            </details>
+          </div>
+          <div class="card-actions">
+            <span class="decision">{{ recommendation.decision.value }}</span>
+            {% if ai_enabled %}
+            <button class="button ghost ai-button" data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}">Извлечь требования</button>
+            {% endif %}
+          </div>
+        </article>
+        {% else %}
+        <div class="empty-state"><strong>В выбранном срезе пока нет активных notices.</strong><p>Запустите ограниченную загрузку ниже или смените профиль.</p></div>
+        {% endfor %}
+      </section>
+
+      <section class="lower-grid" id="analytics">
+        <article class="panel analytics-panel">
+          <div class="panel-head"><div><span class="eyebrow">Рынок</span><h2>Активность заказчиков</h2></div><span class="badge">all history</span></div>
+          <div class="buyer-chart">
+            {% set max_count = top_buyers[0][1] if top_buyers else 1 %}
+            {% for buyer, count in top_buyers %}
+            <div class="bar-row"><span>{{ buyer }}</span><div><i style="width: {{ (count / max_count * 100)|int }}%"></i></div><b>{{ count }}</b></div>
+            {% else %}<p class="muted-copy">История заказчиков появится после загрузки.</p>{% endfor %}
+          </div>
+          <p class="panel-note">Это наблюдаемая активность, не вероятность победы. Outcome-данные USAspending используются отдельно от active notices.</p>
+        </article>
+
+        <article class="panel" id="loading">
+          <div class="panel-head"><div><span class="eyebrow">Контроль данных</span><h2>Bounded-загрузка</h2></div><span class="badge warm">ручной запуск</span></div>
+          <form id="ingestion-form">
+            <fieldset><legend>Источники</legend><label><input type="checkbox" name="sources" value="ted" checked> TED</label><label><input type="checkbox" name="sources" value="usaspending"> USA outcomes</label></fieldset>
+            <div class="form-grid"><label>Лимит<input type="number" name="limit" min="1" max="500" value="25"></label><label>TED, дней<input type="number" name="ted_days" min="1" max="90" value="14"></label><label>USA, дней<input type="number" name="usa_days" min="1" max="731" value="365"></label></div>
+            <button class="button primary" type="submit">Загрузить проверяемый срез</button>
+            <output id="ingestion-status" aria-live="polite">URL источников фиксированы. Полная выгрузка недоступна.</output>
+          </form>
+          <form id="eis-upload-form" class="upload-form">
+            <label>ЕИС manual fallback · XML/ZIP до 10 MiB<input type="file" name="file" accept=".xml,.zip" required></label>
+            <button class="button ghost" type="submit">Загрузить пакет ЕИС</button>
+            <output id="eis-upload-status" aria-live="polite">DTD, ENTITY, path traversal и ZIP bombs отклоняются.</output>
+          </form>
+          <div class="run-list">
+            {% for run in runs %}<div><span class="pulse {{ 'ok' if run.status == 'succeeded' else 'muted' }}"></span><b>{{ run.source.value|upper }}</b><span>{{ run.status }} · {{ run.record_count }} записей</span><time>{{ run.started_at.strftime('%d.%m %H:%M') }}</time></div>{% endfor %}
+          </div>
+        </article>
+      </section>
+
+      {% if selected %}
+      <section class="panel profile-panel" id="profile" data-profile='{{ selected.model_dump(mode="json")|tojson }}'>
+        <div class="panel-head"><div><span class="eyebrow">Версионируемый профиль</span><h2>{{ selected.name }}</h2></div><span class="badge">v{{ selected.version }}</span></div>
+        <div class="profile-layout">
+          <div><h3>Компетенции</h3><ul>{% for capability in selected.capabilities %}<li>{{ capability }}</li>{% endfor %}</ul></div>
+          <div><h3>Классификаторы</h3><div class="chip-set">{% for system, prefixes in selected.classification_prefixes.items() %}{% for prefix in prefixes %}<span>{{ system }} {{ prefix }}</span>{% endfor %}{% endfor %}</div></div>
+          <form id="profile-form"><label>Название<input name="name" value="{{ selected.name }}" required></label><label>Ключевые слова<textarea name="keywords" rows="3">{{ selected.positive_keywords|join(', ') }}</textarea></label><button class="button ghost" type="submit">Сохранить как v{{ selected.version + 1 }}</button><output id="profile-status" aria-live="polite">Предыдущая версия останется в истории.</output></form>
+        </div>
+      </section>
+      {% endif %}
+
+      <footer><span>TenderPulse · local MVP</span><span>Unknown ≠ zero · evidence before confidence</span></footer>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,53 @@
+{
+  "notices": [
+    {
+      "publication-number": "497954-2026",
+      "publication-date": "2026-07-20+02:00",
+      "notice-type": "cn-standard",
+      "notice-title": {
+        "eng": "Spain – Electronic mail software package – Google Workspace licences and support"
+      },
+      "description-proc": {
+        "spa": "Renovación de licencias y soporte de la suite de comunicación y colaboración Google Workspace."
+      },
+      "buyer-name": {
+        "spa": ["Junta de Gobierno del Ayuntamiento de Sevilla"]
+      },
+      "classification-cpv": ["48223000", "64216120", "72412000"],
+      "place-of-performance": ["ES618", "ESP"],
+      "deadline-receipt-tender-date-lot": ["2026-08-17+02:00"],
+      "deadline-receipt-tender-time-lot": ["23:59:00+02:00"],
+      "links": {
+        "html": {
+          "ENG": "https://ted.europa.eu/en/notice/-/detail/497954-2026"
+        }
+      }
+    },
+    {
+      "publication-number": "497802-2026",
+      "publication-date": "2026-07-20+02:00",
+      "notice-type": "cn-standard",
+      "notice-title": {
+        "eng": "Poland – Mammography devices – Supply of a digital mammography system"
+      },
+      "description-proc": {
+        "pol": "Zakup wraz z dostawą Mammografu cyfrowego z opcją mammografii spektralnej."
+      },
+      "buyer-name": {
+        "pol": ["Uniwersytecki Szpital Kliniczny w Poznaniu"]
+      },
+      "classification-cpv": ["33111650"],
+      "place-of-performance": ["PL415", "POL"],
+      "deadline-receipt-tender-date-lot": ["2026-08-24+02:00"],
+      "deadline-receipt-tender-time-lot": ["11:00:00+02:00"],
+      "links": {
+        "html": {
+          "ENG": "https://ted.europa.eu/en/notice/-/detail/497802-2026"
+        }
+      }
+    }
+  ],
+  "totalNoticeCount": 2,
+  "iterationNextToken": null,
+  "timedOut": false
+}

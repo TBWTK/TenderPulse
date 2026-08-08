@@ -1,0 +1,51 @@
+version: 2
+
+sources:
+  - name: app
+    schema: public
+    tables:
+      - name: procurement_records
+        columns:
+          - name: id
+            tests: [not_null, unique]
+          - name: source
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [ted, eis, usaspending]
+      - name: procurement_versions
+        columns:
+          - name: id
+            tests: [not_null, unique]
+          - name: record_id
+            tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('app', 'procurement_records')
+                    field: id
+          - name: raw_sha256
+            tests: [not_null]
+
+models:
+  - name: stg_current_procurement_records
+    columns:
+      - name: record_id
+        tests: [not_null, unique]
+      - name: source_record_id
+        tests: [not_null]
+      - name: raw_sha256
+        tests: [not_null]
+  - name: mart_source_freshness
+    columns:
+      - name: source
+        tests: [not_null, unique]
+      - name: current_record_count
+        tests: [not_null]
+  - name: mart_buyer_activity
+    columns:
+      - name: source
+        tests: [not_null]
+      - name: buyer_name
+        tests: [not_null]

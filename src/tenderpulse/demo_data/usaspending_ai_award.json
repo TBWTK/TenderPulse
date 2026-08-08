@@ -1,0 +1,20 @@
+{
+  "spending_level": "awards",
+  "limit": 1,
+  "results": [
+    {
+      "internal_id": 349279105,
+      "Award ID": "W911QX20C0023",
+      "Recipient Name": "ECS FEDERAL, LLC",
+      "Award Amount": 120575059.35,
+      "Description": "Research and development of artificial intelligence and machine learning algorithms",
+      "Start Date": "2020-04-23",
+      "End Date": "2027-03-11",
+      "Awarding Agency": "Department of Defense",
+      "Awarding Sub Agency": "Department of the Army",
+      "generated_internal_id": "CONT_AWD_W911QX20C0023_9700_-NONE-_-NONE-"
+    }
+  ],
+  "page_metadata": {"page": 1, "hasNext": false},
+  "messages": []
+}

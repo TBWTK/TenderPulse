@@ -1,0 +1,29 @@
+{
+  "notices": [
+    {
+      "publication-number": "533445-2026",
+      "publication-date": "2026-08-03+02:00",
+      "notice-type": "can-standard",
+      "notice-title": {
+        "ita": "Italia – Dispositivi e prodotti medici vari – CEMENTI",
+        "eng": "Italy – Miscellaneous medical devices and products – CEMENTI"
+      },
+      "description-proc": {
+        "ita": "Fornitura quadriennale di dispositivi medici per ortopedia e traumatologia"
+      },
+      "buyer-name": {
+        "ita": ["ESTAR - Ente di Supporto Tecnico Amministrativo Regionale"]
+      },
+      "classification-cpv": ["33190000", "33190000"],
+      "place-of-performance": ["ITI14", "ITA", "ITA"],
+      "links": {
+        "html": {
+          "ENG": "https://ted.europa.eu/en/notice/-/detail/533445-2026"
+        }
+      }
+    }
+  ],
+  "totalNoticeCount": 1,
+  "iterationNextToken": null,
+  "timedOut": false
+}

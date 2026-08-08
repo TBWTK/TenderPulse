@@ -1,0 +1,27 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from sqlalchemy import create_engine, inspect
+
+from tenderpulse.cli import init_db
+from tenderpulse.settings import Settings
+
+
+def test_initial_migration_creates_lineage_schema(tmp_path: Path) -> None:
+    path = tmp_path / "migration.sqlite"
+    database_url = f"sqlite+pysqlite:///{path}"
+
+    init_db(Settings(database_url=database_url))
+
+    tables = set(inspect(create_engine(database_url)).get_table_names())
+    assert {
+        "alembic_version",
+        "ai_extraction_attempts",
+        "alert_events",
+        "company_profiles",
+        "ingestion_runs",
+        "procurement_records",
+        "procurement_versions",
+        "raw_artifacts",
+    } <= tables
