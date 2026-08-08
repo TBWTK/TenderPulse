@@ -1,7 +1,7 @@
 ---
 title: Этапы проекта
 type: roadmap
-status: draft
+status: complete
 updated: 2026-08-08
 ---
 
@@ -16,6 +16,6 @@ updated: 2026-08-08
 | AI evidence | Требования/сроки и объяснение с GigaChat | Structured-output eval, citations, unknown handling, cached evidence | done |
 | Product | Полный profile input, profile-driven source scope, recommendations, visible AI evidence, analytics, controls и alerts | Current DB profile versions drive versioned HTML/API/matching/ingestion; in-app/webhook idempotency | done |
 | Identity | Source-scoped buyers/suppliers and aliases | Backfill all SCD2 versions, dbt relationships, no guessed cross-source merge | done |
-| Quality & handoff | Документация совпадает с работающим Docker MVP | Full regression, dbt, live smoke, audit, Git checkpoint/push approval | active |
+| Quality & handoff | Документация совпадает с работающим Docker MVP | Full regression, dbt, live smoke, audit, Git checkpoint и проверенный push | done |
 
 Допустимые статусы: `planned`, `active`, `blocked`, `done`.
