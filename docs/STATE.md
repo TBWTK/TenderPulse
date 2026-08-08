@@ -14,11 +14,11 @@ updated: 2026-08-08
 
 ## Acceptance criteria
 
-- [ ] Full pytest/coverage, Ruff, mypy, dbt, Compose health и project-control gates проходят после
+- [x] Full pytest/coverage, Ruff, mypy, dbt, Compose health и project-control gates проходят после
   последней миграции и EIS upload projection.
-- [ ] Live TED, USAspending и GigaChat evidence smokes имеют bounded параметры и сохранённый audit trail.
-- [ ] `.env` и credentials исключены из Git; staged files проходят secret-pattern audit.
-- [ ] Runbook, state, roadmap, data/security/quality docs совпадают с фактическими API и Docker defaults.
+- [x] Live TED, USAspending и GigaChat evidence smokes имеют bounded параметры и сохранённый audit trail.
+- [x] `.env` и credentials исключены из Git; staged files проходят secret-pattern audit.
+- [x] Runbook, state, roadmap, data/security/quality docs совпадают с фактическими API и Docker defaults.
 - [ ] Git checkpoint создан и отправлен в пустой `origin/main` без force/перезаписи чужой истории.
 
 ## Current verified state
@@ -40,7 +40,8 @@ updated: 2026-08-08
 - ЕИС manual fallback принимает XML/ZIP до 10 MiB, ограничивает members/uncompressed bytes/records,
   отклоняет DTD/ENTITY/path traversal и связывает records с hash всего загруженного package.
 - Alembic migrations `0001..0003` создают lineage, AI attempts и idempotent in-app alert outbox.
-- Project-control data profile создан; Git `main` и `origin` инициализированы, checkpoint commit ещё не создан.
+- Project-control data profile создан; локальный root commit `2e6f1df` создан на `main` после staged secret
+  audit. Push в `origin/main` ожидает отдельного явного разрешения на внешний data egress.
 - 08.08.2026 официальный TED v3 smoke вернул актуальные records с provenance links; endpoint
   anonymous и поддерживает bounded pagination/iteration.
 - 08.08.2026 официальный USAspending smoke вернул contract awards; источник не содержит активные notices.
@@ -66,12 +67,14 @@ updated: 2026-08-08
 
 ## Next exact step
 
-Выполнить staged secret audit, финальные checks, создать первый Git commit и push в `origin/main`.
+После явного разрешения пользователя выполнить `git push -u origin main`, проверить remote ref и закрыть
+Quality & handoff checkpoint.
 
 ## Blockers
 
 - Live-канал ЕИС требует проверенного TLS bundle и подтверждения актуального XML/ZIP layout; это не
   блокирует manual XML/ZIP fallback, но не позволяет заявлять регулярную live-загрузку ЕИС.
+- GitHub push остановлен approval policy как внешний data egress; локальный commit готов, обход не допускается.
 
 ## Non-goals
 
