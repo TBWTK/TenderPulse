@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 from tenderpulse.ai.gigachat import GeneratedArguments, GigaChatError
 from tenderpulse.ai.service import AIExtractionService, ExtractionStatus
 from tenderpulse.persistence.ai_repository import AIExtractionRepository
-from tenderpulse.persistence.models import Base
+from tenderpulse.persistence.models import AIExtractionAttemptRow, Base
 from tenderpulse.persistence.repository import ProcurementRepository
 
 
@@ -148,3 +148,36 @@ def test_known_gigachat_failure_is_visible_and_does_not_create_claims(it_notice)
     assert result.retryable is True
     assert result.error_code == "gigachat_chat_503"
     assert ProcurementRepository(session).list_current_records() == (it_notice,)
+
+
+def test_legacy_validated_attempt_remains_readable_with_explicit_coverage(it_notice) -> None:
+    session = _session()
+    ProcurementRepository(session).apply_records((it_notice,), at=datetime(2026, 8, 8, tzinfo=UTC))
+    repository = AIExtractionRepository(session)
+    context = repository.get_current_context(it_notice.source, it_notice.source_record_id)
+    assert context is not None
+    session.add(
+        AIExtractionAttemptRow(
+            record_version_id=context.record_version_id,
+            provider="gigachat",
+            requested_model="GigaChat-2",
+            response_model="GigaChat-2:legacy",
+            prompt_version="tender-evidence-v1",
+            input_sha256="1" * 64,
+            output_sha256="2" * 64,
+            raw_sha256=it_notice.evidence.raw_sha256,
+            status="validated",
+            payload={"requirements": [], "deadlines": [], "gaps": []},
+            error_code=None,
+            error_message=None,
+            retryable=False,
+            created_at=datetime(2026, 8, 8, 1, tzinfo=UTC),
+        )
+    )
+    session.commit()
+
+    attempt = repository.list_attempts(it_notice.source, it_notice.source_record_id)[0]
+
+    assert attempt.claims is not None
+    assert attempt.claims.requirements_status == "unknown"
+    assert attempt.claims.deadlines_status == "unknown"

@@ -24,7 +24,8 @@ Web/API доступен только на `http://127.0.0.1:8010`; PostgreSQL �
 Init container применяет все Alembic migrations, загружает три небольших demo fixtures, два
 синтетических профиля и создаёт in-app alerts. Повторный init идемпотентен для canonical versions и
 alerts, но сохраняет новый ingestion run как свидетельство повтора. После migrations он также
-идемпотентно восстанавливает organization links для всех ранее сохранённых SCD2-версий.
+идемпотентно восстанавливает organization links для всех ранее сохранённых SCD2-версий. Seed создаёт
+только отсутствующий профиль: сохранённая пользователем версия никогда не откатывается к demo v1.
 
 ## Управление данными
 
@@ -36,6 +37,8 @@ alerts, но сохраняет новый ingestion run как свидетел
 - Runs/freshness: `GET /api/ingestion/runs`, `GET /api/analytics/source-freshness`.
 - Результаты контрактов: `GET /api/analytics/award-outcomes`; winner/amount имеют явный coverage status.
 - Lineage: `GET /api/records/{source}/{source_record_id}/lineage`.
+- Профили: dashboard редактирует name, capabilities, keywords, CPV/OKPD2/PSC, countries и budget bounds;
+  `PUT /api/profiles/{slug}` обязан передавать следующую version. В MVP остаётся ровно два slug-а.
 
 Для регулярного TED/ЕИС/USA цикла:
 
@@ -83,15 +86,20 @@ response body и возможный token из query string в audit/log не з
 AI extraction вызывается явно через dashboard или `POST
 /api/records/{source}/{source_record_id}/evidence/extract`. Результат не меняет canonical facts:
 validated/rejected/failed attempt хранится отдельно с model/prompt/input/output hashes и citations.
+После ответа и после reload карточка показывает последний attempt текущей record version, включая
+coverage statuses, gaps и verbatim citations. `unknown` означает недостаток evidence, а не отсутствие
+требования или срока.
 
 ## Проверка и остановка
 
 ```bash
 make verify
-DBT_HOST=127.0.0.1 DBT_PORT=5433 DBT_USER=tenderpulse \
-  DBT_PASSWORD=tenderpulse-local-only DBT_DBNAME=tenderpulse make dbt-test
+make dbt-test
 docker compose down
 ```
+
+`make dbt-test` по умолчанию использует Compose-порт `127.0.0.1:5433`; переменные `DBT_*` нужны только
+для явно переопределённого подключения.
 
 `docker compose down` сохраняет named volumes. Удаление volumes не входит в обычную остановку и
 является destructive operation. До public deployment обязательны auth/RBAC, CSRF, tenant isolation,

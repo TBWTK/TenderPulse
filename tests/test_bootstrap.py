@@ -26,6 +26,13 @@ def test_demo_seed_is_a_repeatable_end_to_end_vertical_slice() -> None:
         return datetime(2026, 8, 8, 12, 0, tzinfo=UTC)
 
     first = seed_demo(factory, raw_store, now=now)
+    with factory.begin() as session:
+        repository = ProcurementRepository(session)
+        current = repository.get_profile("it-data-integrator")
+        assert current is not None
+        repository.add_profile_version(
+            current.model_copy(update={"version": 2, "name": "User configured profile"})
+        )
     replay = seed_demo(factory, raw_store, now=now)
 
     with factory() as session:
@@ -41,6 +48,12 @@ def test_demo_seed_is_a_repeatable_end_to_end_vertical_slice() -> None:
     assert first.record_count == replay.record_count == 4
     assert len(records) == 4
     assert len(profiles) == 2
+    assert next(profile for profile in profiles if profile.slug == "it-data-integrator").name == (
+        "User configured profile"
+    )
+    assert (
+        next(profile for profile in profiles if profile.slug == "it-data-integrator").version == 2
+    )
     assert run_count == 6
     assert artifact_count == 3
     assert lineage_counts == [1, 1, 1, 1]

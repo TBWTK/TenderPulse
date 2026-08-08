@@ -87,28 +87,27 @@ class ProcurementRepository:
         )
         return tuple(self._to_version(row) for row in self._session.scalars(statement))
 
-    def replace_profiles(self, profiles: tuple[CompanyProfile, ...]) -> None:
-        incoming = {(profile.slug, profile.version): profile for profile in profiles}
-        existing = {
-            (row.slug, row.version): row for row in self._session.scalars(select(CompanyProfileRow))
-        }
-        for key, existing_row in existing.items():
-            existing_row.active = key in incoming
-        for key, profile in incoming.items():
-            profile_row = existing.get(key)
-            payload = profile.model_dump(mode="json")
-            if profile_row is None:
+    def seed_profiles(self, profiles: tuple[CompanyProfile, ...]) -> None:
+        if len({profile.slug for profile in profiles}) != len(profiles):
+            raise ValueError("seed profiles must have distinct slugs")
+        existing_by_slug: dict[str, list[CompanyProfileRow]] = {}
+        for row in self._session.scalars(select(CompanyProfileRow)):
+            existing_by_slug.setdefault(row.slug, []).append(row)
+        for profile in profiles:
+            existing = existing_by_slug.get(profile.slug, [])
+            if not existing:
                 self._session.add(
                     CompanyProfileRow(
                         slug=profile.slug,
                         version=profile.version,
-                        payload=payload,
+                        payload=profile.model_dump(mode="json"),
                         active=True,
                     )
                 )
-            else:
-                profile_row.payload = payload
-                profile_row.active = True
+                continue
+            active_count = sum(row.active for row in existing)
+            if active_count != 1:
+                raise RuntimeError(f"profile {profile.slug} must have exactly one active version")
 
     def list_profiles(self) -> tuple[CompanyProfile, ...]:
         statement = (

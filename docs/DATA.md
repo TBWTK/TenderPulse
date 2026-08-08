@@ -48,6 +48,12 @@ updated: 2026-08-08
     Штатный `init-db` идемпотентно backfill-ит ссылки для уже существующей истории.
 11. Webhook attempt использует стабильный idempotency key. `2xx` завершает delivery; transport/429/5xx
     допускают bounded retry, остальные `4xx` остаются terminal failed.
+12. Profile PUT принимает только следующую версию, нормализует и дедуплицирует matching-поля, закрывает
+    прежнюю активную версию и сохраняет новую. Demo seed создаёт только отсутствующий slug и не меняет
+    уже существующую активную пользовательскую версию; одновременно активна ровно одна версия slug-а.
+13. Начиная с Alembic `0006`, каждый сохранённый AI payload имеет явные `requirements_status` и
+    `deadlines_status`. Для legacy payload непустая категория становится `found`, пустая — `unknown`;
+    миграция не утверждает `not_present` без доказательства модели.
 
 `source_published_at` принадлежит источнику, `observed_at` — момент видимости ответу adapter-а,
 `ingested_at` — commit в TenderPulse. Freshness считается по всем трём и показывает unknown отдельно.

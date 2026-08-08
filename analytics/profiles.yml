@@ -4,7 +4,7 @@ tenderpulse:
     dev:
       type: postgres
       host: "{{ env_var('DBT_HOST', 'localhost') }}"
-      port: "{{ env_var('DBT_PORT', '5432') | int }}"
+      port: "{{ env_var('DBT_PORT', '5433') | int }}"
       user: "{{ env_var('DBT_USER', 'tenderpulse') }}"
       password: "{{ env_var('DBT_PASSWORD', 'tenderpulse-local-only') }}"
       dbname: "{{ env_var('DBT_DBNAME', 'tenderpulse') }}"

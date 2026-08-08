@@ -292,18 +292,24 @@ def create_app(
             and record.lifecycle in {LifecycleStatus.ACTIVE, LifecycleStatus.PLANNED}
         )
         ranked = TenderMatcher(now=now).rank(selected, opportunities) if selected else []
-        cards = [
-            {
-                "recommendation": recommendation,
-                "record": next(
-                    record
-                    for record in opportunities
-                    if record.source is recommendation.record_source
-                    and record.source_record_id == recommendation.record_source_id
-                ),
-            }
-            for recommendation in ranked
-        ]
+        record_by_key = {
+            (record.source, record.source_record_id): record for record in opportunities
+        }
+        extraction_repository = AIExtractionRepository(session)
+        cards: list[dict[str, object]] = []
+        for recommendation in ranked:
+            record = record_by_key[(recommendation.record_source, recommendation.record_source_id)]
+            attempts = extraction_repository.list_attempts(
+                record.source,
+                record.source_record_id,
+            )
+            cards.append(
+                {
+                    "recommendation": recommendation,
+                    "record": record,
+                    "evidence_attempt": attempts[-1] if attempts else None,
+                }
+            )
         buyers = Counter(record.buyer_name for record in records if record.buyer_name)
         context = {
             "profiles": profiles,

@@ -68,6 +68,6 @@ def seed_demo(
         record_count += result.record_count
 
     with session_factory.begin() as session:
-        ProcurementRepository(session).replace_profiles(load_demo_profiles())
+        ProcurementRepository(session).seed_profiles(load_demo_profiles())
         AlertService(session, now=now).sync_all()
     return DemoSeedResult(run_count=len(inputs), record_count=record_count)

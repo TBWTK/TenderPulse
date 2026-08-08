@@ -33,8 +33,18 @@ class StubGenerator:
                         },
                     }
                 ],
-                "deadlines_status": "unknown",
-                "deadlines": [],
+                "deadlines_status": "found",
+                "deadlines": [
+                    {
+                        "label": "Submission deadline",
+                        "value": "2026-09-30T12:00:00Z",
+                        "normalized_at": "2026-09-30T12:00:00Z",
+                        "citation": {
+                            "field": "deadline_at",
+                            "quote": "2026-09-30T12:00:00Z",
+                        },
+                    }
+                ],
                 "gaps": [],
             },
             response_model="GigaChat-2:fixture",
@@ -82,7 +92,7 @@ def _client(
     with factory.begin() as session:
         repository = ProcurementRepository(session)
         repository.apply_records(records, at=datetime(2026, 8, 8, tzinfo=UTC))
-        repository.replace_profiles(load_demo_profiles())
+        repository.seed_profiles(load_demo_profiles())
     return TestClient(
         create_app(
             factory,
@@ -268,7 +278,7 @@ def test_award_outcome_api_exposes_winner_amount_buyer_and_raw_evidence(
     ]
 
 
-def test_existing_demo_profile_can_be_versioned_but_third_profile_is_rejected(
+def test_full_demo_profile_can_be_versioned_and_changes_recommendations(
     it_notice: ProcurementRecord,
 ) -> None:
     client = _client((it_notice,))
@@ -276,22 +286,46 @@ def test_existing_demo_profile_can_be_versioned_but_third_profile_is_rejected(
         item for item in client.get("/api/profiles").json() if item["slug"] == "it-data-integrator"
     )
     current["version"] = 2
-    current["positive_keywords"].append("data mesh")
+    current.update(
+        {
+            "name": "  Sovereign   Systems  ",
+            "capabilities": [" Secure integration ", "secure integration"],
+            "positive_keywords": ["sovereign cloud", " SOVEREIGN CLOUD "],
+            "classification_prefixes": {"cpv": ["99-99"]},
+            "countries": ["us", "US"],
+            "min_amount": "600000",
+            "max_amount": "750000",
+        }
+    )
 
     updated = client.put("/api/profiles/it-data-integrator", json=current)
-    unknown = {**current, "slug": "third-company", "name": "Third company"}
-    rejected = client.put("/api/profiles/third-company", json=unknown)
 
     assert updated.status_code == 200
-    assert updated.json()["version"] == 2
+    assert updated.json() == {
+        "slug": "it-data-integrator",
+        "version": 2,
+        "name": "Sovereign Systems",
+        "capabilities": ["Secure integration"],
+        "positive_keywords": ["sovereign cloud"],
+        "classification_prefixes": {"CPV": ["9999"]},
+        "countries": ["US"],
+        "min_amount": "600000",
+        "max_amount": "750000",
+    }
     profiles = client.get("/api/profiles").json()
     assert len(profiles) == 2
-    assert (
-        next(item for item in profiles if item["slug"] == "it-data-integrator")[
-            "positive_keywords"
-        ][-1]
-        == "data mesh"
-    )
+    recommendation = client.get("/api/recommendations/it-data-integrator").json()[0]
+    assert recommendation["score"] == "0"
+    assert recommendation["decision"] == "not_relevant"
+
+
+def test_third_profile_is_rejected(it_notice: ProcurementRecord) -> None:
+    client = _client((it_notice,))
+    current = client.get("/api/profiles").json()[0]
+    unknown = {**current, "slug": "third-company", "name": "Third company"}
+
+    rejected = client.put("/api/profiles/third-company", json=unknown)
+
     assert rejected.status_code == 404
 
 
@@ -305,6 +339,31 @@ def test_dashboard_renders_product_data(it_notice: ProcurementRecord) -> None:
     assert "Northstar Data Integration" in response.text
     assert "Cloud data platform implementation" in response.text
     assert "raw SHA" in response.text
+    assert 'name="capabilities"' in response.text
+    assert 'name="classifications"' in response.text
+    assert 'name="countries"' in response.text
+    assert 'name="min_amount"' in response.text
+    assert 'name="max_amount"' in response.text
+
+
+def test_dashboard_renders_persisted_ai_requirements_deadlines_and_citations(
+    it_notice: ProcurementRecord,
+) -> None:
+    client = _client((it_notice,), evidence_generator=StubGenerator())
+    extraction = client.post(
+        f"/api/records/{it_notice.source.value}/{it_notice.source_record_id}/evidence/extract"
+    )
+
+    response = client.get("/?profile=it-data-integrator")
+
+    assert extraction.status_code == 200
+    assert response.status_code == 200
+    assert "requirements: found" in response.text
+    assert "Data engineering services are required." in response.text
+    assert "deadlines: found" in response.text
+    assert "Submission deadline" in response.text
+    assert "description · Data engineering" in response.text
+    assert "deadline_at · 2026-09-30T12:00:00Z" in response.text
 
 
 def test_alert_api_syncs_lists_and_marks_in_app_delivery_read(

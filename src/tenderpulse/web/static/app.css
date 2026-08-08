@@ -84,6 +84,12 @@ select, input, textarea { color: var(--ink); background: white; border: 1px soli
 .evidence-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .evidence-row span, .chip-set span, .badge { padding: 5px 8px; color: #35534f; background: #e8eee8; border-radius: 4px; font: 9px var(--mono); }
 .evidence-row span b { color: var(--mint-strong); }.evidence-row span.gap { color: #865d29; background: #f6e9ce; }
+.ai-evidence { margin-top: 14px; padding: 12px; background: #eef2ed; border: 1px solid #dce3db; border-radius: 7px; }
+.ai-evidence.validated { border-left: 3px solid var(--mint-strong); }.ai-evidence.rejected, .ai-evidence.failed { border-left: 3px solid var(--coral); }
+.ai-evidence-head { display: flex; justify-content: space-between; gap: 12px; font: 9px var(--mono); text-transform: uppercase; }.ai-evidence-head span { color: var(--muted); }.ai-evidence-head b { color: var(--ink); }
+.coverage-row { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 7px; }.coverage-row span { padding: 4px 7px; color: #35534f; background: white; border-radius: 4px; font: 9px var(--mono); }
+.claim-list { margin-top: 9px; display: grid; gap: 7px; }.claim-list p { margin: 0; padding-left: 10px; border-left: 2px solid var(--line); font-size: 11px; line-height: 1.45; }.claim-list b, .claim-list small { display: block; }.claim-list small { margin-top: 3px; color: var(--muted); font: 9px var(--mono); }
+.ai-gaps { margin: 9px 0 0; color: var(--muted); font: 9px/1.5 var(--mono); }
 details { margin-top: 15px; }
 summary { cursor: pointer; color: var(--muted); font: 10px var(--mono); }
 .trace-grid { margin-top: 10px; display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 6px 10px; font-size: 10px; }
@@ -107,7 +113,7 @@ fieldset { margin: 0 0 18px; padding: 0; border: 0; display: flex; gap: 16px; } 
 #ingestion-form .button { margin-top: 16px; width: 100%; } output { display: block; margin-top: 10px; }
 .upload-form { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }.upload-form label { display: grid; gap: 8px; color: var(--muted); font: 10px var(--mono); }.upload-form input { width: 100%; font-size: 10px; }.upload-form .button { margin-top: 9px; width: 100%; }
 .run-list { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); display: grid; gap: 10px; }.run-list > div { display: grid; grid-template-columns: 8px 48px 1fr auto; align-items: center; gap: 8px; font-size: 10px; }.run-list time { color: var(--muted); font: 9px var(--mono); }
-.profile-panel { margin-top: 18px; }.profile-layout { display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 30px; }.profile-layout h3 { font-size: 12px; }.profile-layout ul { padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.7; }.chip-set { display: flex; flex-wrap: wrap; gap: 6px; }#profile-form { display: grid; gap: 10px; }#profile-form textarea { resize: vertical; }
+.profile-panel { margin-top: 18px; }.profile-layout { display: grid; grid-template-columns: .8fr .8fr 1.6fr; gap: 30px; }.profile-layout h3 { font-size: 12px; }.profile-layout ul { padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.7; }.chip-set { display: flex; flex-wrap: wrap; gap: 6px; }#profile-form { display: grid; gap: 10px; }#profile-form textarea { resize: vertical; }.profile-budget-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 footer { margin-top: 38px; padding-top: 22px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--muted); font: 9px var(--mono); }
 
 @media (max-width: 1050px) { .shell { grid-template-columns: 80px 1fr; }.rail { padding: 25px 14px; }.brand > span:last-child, .nav a:not(.active), .nav a.active { font-size: 0; }.nav a.active span { font-size: 10px; }.rail-section, .rail-footer div { display: none; }.lower-grid { grid-template-columns: 1fr; }.profile-layout { grid-template-columns: 1fr; }.alert-strip { grid-template-columns: 1fr 1fr; }.opportunity { grid-template-columns: 75px 1fr; }.card-actions { grid-column: 2; border-left: 0; border-top: 1px solid var(--line); flex-direction: row; }.decision { margin: auto auto auto 0; } }

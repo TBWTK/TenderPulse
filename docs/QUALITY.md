@@ -24,6 +24,11 @@ updated: 2026-08-08
   mixed-currency lots do not become a false total.
 - [x] Opt-in webhook uses a stable idempotency key, retries only retryable failures and stores attempts
   without destination URL or response body.
+- [x] Full company-profile input is normalized and versioned; invalid classification/country/budget
+  states fail validation, changed versions alter ranking and create a version-specific alert snapshot.
+- [x] Replaying bootstrap preserves the current user profile version instead of reactivating demo v1.
+- [x] Dashboard reload projects the latest current-record AI attempt with coverage, claims, gaps and
+  citations; client updates use DOM text nodes and never inject source/LLM text through `innerHTML`.
 
 ## Regression gates
 
@@ -32,11 +37,13 @@ updated: 2026-08-08
 - [x] dbt source/not-null/unique/relationships/accepted-values tests pass for all marts.
 - [x] Ruff formatting/lint and strict mypy pass.
 - [x] Docker Compose config and container health checks pass.
-- [x] Server-rendered dashboard and API product flows pass integration tests; browser visual QA was not requested.
+- [x] Server-rendered dashboard, API product flows and static DOM-safety contracts pass integration tests.
 - [x] Live TED/ЕИС/USA/GigaChat smokes are bounded and record no secret values; ЕИС replay preserves one
   canonical version while recording each run and raw hash.
 - [x] In-app alert replay is idempotent and new record/profile versions produce distinct events.
-- [x] Alembic `0004..0005`, organization/outcome marts and 48 dbt data tests pass on Docker PostgreSQL.
+- [x] Alembic `0004..0006`, legacy AI coverage migration, organization/outcome marts and 48 dbt data
+  tests pass on Docker PostgreSQL.
+- [x] dbt's default local port is contract-tested against the Docker Compose published port.
 
 ## Verification commands
 

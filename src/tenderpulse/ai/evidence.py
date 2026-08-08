@@ -160,6 +160,16 @@ def validate_extraction_arguments(
     return extraction
 
 
+def upgrade_legacy_extraction_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Add explicit coverage to v1 payloads without inventing absence evidence."""
+    upgraded = dict(payload)
+    for category in ("requirements", "deadlines"):
+        status_field = f"{category}_status"
+        if status_field not in upgraded:
+            upgraded[status_field] = "found" if upgraded.get(category) else "unknown"
+    return upgraded
+
+
 def _render_datetime(value: datetime | None) -> str:
     if value is None:
         return "unknown"

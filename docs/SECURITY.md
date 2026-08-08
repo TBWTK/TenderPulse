@@ -21,6 +21,7 @@ payloads, пользовательские файлы/поля, LLM output и UR
 | TLS interception | checked-in public root + issuing CA, verification always on, fingerprint tests and documented expiry | upstream chain rotation |
 | SSRF | fixed adapter base URLs, validated object keys, no user-provided fetch URL | compromised official source |
 | Prompt injection | source text is data, no LLM tools, structured schema and citations | semantic manipulation remains possible |
+| Stored XSS from source/LLM text | server template autoescape; dynamic evidence is built with `textContent`/DOM nodes, never `innerHTML` | future UI code must keep the same sink policy |
 | Poisoned/changed source | raw hash, source locator, SCD2 diff, validation issues | source itself may publish wrong facts |
 | Cross-company leakage | local single-tenant MVP; no public deployment | missing auth/RBAC blocks public use |
 | Alert duplication | transactional outbox + stable webhook `Idempotency-Key` + attempt history | receiver must implement deduplication |

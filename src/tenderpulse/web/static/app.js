@@ -1,3 +1,73 @@
+const errorMessage = (payload, fallback) => {
+  if (typeof payload?.detail === 'string') return payload.detail;
+  if (Array.isArray(payload?.detail)) {
+    return payload.detail.map((item) => `${item.loc?.slice(1).join('.') || 'input'}: ${item.msg}`).join(' · ');
+  }
+  return fallback;
+};
+
+const splitValues = (value, separator) => String(value).split(separator).map((item) => item.trim()).filter(Boolean);
+
+const parseClassifications = (value) => {
+  const result = {};
+  splitValues(value, /\r?\n/).forEach((line) => {
+    const separator = line.indexOf(':');
+    if (separator < 1) throw new Error(`Классификатор без SYSTEM: ${line}`);
+    const system = line.slice(0, separator).trim();
+    const prefixes = splitValues(line.slice(separator + 1), ',');
+    if (!prefixes.length) throw new Error(`Не указаны prefixes для ${system}`);
+    result[system] = [...(result[system] || []), ...prefixes];
+  });
+  if (!Object.keys(result).length) throw new Error('Укажите хотя бы один классификатор');
+  return result;
+};
+
+const textElement = (tag, value, className = '') => {
+  const element = document.createElement(tag);
+  element.textContent = value;
+  if (className) element.className = className;
+  return element;
+};
+
+const renderEvidence = (container, payload) => {
+  container.replaceChildren();
+  container.className = `ai-evidence ${payload.status}`;
+  const head = document.createElement('div');
+  head.className = 'ai-evidence-head';
+  head.append(
+    textElement('span', `AI evidence · current record v${payload.record_version}`),
+    textElement('b', payload.status),
+  );
+  container.append(head);
+  if (!payload.claims) {
+    container.append(textElement('p', payload.error_code || 'claims unavailable', 'ai-gaps'));
+    return;
+  }
+  const coverage = document.createElement('div');
+  coverage.className = 'coverage-row';
+  coverage.append(
+    textElement('span', `requirements: ${payload.claims.requirements_status}`),
+    textElement('span', `deadlines: ${payload.claims.deadlines_status}`),
+  );
+  container.append(coverage);
+  const claimList = document.createElement('div');
+  claimList.className = 'claim-list';
+  const addClaim = (label, citation) => {
+    const claim = document.createElement('p');
+    claim.append(
+      textElement('b', label),
+      textElement('small', `${citation.field} · ${citation.quote}`),
+    );
+    claimList.append(claim);
+  };
+  payload.claims.requirements.forEach((claim) => addClaim(claim.text, claim.citation));
+  payload.claims.deadlines.forEach((claim) => addClaim(`${claim.label} · ${claim.value}`, claim.citation));
+  if (claimList.childElementCount) container.append(claimList);
+  if (payload.claims.gaps.length) {
+    container.append(textElement('p', `gaps · ${payload.claims.gaps.join(' · ')}`, 'ai-gaps'));
+  }
+};
+
 const profileSwitch = document.querySelector('#profile-switch');
 profileSwitch?.addEventListener('change', () => {
   const url = new URL(window.location.href);
@@ -25,7 +95,7 @@ ingestionForm?.addEventListener('submit', async (event) => {
       }),
     });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || 'Ошибка загрузки');
+    if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка загрузки'));
     status.textContent = payload.map((item) => `${item.source}: ${item.status}, ${item.record_count}`).join(' · ');
     window.setTimeout(() => window.location.reload(), 900);
   } catch (error) {
@@ -41,7 +111,7 @@ eisUploadForm?.addEventListener('submit', async (event) => {
   try {
     const response = await fetch('/api/ingestion/eis-upload', {method: 'POST', body: new FormData(eisUploadForm)});
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || 'Ошибка пакета');
+    if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка пакета'));
     status.textContent = `ЕИС: ${payload.status}, ${payload.record_count} записей`;
     window.setTimeout(() => window.location.reload(), 800);
   } catch (error) {
@@ -57,7 +127,8 @@ document.querySelectorAll('.ai-button').forEach((button) => {
     try {
       const response = await fetch(`/api/records/${button.dataset.source}/${button.dataset.record}/evidence/extract`, {method: 'POST'});
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.detail || 'Ошибка извлечения');
+      if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка извлечения'));
+      renderEvidence(button.closest('.opportunity').querySelector('[data-evidence-output]'), payload);
       button.textContent = payload.status === 'validated' ? 'Evidence сохранён' : `Статус: ${payload.status}`;
     } catch (error) {
       button.textContent = `Не выполнено: ${error.message}`;
@@ -74,16 +145,24 @@ profileForm?.addEventListener('submit', async (event) => {
   const status = document.querySelector('#profile-status');
   const profile = JSON.parse(profilePanel.dataset.profile);
   const data = new FormData(profileForm);
-  profile.version += 1;
-  profile.name = String(data.get('name')).trim();
-  profile.positive_keywords = String(data.get('keywords')).split(',').map((item) => item.trim()).filter(Boolean);
-  status.textContent = `Сохраняю v${profile.version}…`;
   try {
-    const response = await fetch(`/api/profiles/${profile.slug}`, {
-      method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(profile),
+    const update = {
+      ...profile,
+      version: profile.version + 1,
+      name: String(data.get('name')).trim(),
+      capabilities: splitValues(data.get('capabilities'), /\r?\n/),
+      positive_keywords: splitValues(data.get('keywords'), /[,\r\n]/),
+      classification_prefixes: parseClassifications(data.get('classifications')),
+      countries: splitValues(data.get('countries'), /[,;\s]+/),
+      min_amount: String(data.get('min_amount')).trim() || null,
+      max_amount: String(data.get('max_amount')).trim() || null,
+    };
+    status.textContent = `Сохраняю v${update.version}…`;
+    const response = await fetch(`/api/profiles/${update.slug}`, {
+      method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(update),
     });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.detail || 'Ошибка профиля');
+    if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка профиля'));
     status.textContent = `Версия ${payload.version} активна. Пересчитываю рекомендации…`;
     window.setTimeout(() => window.location.reload(), 700);
   } catch (error) {

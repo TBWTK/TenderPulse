@@ -9,28 +9,29 @@ updated: 2026-08-08
 
 ## Active objective
 
-Завершить и зафиксировать live ЕИС slice: официальный bounded RSS 44-ФЗ с проверенной TLS-цепочкой,
-raw/SCD2 lineage, scheduler/API/UI и сохранённым manual XML/ZIP fallback; затем передать готовый Git
-checkpoint без несанкционированной внешней отправки.
+Закрыть product-input/evidence slice: дать компании полноценно описывать оба MVP-профиля через UI,
+сохранять каждое изменение новой версией и показывать извлечённые GigaChat requirements/deadlines с
+coverage status, gaps и citations непосредственно в рекомендации.
 
 ## Acceptance criteria
 
-- [x] ЕИС RSS использует только фиксированный официальный HTTPS endpoint, 44-ФЗ, одну страницу,
-  интервал не более 31 дня и не более 50 records; пустой валидный канал даёт явные 0 records.
-- [x] Серверный TLS проверяется pinned root + issuing CA Минцифры; DTD/ENTITY, чужие item links,
-  неожиданный media type/schema и ответы более 2 MiB отклоняются явно.
-- [x] Live ЕИС проходит через общий raw/run/canonical/SCD2/organization pipeline, доступен scheduler,
-  ручному API и dashboard; bounded XML/ZIP upload остаётся независимым fallback для истории.
-- [x] Два последовательных live-запуска доказали одинаковый raw SHA и отсутствие лишней SCD2-версии;
-  pytest/coverage, Ruff, mypy, dbt, Compose health и project-control gates проходят.
-- [x] Локальный Git checkpoint `04509ec` создан после secret scan; push в `origin/main` остаётся только
-  после отдельного явного разрешения пользователя.
+- [x] Dashboard редактирует name, capabilities, keywords, CPV/OKPD2/PSC prefixes, countries и budget
+  bounds для каждого из ровно двух профилей; PUT создаёт следующую immutable version.
+- [x] Company-profile contract нормализует whitespace/case, удаляет дубликаты и явно отклоняет пустые
+  capabilities/keywords, неизвестные classification systems, неверные country codes и budget range.
+- [x] Изменённый профиль немедленно влияет на deterministic recommendations и создаёт отдельный alert
+  snapshot только для новой profile version.
+- [x] Последний AI extraction attempt для current record version отображается в dashboard: status,
+  requirements/deadlines coverage, claims, gaps и verbatim citations; reload не теряет evidence.
+- [x] UI обновляет evidence безопасными DOM text nodes; full regression/dbt/Compose и server-rendered/API
+  QA проходят, документация согласована. In-app browser не открыл loopback из-за client policy, поэтому
+  его визуальный smoke заменён проверяемыми HTML/API/asset-контрактами и не считается product evidence.
 
 ## Current verified state
 
 - Foundation vertical slice реализован: immutable content-addressed raw, ingestion runs, canonical records,
   SCD2 versions, два профиля, matcher, lineage/recommendations API, Alembic, dbt и Docker Compose.
-- `pytest`: 100 passed, branch coverage 86.23%; Ruff format/lint и strict mypy прошли 08.08.2026.
+- `pytest`: 115 passed, branch coverage 86.49%; Ruff format/lint и strict mypy прошли 08.08.2026.
 - Docker health подтверждён для API, worker, PostgreSQL/pgvector и MinIO; init migration/seed завершился с 0.
 - dbt 1.12: 5 models + 48 data tests, `PASS=53 WARN=0 ERROR=0` на PostgreSQL Docker.
 - GigaChat evidence v2 реализован через forced function call и явные coverage statuses; все claims требуют
@@ -47,11 +48,17 @@ checkpoint без несанкционированной внешней отпр
   ЕИС-версий и `max_version=1`; organization projection содержит 8 ЕИС-покупателей и 11 role links.
 - Server-rendered dashboard на `127.0.0.1:8010` вернул HTTP 200 (22 461 bytes), показывает два профиля,
   recommendations, freshness, buyer/outcome analytics, controls, AI evidence и in-app alerts.
+- Runtime profile smoke создал нормализованный `it-data-integrator` v2, получил 10/10 `not_relevant`
+  после изменения matching input, пережил повторный `init`, затем восстановил demo content как auditable
+  v3; второй `init` также сохранил v3 вместо реактивации seed v1.
+- Dashboard runtime smoke после schema upgrade показал TED `497954-2026` с сохранёнными coverage
+  `requirements: unknown` и `deadlines: found`, без server error и потери citations при reload.
 - ЕИС live connector читает официальный RSS одной страницы (44-ФЗ, ≤50 records, ≤31 days) через
   проверенную root + issuing CA цепочку. Manual fallback принимает XML/ZIP до 10 MiB, ограничивает
   members/uncompressed bytes/records и связывает records с hash всего package.
-- Alembic migrations `0001..0005` создают lineage, AI attempts, organization identity, in-app outbox и
-  webhook delivery attempts. Текущий Docker revision — `0005_webhook_alert_delivery`.
+- Alembic migrations `0001..0006` создают lineage, AI attempts, organization identity, in-app outbox,
+  webhook delivery attempts и explicit legacy AI coverage. Текущий Docker revision —
+  `0006_ai_evidence_coverage`; 2/2 исторических payloads имеют явные coverage statuses.
 - Organization backfill на существующем PostgreSQL создал 10 source-scoped entities и 11 links по всем
   сохранённым версиям; повторный запуск идемпотентен.
 - `GET /api/analytics/award-outcomes` вернул три реальных USAspending awards с buyer, winner,
@@ -85,6 +92,9 @@ checkpoint без несанкционированной внешней отпр
   runbook/security projection и миграция `0005`.
 - ЕИС projection: официальный RSS query/parser/client, bounded filters, API/UI/scheduler config,
   live replay evidence, certificate tests и ADR-003; manual package path сохранён.
+- Product-input/evidence projection: полный versioned profile editor, нормализация/валидация matching
+  input, seed-preservation invariant, current-record evidence cards, safe DOM rendering и миграция `0006`.
+- Analytics config projection: dbt default port contract-tested against Docker Compose (`5433`).
 - `certs/russian_trusted_root_ca_pem.crt` и `certs/russian_trusted_sub_ca_pem.crt`: проверенная локальная
   TLS chain для GigaChat/ЕИС без `verify=false`.
 
@@ -99,9 +109,9 @@ checkpoint без несанкционированной внешней отпр
 
 ## Next exact step
 
-После отдельного явного разрешения пользователя выполнить `git push -u origin main`, проверить remote
-ref и зафиксировать опубликованный checkpoint. До такого разрешения никаких внешних Git writes не
-выполнять.
+Создать локальный Git checkpoint product-input/evidence slice, выполнить staged secret scan и
+project-control audit; после явного разрешения пользователя отправить накопленные commits в
+`origin/main` и проверить remote SHA.
 
 ## Blockers
 
@@ -112,6 +122,7 @@ ref и зафиксировать опубликованный checkpoint. До 
 - Полная историческая выгрузка или более 500 records за один запуск.
 - Production auth/RBAC, автоматическая подача заявки и юридическая гарантия требований.
 - SAM.gov, прогноз вероятности победы и обучение собственной модели.
+- Создание третьего MVP-профиля и ingest произвольных офисных документов компании.
 
 ## Verification
 
@@ -122,9 +133,7 @@ ref и зафиксировать опубликованный checkpoint. До 
 .venv/bin/ruff check src tests migrations
 .venv/bin/ruff format --check src tests migrations
 .venv/bin/mypy src/tenderpulse
-DBT_HOST=127.0.0.1 DBT_PORT=5433 DBT_USER=tenderpulse \
-  DBT_PASSWORD=tenderpulse-local-only DBT_DBNAME=tenderpulse \
-  .venv/bin/dbt build --project-dir analytics --profiles-dir analytics
+make dbt-test
 docker compose config --quiet
 python3 /Users/tbwtk/.codex/skills/project-control/scripts/project_control.py check .
 ```

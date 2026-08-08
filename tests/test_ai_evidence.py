@@ -7,6 +7,7 @@ import pytest
 from tenderpulse.ai.evidence import (
     EvidenceValidationError,
     build_evidence_input,
+    upgrade_legacy_extraction_payload,
     validate_extraction_arguments,
 )
 
@@ -135,3 +136,26 @@ def test_empty_claim_category_requires_explicit_coverage_status(it_notice) -> No
                 "gaps": [],
             },
         )
+
+
+def test_legacy_extraction_payload_upgrades_empty_categories_to_explicit_unknown() -> None:
+    upgraded = upgrade_legacy_extraction_payload(
+        {
+            "requirements": [],
+            "deadlines": [
+                {
+                    "label": "submission",
+                    "value": "2026-09-30T12:00:00Z",
+                    "normalized_at": "2026-09-30T12:00:00Z",
+                    "citation": {
+                        "field": "deadline_at",
+                        "quote": "2026-09-30T12:00:00Z",
+                    },
+                }
+            ],
+            "gaps": [],
+        }
+    )
+
+    assert upgraded["requirements_status"] == "unknown"
+    assert upgraded["deadlines_status"] == "found"

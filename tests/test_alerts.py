@@ -28,7 +28,7 @@ def test_in_app_alert_outbox_is_idempotent_and_traceable(it_notice) -> None:
     repository = ProcurementRepository(session)
     at = datetime(2026, 8, 8, tzinfo=UTC)
     repository.apply_records((it_notice,), at=at)
-    repository.replace_profiles(load_demo_profiles())
+    repository.seed_profiles(load_demo_profiles())
     service = AlertService(session, now=lambda: at)
 
     first = service.sync_profile("it-data-integrator")
@@ -50,7 +50,7 @@ def test_new_record_version_can_create_a_new_alert(it_notice) -> None:
     repository = ProcurementRepository(session)
     at = datetime(2026, 8, 8, tzinfo=UTC)
     repository.apply_records((it_notice,), at=at)
-    repository.replace_profiles(load_demo_profiles())
+    repository.seed_profiles(load_demo_profiles())
     AlertService(session, now=lambda: at).sync_profile("it-data-integrator")
     repository.apply_records(
         (it_notice.model_copy(update={"title": "Updated cloud data platform"}),),
@@ -69,12 +69,32 @@ def test_new_record_version_can_create_a_new_alert(it_notice) -> None:
     ] == [2, 1]
 
 
+def test_new_profile_version_creates_a_distinct_alert_snapshot(it_notice) -> None:
+    session = _session()
+    repository = ProcurementRepository(session)
+    at = datetime(2026, 8, 8, tzinfo=UTC)
+    repository.apply_records((it_notice,), at=at)
+    repository.seed_profiles(load_demo_profiles())
+    first = AlertService(session, now=lambda: at).sync_profile("it-data-integrator")
+    current = repository.get_profile("it-data-integrator")
+    assert current is not None
+    repository.add_profile_version(current.model_copy(update={"version": 2}))
+
+    second = AlertService(session, now=lambda: at + timedelta(seconds=1)).sync_profile(
+        "it-data-integrator"
+    )
+    session.commit()
+
+    assert [first[0].profile_version, second[0].profile_version] == [1, 2]
+    assert len(AlertRepository(session).list_for_profile("it-data-integrator")) == 2
+
+
 def test_alert_can_be_marked_read(it_notice) -> None:
     session = _session()
     repository = ProcurementRepository(session)
     at = datetime(2026, 8, 8, tzinfo=UTC)
     repository.apply_records((it_notice,), at=at)
-    repository.replace_profiles(load_demo_profiles())
+    repository.seed_profiles(load_demo_profiles())
     alert = AlertService(session, now=lambda: at).sync_profile("it-data-integrator")[0]
 
     read = AlertRepository(session).mark_read(alert.id, at=at + timedelta(minutes=1))

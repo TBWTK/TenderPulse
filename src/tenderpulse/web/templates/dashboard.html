@@ -124,6 +124,20 @@
               {% endfor %}
               {% for gap in recommendation.gaps %}<span class="gap">{{ gap.value }}</span>{% endfor %}
             </div>
+            {% set evidence_attempt = item.evidence_attempt %}
+            <section class="ai-evidence {{ evidence_attempt.status.value if evidence_attempt else 'empty' }}" data-evidence-output aria-live="polite">
+              {% if evidence_attempt %}
+              <div class="ai-evidence-head"><span>AI evidence · current record v{{ evidence_attempt.record_version }}</span><b>{{ evidence_attempt.status.value }}</b></div>
+              {% if evidence_attempt.claims %}
+              <div class="coverage-row"><span>requirements: {{ evidence_attempt.claims.requirements_status.value }}</span><span>deadlines: {{ evidence_attempt.claims.deadlines_status.value }}</span></div>
+              <div class="claim-list">
+                {% for claim in evidence_attempt.claims.requirements %}<p><b>{{ claim.text }}</b><small>{{ claim.citation.field }} · {{ claim.citation.quote }}</small></p>{% endfor %}
+                {% for claim in evidence_attempt.claims.deadlines %}<p><b>{{ claim.label }} · {{ claim.value }}</b><small>{{ claim.citation.field }} · {{ claim.citation.quote }}</small></p>{% endfor %}
+              </div>
+              {% if evidence_attempt.claims.gaps %}<p class="ai-gaps">gaps · {{ evidence_attempt.claims.gaps|join(' · ') }}</p>{% endif %}
+              {% else %}<p class="ai-gaps">{{ evidence_attempt.error_code or 'claims unavailable' }}</p>{% endif %}
+              {% else %}<p class="ai-gaps">Requirements/deadlines ещё не извлечены для этой версии.</p>{% endif %}
+            </section>
             <details>
               <summary>Прослеживаемость</summary>
               <div class="trace-grid">
@@ -191,7 +205,21 @@
         <div class="profile-layout">
           <div><h3>Компетенции</h3><ul>{% for capability in selected.capabilities %}<li>{{ capability }}</li>{% endfor %}</ul></div>
           <div><h3>Классификаторы</h3><div class="chip-set">{% for system, prefixes in selected.classification_prefixes.items() %}{% for prefix in prefixes %}<span>{{ system }} {{ prefix }}</span>{% endfor %}{% endfor %}</div></div>
-          <form id="profile-form"><label>Название<input name="name" value="{{ selected.name }}" required></label><label>Ключевые слова<textarea name="keywords" rows="3">{{ selected.positive_keywords|join(', ') }}</textarea></label><button class="button ghost" type="submit">Сохранить как v{{ selected.version + 1 }}</button><output id="profile-status" aria-live="polite">Предыдущая версия останется в истории.</output></form>
+          <form id="profile-form">
+            <label>Название<input name="name" value="{{ selected.name }}" required></label>
+            <label>Компетенции · по одной на строку<textarea name="capabilities" rows="4" required>{% for value in selected.capabilities %}{{ value }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea></label>
+            <label>Ключевые слова · строка или запятая<textarea name="keywords" rows="4" required>{{ selected.positive_keywords|join(', ') }}</textarea></label>
+            <label>Классификаторы · `SYSTEM: prefix, prefix`<textarea name="classifications" rows="4" required>{% for system, prefixes in selected.classification_prefixes.items() %}{{ system }}: {{ prefixes|join(', ') }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea></label>
+            <label>География · ISO alpha-2 через запятую<input name="countries" value="{{ selected.countries|join(', ') }}" required></label>
+            <div class="profile-budget-grid">
+              <label>Бюджет от<input type="number" name="min_amount" min="0" step="any" value="{{ selected.min_amount if selected.min_amount is not none else '' }}"></label>
+              <label>Бюджет до<input type="number" name="max_amount" min="0" step="any" value="{{ selected.max_amount if selected.max_amount is not none else '' }}"></label>
+            </div>
+            <button class="button ghost" type="submit">Сохранить как v{{ selected.version + 1 }}</button>
+            <output id="profile-status" aria-live="polite">Все поля сохранятся новой версией; предыдущая останется в истории.</output>
+          </form>
         </div>
       </section>
       {% endif %}

@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from tenderpulse.ai.evidence import ExtractionClaims
+from tenderpulse.ai.evidence import ExtractionClaims, upgrade_legacy_extraction_payload
 from tenderpulse.ai.models import ExtractionOutcome, ExtractionStatus
 from tenderpulse.domain.models import ProcurementRecord, SourceCode
 from tenderpulse.persistence.models import (
@@ -143,7 +143,11 @@ class AIExtractionRepository:
             input_sha256=row.input_sha256,
             output_sha256=row.output_sha256,
             status=ExtractionStatus(row.status),
-            claims=ExtractionClaims.model_validate(payload) if payload is not None else None,
+            claims=(
+                ExtractionClaims.model_validate(upgrade_legacy_extraction_payload(payload))
+                if payload is not None
+                else None
+            ),
             error_code=row.error_code,
             error_message=row.error_message,
             retryable=row.retryable,
