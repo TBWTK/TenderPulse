@@ -23,7 +23,7 @@ updated: 2026-08-08
   delivered/failed attempts без response body или secret destination.
 - [x] Full pytest/coverage, Ruff, mypy, dbt, Compose health и project-control gates проходят после новых
   миграций; документация совпадает с реализацией.
-- [ ] Локальный Git checkpoint создан; отправка в `origin/main` выполнена только после явного разрешения.
+- [x] Локальный Git checkpoint создан; отправка в `origin/main` выполняется только после явного разрешения.
 
 ## Current verified state
 
@@ -53,6 +53,8 @@ updated: 2026-08-08
   внешняя отправка не выполнялась, `ALERT_WEBHOOK_URL` по умолчанию не задан.
 - Project-control data profile создан; локальный root commit `2e6f1df` создан на `main` после staged secret
   audit. Push в `origin/main` ожидает отдельного явного разрешения на внешний data egress.
+- Проверенный normalization/outcomes/alerts slice сохранён локальным commit `74b36e8`; staged secret scan
+  не нашёл credentials/private keys, `.env` остаётся ignored.
 - 08.08.2026 официальный TED v3 smoke вернул актуальные records с provenance links; endpoint
   anonymous и поддерживает bounded pagination/iteration.
 - 08.08.2026 официальный USAspending smoke вернул contract awards; источник не содержит активные notices.
@@ -83,8 +85,8 @@ updated: 2026-08-08
 
 ## Next exact step
 
-Создать локальный Git checkpoint после staged secret audit. Push в `origin/main` остаётся отдельным
-внешним действием и выполняется только после явного разрешения пользователя.
+После явного разрешения пользователя выполнить `git push -u origin main`, проверить remote ref и
+зафиксировать опубликованный checkpoint. До такого разрешения никаких внешних Git writes не выполнять.
 
 ## Blockers
 
