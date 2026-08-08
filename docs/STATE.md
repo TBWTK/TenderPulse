@@ -71,6 +71,9 @@ coverage status, gaps и citations непосредственно в реком�
   не нашёл credentials/private keys, `.env` остаётся ignored.
 - Проверенный live ЕИС slice сохранён локальным commit `04509ec`; staged secret scan не нашёл
   credentials/private keys, публичный issuing CA не содержит private key.
+- Проверенный product-input/evidence slice сохранён локальным commit `e6934e0`: полный versioned profile
+  editor, seed preservation, current-record AI evidence, migration `0006` и dbt port contract. Staged
+  secret scan прошёл, `.env` остался ignored.
 - 08.08.2026 официальный TED v3 smoke вернул актуальные records с provenance links; endpoint
   anonymous и поддерживает bounded pagination/iteration.
 - 08.08.2026 официальный USAspending smoke вернул contract awards; источник не содержит активные notices.
@@ -109,9 +112,8 @@ coverage status, gaps и citations непосредственно в реком�
 
 ## Next exact step
 
-Создать локальный Git checkpoint product-input/evidence slice, выполнить staged secret scan и
-project-control audit; после явного разрешения пользователя отправить накопленные commits в
-`origin/main` и проверить remote SHA.
+После явного разрешения пользователя отправить накопленные commits в `origin/main`, проверить remote
+SHA и закрыть Quality & handoff stage.
 
 ## Blockers
 
