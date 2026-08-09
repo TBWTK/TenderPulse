@@ -1,8 +1,8 @@
 ---
 title: Данные
 type: data
-status: draft
-updated: 2026-08-08
+status: active
+updated: 2026-08-10
 ---
 
 # Данные
@@ -25,6 +25,7 @@ updated: 2026-08-08
 | AI extraction attempt | validated/rejected/failed claims + model/prompt/hashes | extraction service | UUID + record version |
 | Recommendation | score, decision, gaps and freshness | matcher | profile version + record version |
 | Match evidence | feature, weight, value, citation | matcher | UUID |
+| Product analytics | typed current/history/outcome projection | analytics service | profile slug + current snapshot |
 | Alert event | idempotent in-app delivery snapshot | dispatcher | profile version + record version + channel + policy |
 | Alert delivery attempt | webhook status/retry evidence without destination/response content | dispatcher | alert + destination hash + attempt |
 
@@ -58,6 +59,20 @@ updated: 2026-08-08
 13. Начиная с Alembic `0006`, каждый сохранённый AI payload имеет явные `requirements_status` и
     `deadlines_status`. Для legacy payload непустая категория становится `found`, пустая — `unknown`;
     миграция не утверждает `not_present` без доказательства модели.
+14. Matching scope выбирается общей функцией `current_opportunities`: `kind=notice` и lifecycle
+    `active|planned`. Product analytics требует, чтобы recommendations ровно покрывали этот scope;
+    несовпадение останавливает построение projection.
+
+## Scope аналитики
+
+| Projection | Фактический scope | Показатели |
+| --- | --- | --- |
+| Matching / coverage / distributions | current active/planned notices | decision funnel, known fields, source, classification, geography, buyer |
+| History | все сохранённые SCD2 versions и их current flags | current records, total versions, records with changes |
+| Outcomes | current award lots | award count, known winner, known amount, buyer/winner/amount evidence |
+
+`unknown` включается в denominator coverage, но не превращается в отдельную выдуманную категорию.
+Профиль влияет на decision funnel, но не изменяет canonical coverage/distributions текущего notice scope.
 
 `source_published_at` принадлежит источнику, `observed_at` — момент видимости ответу adapter-а,
 `ingested_at` — commit в TenderPulse. Freshness считается по всем трём и показывает unknown отдельно.

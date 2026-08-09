@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from tenderpulse.domain.matching import GapCode, MatchDecision, TenderMatcher
-from tenderpulse.domain.models import ProcurementRecord
+from tenderpulse.domain.matching import (
+    GapCode,
+    MatchDecision,
+    TenderMatcher,
+    current_opportunities,
+)
+from tenderpulse.domain.models import LifecycleStatus, ProcurementRecord, RecordKind
 from tenderpulse.profiles import load_demo_profiles
 
 
@@ -71,3 +76,22 @@ def test_expired_notice_is_not_recommended(it_notice: ProcurementRecord) -> None
 
     assert recommendation.decision is MatchDecision.EXPIRED
     assert GapCode.DEADLINE_PASSED in recommendation.gaps
+
+
+def test_current_opportunities_is_the_single_active_notice_scope(
+    it_notice: ProcurementRecord,
+) -> None:
+    planned = it_notice.model_copy(
+        update={"source_record_id": "planned", "lifecycle": LifecycleStatus.PLANNED}
+    )
+    inactive = it_notice.model_copy(
+        update={"source_record_id": "inactive", "lifecycle": LifecycleStatus.CANCELLED}
+    )
+    award = it_notice.model_copy(update={"source_record_id": "award", "kind": RecordKind.AWARD})
+
+    selected = current_opportunities((inactive, award, planned, it_notice))
+
+    assert [record.source_record_id for record in selected] == [
+        "planned",
+        it_notice.source_record_id,
+    ]

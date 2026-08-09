@@ -1,58 +1,70 @@
 ---
 title: Текущее состояние
 type: state
-status: idle
-updated: 2026-08-08
+status: complete
+updated: 2026-08-10
 ---
 
 # Текущее состояние
 
 ## Active objective
 
-Активного инженерного инкремента нет: проверенный TenderPulse MVP опубликован в `origin/main` и
-передан пользователю. Следующая работа начинается только с нового согласованного продуктового результата.
+Довести TenderPulse от проверенного инженерного прототипа до принимаемого продуктового MVP: пользователь
+должен видеть отделённые рекомендации, честный AI evidence state, согласованную навигацию, достоверную
+аналитику текущего среза и видимую историю без ложных обещаний полноты или вероятности победы.
 
 ## Acceptance criteria
 
-- [x] Все заявленные MVP-capabilities сопоставлены с code/test/runtime/data evidence.
-- [x] Product, architecture, data, UI, tests и docs описывают одинаковые границы MVP.
-- [x] В tracked-файлах нет `.env`, private keys или заполненных GigaChat/token credentials.
-- [x] Clean-ветка `main` опубликована в `origin/main`; local и remote SHA проверены на совпадение.
+- [x] Очередь по умолчанию содержит только `recommended` и `review`; `not_relevant`/`expired` доступны
+  отдельно как рассмотренные записи, а counts и заголовки не смешивают эти понятия.
+- [x] AI-action доступен только для actionable records, явно ограничен сохранёнными evidence fields и
+  после validated attempt показывает coverage/result вместо бессмысленного повторного запуска.
+- [x] Порядок sidebar совпадает с DOM, active section обновляется при переходе/scroll и проверяется тестом.
+- [x] Аналитика выбранного профиля показывает decision funnel, current-data coverage, категории,
+  географию, покупателей, outcomes и history/version counts; каждый показатель имеет точный scope label.
+- [x] Карточка показывает число версий и даёт открыть version timeline с raw SHA/run/source evidence.
+- [x] Оба demo-профиля проходят end-to-end product eval; unknown остаётся явным, а нерелевантные записи
+  не выглядят рекомендациями и не создают AI/alert actions.
+- [x] Полный pytest/coverage, Ruff, format, strict mypy, dbt, Docker health, browser inspection и
+  project-control audit проходят; docs/API/UI/data contracts согласованы.
 
 ## Current verified state
 
-- Реализованы bounded adapters TED Search API, официальный ЕИС RSS + безопасный XML/ZIP fallback и
-  USAspending awards; downstream использует единый versioned canonical procurement model.
-- Immutable raw artifacts, SHA-256, ingestion provenance, SCD2 history, source-scoped organizations,
-  lots/classifications/geography и match evidence позволяют восстановить каждую рекомендацию.
-- Два версионируемых профиля управляют TED CPV и USA keyword scope; UI показывает рекомендации,
-  requirements/deadlines coverage, AI citations/gaps, аналитику, загрузку и alerts.
-- Свежий regression checkpoint 08.08.2026: `121 passed`, branch coverage `86.57%`; Ruff lint/format и
-  strict mypy прошли; dbt `PASS=53 WARN=0 ERROR=0`; Docker API/worker/PostgreSQL/MinIO healthy;
-  dashboard вернул HTTP 200.
-- Bounded live smokes TED, ЕИС, USAspending и GigaChat ранее прошли с TLS verification и сохранённым
-  raw/run evidence; live external calls остаются opt-in и не принадлежат deterministic CI.
-- `origin/main` создан обычным push без переписывания истории; upstream настроен, SHA сверяется через
-  `git rev-parse HEAD` и `git ls-remote --heads origin main`.
+- Data/platform foundation сохранён: bounded TED/ЕИС/USA adapters, immutable raw, SCD2 canonical,
+  source-scoped identity, два versioned profiles, matcher, GigaChat evidence, alerts, dbt и Docker.
+- Product acceptance checkpoint 10.08.2026: 131 deterministic tests pass; branch coverage 86.97%; Ruff,
+  format и strict mypy pass; dbt `PASS=53`; rebuilt API/worker/db/minio containers healthy.
+- Browser inspection двух профилей подтверждает разделённые actionable/rejected views, отсутствие
+  AI-action у rejected, cached evidence state, sidebar scroll-spy, scoped analytics и version timeline;
+  browser console errors: 0.
+- Реальный Docker snapshot: IT profile — 2 actionable / 8 rejected из 10; MedLab — 3 actionable
+  (`2 recommended + 1 review`) / 7 rejected. Analytics показывает coverage, distributions, 19 current
+  records / 19 versions и 3 award outcomes без заявления о win probability.
 
 ## Changed areas
 
-- MVP: adapters, canonical/history/identity, raw storage, API/worker, matching/AI evidence, profiles,
-  alerts, analytics/dbt, migrations, Docker, UI, fixtures, tests и project documentation.
-- Handoff checkpoint меняет только `docs/STATE.md` и `docs/ROADMAP.md`; production code/data не менялись.
+- Product queue projection: API группирует единый ranked result, template macro рендерит actionable и
+  rejected audit views, JavaScript управляет AI-action/scroll-spy, CSS показывает audit/action states;
+  tests фиксируют наблюдаемую семантику.
+- Product analytics projection: typed API/UI contract объединяет decision funnel, data coverage,
+  distributions, SCD2 history и award outcomes с явными scope labels; repository предоставляет полный lineage.
+- Matching scope: `current_opportunities` является единым владельцем active/planned notice selection для
+  recommendation API, dashboard и alerts. Workspace date использует московский business day.
 
 ## Decisions made
 
-- USAspending остаётся outcome/history enrichment, не источником активных notices.
-- Lakehouse boundary: S3-compatible immutable raw + PostgreSQL/pgvector canonical/serving + dbt marts.
-- Межисточниковая organization identity не выводится из совпадения имени.
-- ЕИС MVP использует официальный bounded RSS; full export/HTML scraping запрещены.
-- Неизвестные значения остаются явными `unknown`; AI claims допустимы только с проверяемыми citations.
+- Product MVP показывает ranked candidates, но default recommendation queue и rejected audit trail —
+  разные представления одной matcher-authority, а не два независимых расчёта.
+- Analytics для UI строится из canonical records/versions и matcher results с явным scope (`current` или
+  `history`); декоративные labels не могут расширять фактический scope.
+- `validated` означает проверенный structured output, а не полноту source evidence; `unknown` не скрывается.
+- Предсказание победы, автоматическая заявка и полнотекстовое скачивание произвольных вложений не входят
+  в этот MVP и не будут имитироваться эвристикой или LLM.
 
 ## Next exact step
 
-Дождаться нового запроса пользователя и до изменения кода зафиксировать один проверяемый objective с
-acceptance criteria и non-goals.
+Провести пользовательскую приёмку текущего Docker MVP по сохранённым экранам и зафиксировать только
+новые бизнес-требования отдельным следующим этапом.
 
 ## Blockers
 
@@ -60,10 +72,10 @@ acceptance criteria и non-goals.
 
 ## Non-goals
 
-- Полная историческая выгрузка или более 500 records за один запуск.
-- Production auth/RBAC, tenant isolation, автоматическая подача заявки и юридическая гарантия требований.
-- SAM.gov, прогноз вероятности победы, обучение собственной модели и третий MVP-профиль.
-- Произвольные source URLs или неограниченный ad-hoc query вне allowlisted adapters.
+- Полная выгрузка источников, скрытый scraping или гарантия полноты всех юрисдикций.
+- Прогноз вероятности победы, объяснение решения закупочной комиссии и автоматическая подача заявки.
+- Production auth/RBAC/tenant isolation и публичное deployment.
+- Третий профиль, SAM.gov и произвольные user-provided source URLs.
 
 ## Verification
 
@@ -73,8 +85,5 @@ make lint
 make dbt-test
 docker compose config --quiet
 docker compose ps
-curl -sS -o /dev/null -w "%{http_code} %{size_download}\n" http://127.0.0.1:8010/
 python3 /Users/tbwtk/.codex/skills/project-control/scripts/project_control.py audit .
-git rev-parse HEAD
-git ls-remote --heads origin main
 ```

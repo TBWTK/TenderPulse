@@ -2,7 +2,7 @@
 title: Этапы проекта
 type: roadmap
 status: complete
-updated: 2026-08-08
+updated: 2026-08-10
 ---
 
 # Этапы проекта
@@ -17,5 +17,6 @@ updated: 2026-08-08
 | Product | Полный profile input, profile-driven source scope, recommendations, visible AI evidence, analytics, controls и alerts | Current DB profile versions drive versioned HTML/API/matching/ingestion; in-app/webhook idempotency | done |
 | Identity | Source-scoped buyers/suppliers and aliases | Backfill all SCD2 versions, dbt relationships, no guessed cross-source merge | done |
 | Quality & handoff | Документация совпадает с работающим Docker MVP | Full regression, dbt, live smoke, audit, Git checkpoint и проверенный push | done |
+| Product acceptance | Рекомендации, AI-state, navigation, analytics и history образуют честный usable MVP | Two-profile E2E eval, semantic UI tests, browser inspection, full regression | done |
 
 Допустимые статусы: `planned`, `active`, `blocked`, `done`.

@@ -47,6 +47,14 @@ def test_repository_persists_current_and_scd2_lineage(it_notice: ProcurementReco
     assert lineage[0].valid_to == second_at
     assert lineage[1].valid_to is None
     assert lineage[0].record.evidence.raw_sha256 == it_notice.evidence.raw_sha256
+    all_lineages = repository.list_all_lineages()
+    assert list(all_lineages) == [(it_notice.source, it_notice.source_record_id)]
+    assert [
+        version.version for version in all_lineages[(it_notice.source, it_notice.source_record_id)]
+    ] == [
+        1,
+        2,
+    ]
 
 
 def test_repository_source_natural_key_isolated(it_notice: ProcurementRecord) -> None:

@@ -1,9 +1,9 @@
-from collections import Counter
 from collections.abc import Callable, Generator
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Protocol
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
@@ -18,8 +18,8 @@ from tenderpulse.ai.service import AIExtractionService, EvidenceGenerator
 from tenderpulse.alert_models import AlertView
 from tenderpulse.alerts import AlertService
 from tenderpulse.domain.history import RecordVersion
-from tenderpulse.domain.matching import Recommendation, TenderMatcher
-from tenderpulse.domain.models import LifecycleStatus, ProcurementRecord, RecordKind, SourceCode
+from tenderpulse.domain.matching import Recommendation, TenderMatcher, current_opportunities
+from tenderpulse.domain.models import ProcurementRecord, SourceCode
 from tenderpulse.ingestion_models import IngestionRunView, SourceFreshnessView
 from tenderpulse.live_ingestion import LiveSourceResult
 from tenderpulse.outcomes import AwardOutcomeView
@@ -27,10 +27,26 @@ from tenderpulse.persistence.ai_repository import AIExtractionRepository
 from tenderpulse.persistence.alert_repository import AlertRepository
 from tenderpulse.persistence.ingestion_repository import IngestionRepository
 from tenderpulse.persistence.repository import ProcurementRepository
+from tenderpulse.product_analytics import ProductAnalytics, build_product_analytics
 from tenderpulse.profiles import CompanyProfile
 from tenderpulse.sources.common import SourceContractError
 
 MAX_EIS_UPLOAD_BYTES = 10 * 1024 * 1024
+WORKSPACE_TIMEZONE = ZoneInfo("Europe/Moscow")
+RU_MONTHS = (
+    "января",
+    "февраля",
+    "марта",
+    "апреля",
+    "мая",
+    "июня",
+    "июля",
+    "августа",
+    "сентября",
+    "октября",
+    "ноября",
+    "декабря",
+)
 
 
 class IngestionRunner(Protocol):
@@ -132,12 +148,7 @@ def create_app(
         profile = repository.get_profile(profile_slug)
         if profile is None:
             raise HTTPException(status_code=404, detail="company profile not found")
-        opportunities = [
-            record
-            for record in repository.list_current_records()
-            if record.kind is RecordKind.NOTICE
-            and record.lifecycle in {LifecycleStatus.ACTIVE, LifecycleStatus.PLANNED}
-        ]
+        opportunities = current_opportunities(repository.list_current_records())
         return TenderMatcher(now=now).rank(profile, opportunities)
 
     @app.get(
@@ -250,6 +261,26 @@ def create_app(
     def award_outcomes(session: SessionDep) -> tuple[AwardOutcomeView, ...]:
         return ProcurementRepository(session).list_award_outcomes()
 
+    @app.get(
+        "/api/analytics/product/{profile_slug}",
+        response_model=ProductAnalytics,
+    )
+    def product_analytics(profile_slug: str, session: SessionDep) -> ProductAnalytics:
+        repository = ProcurementRepository(session)
+        profile = repository.get_profile(profile_slug)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="company profile not found")
+        records = repository.list_current_records()
+        opportunities = current_opportunities(records)
+        ranked = TenderMatcher(now=now).rank(profile, opportunities)
+        return build_product_analytics(
+            current_records=records,
+            opportunities=opportunities,
+            recommendations=ranked,
+            lineages=repository.list_all_lineages(),
+            award_outcomes=repository.list_award_outcomes(),
+        )
+
     @app.post("/api/alerts/sync/{profile_slug}", response_model=list[AlertView])
     def sync_alerts(profile_slug: str, session: SessionDep) -> tuple[AlertView, ...]:
         try:
@@ -285,36 +316,51 @@ def create_app(
         if selected is None and profiles:
             selected = profiles[0]
         records = repository.list_current_records()
-        opportunities = tuple(
-            record
-            for record in records
-            if record.kind is RecordKind.NOTICE
-            and record.lifecycle in {LifecycleStatus.ACTIVE, LifecycleStatus.PLANNED}
-        )
+        opportunities = current_opportunities(records)
         ranked = TenderMatcher(now=now).rank(selected, opportunities) if selected else []
         record_by_key = {
             (record.source, record.source_record_id): record for record in opportunities
         }
         extraction_repository = AIExtractionRepository(session)
-        cards: list[dict[str, object]] = []
+        lineages = repository.list_all_lineages()
+        actionable_cards: list[dict[str, object]] = []
+        rejected_cards: list[dict[str, object]] = []
         for recommendation in ranked:
             record = record_by_key[(recommendation.record_source, recommendation.record_source_id)]
             attempts = extraction_repository.list_attempts(
                 record.source,
                 record.source_record_id,
             )
-            cards.append(
-                {
-                    "recommendation": recommendation,
-                    "record": record,
-                    "evidence_attempt": attempts[-1] if attempts else None,
-                }
+            card: dict[str, object] = {
+                "recommendation": recommendation,
+                "record": record,
+                "evidence_attempt": attempts[-1] if attempts else None,
+                "lineage": lineages[(record.source, record.source_record_id)],
+            }
+            target = (
+                actionable_cards
+                if recommendation.decision.value in {"recommended", "review"}
+                else rejected_cards
             )
-        buyers = Counter(record.buyer_name for record in records if record.buyer_name)
+            target.append(card)
+        award_outcomes = repository.list_award_outcomes()
+        analytics = (
+            build_product_analytics(
+                current_records=records,
+                opportunities=opportunities,
+                recommendations=ranked,
+                lineages=lineages,
+                award_outcomes=award_outcomes,
+            )
+            if selected
+            else None
+        )
         context = {
             "profiles": profiles,
             "selected": selected,
-            "cards": cards,
+            "workspace_date": _format_workspace_date(now()),
+            "actionable_cards": actionable_cards,
+            "rejected_cards": rejected_cards,
             "record_count": len(records),
             "opportunity_count": len(opportunities),
             "recommended_count": sum(
@@ -322,8 +368,8 @@ def create_app(
             ),
             "freshness": IngestionRepository(session).source_freshness(now=now()),
             "runs": IngestionRepository(session).list_runs(limit=6),
-            "top_buyers": buyers.most_common(5),
-            "award_outcomes": repository.list_award_outcomes()[:5],
+            "analytics": analytics,
+            "award_outcomes": award_outcomes[:5],
             "ai_enabled": evidence_generator is not None,
             "alerts": (
                 AlertRepository(session).list_for_profile(selected.slug) if selected else ()
@@ -332,3 +378,8 @@ def create_app(
         return templates.TemplateResponse(request=request, name="dashboard.html", context=context)
 
     return app
+
+
+def _format_workspace_date(value: datetime) -> str:
+    local_value = value.astimezone(WORKSPACE_TIMEZONE)
+    return f"{local_value.day} {RU_MONTHS[local_value.month - 1]} {local_value.year}"

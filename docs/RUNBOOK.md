@@ -2,7 +2,7 @@
 title: Запуск и эксплуатация
 type: runbook
 status: active
-updated: 2026-08-08
+updated: 2026-08-10
 ---
 
 # Запуск и эксплуатация
@@ -36,6 +36,9 @@ alerts, но сохраняет новый ingestion run как свидетел
   members, 20 MiB uncompressed и 500 records; DTD/ENTITY и unsafe paths запрещены.
 - Runs/freshness: `GET /api/ingestion/runs`, `GET /api/analytics/source-freshness`.
 - Результаты контрактов: `GET /api/analytics/award-outcomes`; winner/amount имеют явный coverage status.
+- Product analytics: `GET /api/analytics/product/{profile_slug}`. `decisions`, `coverage`, `sources`,
+  `categories`, `geographies` и `buyers` относятся только к current active/planned notices; `history`
+  читает все SCD2 versions, `outcomes` — current award lots.
 - Lineage: `GET /api/records/{source}/{source_record_id}/lineage`.
 - Профили: dashboard редактирует name, capabilities, keywords, CPV/OKPD2/PSC, countries и budget bounds;
   `PUT /api/profiles/{slug}` обязан передавать следующую version. В MVP остаётся ровно два slug-а.
@@ -44,6 +47,12 @@ alerts, но сохраняет новый ingestion run как свидетел
 обоих профилей ограничивает TED, union keywords — USAspending; ЕИС RSS использует свой фиксированный
 bounded query. `GET /api/ingestion/runs` возвращает фактические filters и `profile_versions`. Если active
 profiles не ровно два или slug-и дублируются, цикл завершается ошибкой до обращения к источнику.
+
+Dashboard по умолчанию показывает только `recommended`/`review`. Отклонённые matcher-ом records
+раскрываются отдельно под «Рассмотрено и отклонено» и не имеют кнопок AI extraction. Кнопка
+«Проверить требования в доступных данных» проверяет только поля уже сохранённой current record version;
+после validated attempt карточка показывает coverage/claims/gaps вместо повторного действия. Timeline
+«История» содержит raw SHA, ingestion run и официальный source URL каждой версии.
 
 Для регулярного TED/ЕИС/USA цикла:
 

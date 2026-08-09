@@ -6,8 +6,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from tenderpulse.alert_models import AlertView
-from tenderpulse.domain.matching import MatchDecision, TenderMatcher
-from tenderpulse.domain.models import LifecycleStatus, RecordKind
+from tenderpulse.domain.matching import MatchDecision, TenderMatcher, current_opportunities
 from tenderpulse.persistence.alert_repository import AlertRepository
 from tenderpulse.persistence.repository import ProcurementRepository
 
@@ -22,12 +21,7 @@ class AlertService:
         profile = records.get_profile(profile_slug)
         if profile is None:
             raise LookupError(f"company profile not found: {profile_slug}")
-        opportunities = tuple(
-            record
-            for record in records.list_current_records()
-            if record.kind is RecordKind.NOTICE
-            and record.lifecycle in {LifecycleStatus.ACTIVE, LifecycleStatus.PLANNED}
-        )
+        opportunities = current_opportunities(records.list_current_records())
         ranked = TenderMatcher(now=self._now).rank(profile, opportunities)
         record_by_key = {
             (record.source, record.source_record_id): record for record in opportunities

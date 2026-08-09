@@ -81,6 +81,8 @@ def _client(
     *,
     evidence_generator: StubGenerator | None = None,
     ingestion_runner: StubIngestionRunner | None = None,
+    historical_records: tuple[ProcurementRecord, ...] = (),
+    now_at: datetime = datetime(2026, 8, 8, tzinfo=UTC),
 ) -> TestClient:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -91,12 +93,14 @@ def _client(
     factory = sessionmaker(engine, expire_on_commit=False)
     with factory.begin() as session:
         repository = ProcurementRepository(session)
+        if historical_records:
+            repository.apply_records(historical_records, at=datetime(2026, 8, 7, tzinfo=UTC))
         repository.apply_records(records, at=datetime(2026, 8, 8, tzinfo=UTC))
         repository.seed_profiles(load_demo_profiles())
     return TestClient(
         create_app(
             factory,
-            now=lambda: datetime(2026, 8, 8, tzinfo=UTC),
+            now=lambda: now_at,
             evidence_generator=evidence_generator,
             ai_requested_model="GigaChat-2",
             ingestion_runner=ingestion_runner,
@@ -345,6 +349,166 @@ def test_dashboard_renders_product_data(it_notice: ProcurementRecord) -> None:
     assert 'name="min_amount"' in response.text
     assert 'name="max_amount"' in response.text
     assert "текущих версий обоих профилей" in response.text
+
+
+def test_dashboard_workspace_date_comes_from_application_clock(
+    it_notice: ProcurementRecord,
+) -> None:
+    client = _client((it_notice,), now_at=datetime(2026, 8, 10, tzinfo=UTC))
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "10 августа 2026" in response.text
+    assert "08 августа 2026" not in response.text
+
+
+def test_dashboard_workspace_date_uses_moscow_business_day(
+    it_notice: ProcurementRecord,
+) -> None:
+    client = _client((it_notice,), now_at=datetime(2026, 8, 9, 21, 30, tzinfo=UTC))
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "10 августа 2026" in response.text
+
+
+def test_both_demo_profiles_have_distinct_actionable_and_rejected_views(
+    it_notice: ProcurementRecord,
+    medical_notice: ProcurementRecord,
+) -> None:
+    client = _client((it_notice, medical_notice))
+
+    for profile, actionable_title, rejected_title in (
+        ("it-data-integrator", it_notice.title, medical_notice.title),
+        ("medlab-supplier", medical_notice.title, it_notice.title),
+    ):
+        response = client.get(f"/?profile={profile}")
+        actionable, rejected = response.text.split('id="rejected-opportunities"', maxsplit=1)
+        actionable = actionable.split('id="actionable-opportunities"', maxsplit=1)[1]
+
+        assert response.status_code == 200
+        assert actionable_title in actionable
+        assert rejected_title not in actionable
+        assert rejected_title in rejected
+
+
+def test_dashboard_separates_actionable_queue_from_rejected_audit(
+    it_notice: ProcurementRecord,
+    unrelated_notice: ProcurementRecord,
+) -> None:
+    client = _client((it_notice, unrelated_notice), evidence_generator=StubGenerator())
+
+    response = client.get("/?profile=it-data-integrator")
+
+    assert response.status_code == 200
+    actionable, rejected = response.text.split('id="rejected-opportunities"', maxsplit=1)
+    actionable = actionable.split('id="actionable-opportunities"', maxsplit=1)[1]
+    assert it_notice.title in actionable
+    assert unrelated_notice.title not in actionable
+    assert unrelated_notice.title in rejected
+    assert "Рассмотрено и отклонено · 1" in response.text
+    assert actionable.count('class="button ghost ai-button"') == 1
+    assert 'class="button ghost ai-button"' not in rejected
+    assert "Проверить требования в доступных данных" in actionable
+
+
+def test_dashboard_replaces_cached_validated_ai_action_with_coverage_state(
+    it_notice: ProcurementRecord,
+) -> None:
+    client = _client((it_notice,), evidence_generator=StubGenerator())
+    extracted = client.post(
+        f"/api/records/{it_notice.source.value}/{it_notice.source_record_id}/evidence/extract"
+    )
+
+    response = client.get("/?profile=it-data-integrator")
+
+    assert extracted.status_code == 200
+    assert response.status_code == 200
+    assert "Проверено по доступным данным" in response.text
+    assert 'class="button ghost ai-button"' not in response.text
+
+
+def test_product_analytics_exposes_exact_current_and_history_scopes(
+    it_notice: ProcurementRecord,
+    unrelated_notice: ProcurementRecord,
+) -> None:
+    client = _client((it_notice, unrelated_notice))
+
+    response = client.get("/api/analytics/product/it-data-integrator")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["scope"] == "current_active_or_planned_notices"
+    assert payload["decisions"] == {
+        "total": 2,
+        "recommended": 1,
+        "review": 0,
+        "not_relevant": 1,
+        "expired": 0,
+    }
+    assert payload["coverage"] == {
+        "total": 2,
+        "buyer_known": 2,
+        "classification_known": 2,
+        "geography_known": 2,
+        "amount_known": 2,
+        "deadline_known": 2,
+    }
+    assert payload["sources"] == [{"label": "TED", "count": 2}]
+    assert payload["categories"] == [
+        {"label": "CPV:45000000", "count": 1},
+        {"label": "CPV:72200000", "count": 1},
+    ]
+    assert payload["geographies"] == [
+        {"label": "DE", "count": 1},
+        {"label": "SE", "count": 1},
+    ]
+    assert payload["buyers"] == [{"label": "Public Buyer", "count": 2}]
+    assert payload["history"] == {
+        "current_records": 2,
+        "total_versions": 2,
+        "changed_records": 0,
+    }
+    assert payload["outcomes"] == {
+        "awards": 0,
+        "winner_known": 0,
+        "amount_known": 0,
+    }
+
+
+def test_product_analytics_keeps_missing_amount_and_deadline_unknown(
+    medical_notice: ProcurementRecord,
+) -> None:
+    client = _client((medical_notice,))
+
+    response = client.get("/api/analytics/product/medlab-supplier")
+
+    assert response.status_code == 200
+    assert response.json()["coverage"]["amount_known"] == 0
+    assert response.json()["coverage"]["deadline_known"] == 0
+
+
+def test_dashboard_renders_version_timeline_and_truthful_analytics_scope(
+    it_notice: ProcurementRecord,
+) -> None:
+    current = it_notice.model_copy(
+        update={
+            "title": "Corrected cloud platform title",
+            "evidence": it_notice.evidence.model_copy(update={"raw_sha256": "d" * 64}),
+        }
+    )
+    client = _client((current,), historical_records=(it_notice,))
+
+    response = client.get("/?profile=it-data-integrator")
+
+    assert response.status_code == 200
+    assert "История · 2 версии" in response.text
+    assert it_notice.evidence.raw_sha256 in response.text
+    assert current.evidence.raw_sha256 in response.text
+    assert "Текущий срез active/planned" in response.text
+    assert "all history" not in response.text
 
 
 def test_dashboard_renders_persisted_ai_requirements_deadlines_and_citations(

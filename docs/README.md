@@ -3,7 +3,7 @@ title: TenderPulse
 project: TenderPulse
 type: project
 status: active
-updated: 2026-08-08
+updated: 2026-08-10
 ---
 
 # TenderPulse
@@ -42,6 +42,12 @@ TenderPulse превращает ограниченные, регулярно о
 - Карточка рекомендации показывает последний AI attempt для текущей версии notice: coverage
   requirements/deadlines, claims, gaps и verbatim citations. Idempotent in-app alerts и opt-in HTTPS
   webhook ведут журнал попыток; внешняя отправка выключена по умолчанию.
+- Основная очередь содержит только `recommended`/`review`. `not_relevant`/`expired` остаются доступными
+  в отдельном audit-разделе без AI- или alert-действий; оба представления строятся из одного результата matcher.
+- Аналитика выбранного профиля явно разделяет текущий срез active/planned notices, SCD2 history и
+  current award outcomes: decision funnel, полноту полей, источники, категории, географию, покупателей,
+  сохранённые версии, победителей и суммы. Это наблюдаемые данные, а не прогноз вероятности победы.
+- Каждая карточка открывает timeline всех сохранённых версий с raw SHA, ingestion run и официальным URL.
 - Source-scoped identity покупателей/поставщиков: исходные aliases и SCD2/raw evidence сохраняются;
   одинаковое имя из разных источников не считается доказанным merge.
 

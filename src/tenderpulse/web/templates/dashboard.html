@@ -1,3 +1,67 @@
+{% macro opportunity_card(item, ai_enabled, actionable) -%}
+{% set recommendation = item.recommendation %}
+{% set record = item.record %}
+{% set evidence_attempt = item.evidence_attempt %}
+{% set lineage = item.lineage %}
+<article class="opportunity {{ recommendation.decision.value }}">
+  <div class="score-block">
+    <span class="score">{{ (recommendation.score * 100)|int }}</span>
+    <small>match<br>score</small>
+  </div>
+  <div class="opportunity-body">
+    <div class="meta-line">
+      <span class="source-tag">{{ record.source.value|upper }}</span>
+      <span>{{ record.source_record_id }}</span>
+      <span>{{ record.countries|join(' · ') if record.countries else 'география unknown' }}</span>
+      <span>{{ record.deadline_at.strftime('%d.%m.%Y %H:%M') if record.deadline_at else 'срок unknown' }}</span>
+    </div>
+    <h3><a href="{{ record.evidence.source_url }}" target="_blank" rel="noreferrer">{{ record.title }}</a></h3>
+    <p class="buyer">{{ record.buyer_name or 'Заказчик не указан' }}</p>
+    <div class="evidence-row">
+      {% for reason in recommendation.reasons %}
+      <span><b>+{{ (reason.contribution * 100)|int }}</b> {{ reason.code }} · {{ reason.matched_values|join(', ') }}</span>
+      {% endfor %}
+      {% for gap in recommendation.gaps %}<span class="gap">{{ gap.value }}</span>{% endfor %}
+    </div>
+    <section class="ai-evidence {{ evidence_attempt.status.value if evidence_attempt else 'empty' }}" data-evidence-output aria-live="polite">
+      {% if evidence_attempt %}
+      <div class="ai-evidence-head"><span>AI evidence · current record v{{ evidence_attempt.record_version }}</span><b>{{ evidence_attempt.status.value }}</b></div>
+      {% if evidence_attempt.claims %}
+      <div class="coverage-row"><span>requirements: {{ evidence_attempt.claims.requirements_status.value }}</span><span>deadlines: {{ evidence_attempt.claims.deadlines_status.value }}</span></div>
+      <div class="claim-list">
+        {% for claim in evidence_attempt.claims.requirements %}<p><b>{{ claim.text }}</b><small>{{ claim.citation.field }} · {{ claim.citation.quote }}</small></p>{% endfor %}
+        {% for claim in evidence_attempt.claims.deadlines %}<p><b>{{ claim.label }} · {{ claim.value }}</b><small>{{ claim.citation.field }} · {{ claim.citation.quote }}</small></p>{% endfor %}
+      </div>
+      {% if evidence_attempt.claims.gaps %}<p class="ai-gaps">gaps · {{ evidence_attempt.claims.gaps|join(' · ') }}</p>{% endif %}
+      {% else %}<p class="ai-gaps">{{ evidence_attempt.error_code or 'claims unavailable' }}</p>{% endif %}
+      {% else %}<p class="ai-gaps">Requirements/deadlines ещё не проверены в доступных полях этой версии.</p>{% endif %}
+    </section>
+    <details class="lineage-timeline">
+      <summary>История · {{ lineage|length }} {{ 'версия' if lineage|length == 1 else 'версии' }}</summary>
+      <div class="timeline-list">
+        {% for version in lineage %}
+        <article>
+          <b>v{{ version.version }} · {{ 'current' if version.valid_to is none else 'до ' ~ version.valid_to.strftime('%d.%m.%Y %H:%M') }}</b>
+          <span>raw SHA</span><code>{{ version.record.evidence.raw_sha256 }}</code>
+          <span>ingest run</span><code>{{ version.record.evidence.ingestion_run_id }}</code>
+          <span>source</span><a href="{{ version.record.evidence.source_url }}" target="_blank" rel="noreferrer">официальная запись ↗</a>
+        </article>
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+  <div class="card-actions">
+    <span class="decision">{{ recommendation.decision.value }}</span>
+    {% if actionable and ai_enabled and not evidence_attempt %}
+    <button class="button ghost ai-button" data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}">Проверить требования в доступных данных</button>
+    {% elif actionable and evidence_attempt and evidence_attempt.status.value == 'validated' %}
+    <span class="action-state">Проверено по доступным данным</span>
+    {% elif actionable and ai_enabled %}
+    <button class="button ghost ai-button" data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}">Повторить проверку evidence</button>
+    {% endif %}
+  </div>
+</article>
+{%- endmacro %}
 <!doctype html>
 <html lang="ru">
 <head>
@@ -17,10 +81,10 @@
       </a>
 
       <nav class="nav" aria-label="Разделы">
-        <a class="active" href="#opportunities"><span>01</span> Возможности</a>
+        <a class="active" href="#opportunities" aria-current="location"><span>01</span> Возможности</a>
         <a href="#analytics"><span>02</span> Аналитика</a>
-        <a href="#profile"><span>03</span> Профиль</a>
-        <a href="#loading"><span>04</span> Загрузка данных</a>
+        <a href="#loading"><span>03</span> Загрузка данных</a>
+        <a href="#profile"><span>04</span> Профиль</a>
       </nav>
 
       <section class="rail-section" aria-labelledby="freshness-title">
@@ -49,7 +113,7 @@
     <main>
       <header class="topbar">
         <div>
-          <div class="eyebrow">Рабочее пространство / 08 августа 2026</div>
+          <div class="eyebrow">Рабочее пространство / {{ workspace_date }}</div>
           <h1>Лента возможностей</h1>
         </div>
         <label class="profile-switch">
@@ -77,8 +141,8 @@
       </section>
 
       <section class="metrics" aria-label="Ключевые показатели">
-        <article><span class="metric-index">A</span><strong>{{ opportunity_count }}</strong><p>активных возможностей</p></article>
-        <article><span class="metric-index">B</span><strong>{{ record_count }}</strong><p>canonical records</p></article>
+        <article><span class="metric-index">A</span><strong>{{ actionable_cards|length }}</strong><p>для подачи / проверки</p></article>
+        <article><span class="metric-index">B</span><strong>{{ opportunity_count }}</strong><p>рассмотрено active/planned</p></article>
         <article><span class="metric-index">C</span><strong>{{ profiles|length }}</strong><p>версируемых профиля</p></article>
         <article><span class="metric-index">D</span><strong>500</strong><p>жёсткий лимит / запуск</p></article>
       </section>
@@ -100,87 +164,93 @@
         {% endfor %}
       </section>
 
-      <section class="opportunity-list">
-        {% for item in cards %}
-        {% set recommendation = item.recommendation %}
-        {% set record = item.record %}
-        <article class="opportunity {{ recommendation.decision.value }}">
-          <div class="score-block">
-            <span class="score">{{ (recommendation.score * 100)|int }}</span>
-            <small>match<br>score</small>
-          </div>
-          <div class="opportunity-body">
-            <div class="meta-line">
-              <span class="source-tag">{{ record.source.value|upper }}</span>
-              <span>{{ record.source_record_id }}</span>
-              <span>{{ record.countries|join(' · ') if record.countries else 'география unknown' }}</span>
-              <span>{{ record.deadline_at.strftime('%d.%m.%Y %H:%M') if record.deadline_at else 'срок unknown' }}</span>
-            </div>
-            <h3><a href="{{ record.evidence.source_url }}" target="_blank" rel="noreferrer">{{ record.title }}</a></h3>
-            <p class="buyer">{{ record.buyer_name or 'Заказчик не указан' }}</p>
-            <div class="evidence-row">
-              {% for reason in recommendation.reasons %}
-              <span><b>+{{ (reason.contribution * 100)|int }}</b> {{ reason.code }} · {{ reason.matched_values|join(', ') }}</span>
-              {% endfor %}
-              {% for gap in recommendation.gaps %}<span class="gap">{{ gap.value }}</span>{% endfor %}
-            </div>
-            {% set evidence_attempt = item.evidence_attempt %}
-            <section class="ai-evidence {{ evidence_attempt.status.value if evidence_attempt else 'empty' }}" data-evidence-output aria-live="polite">
-              {% if evidence_attempt %}
-              <div class="ai-evidence-head"><span>AI evidence · current record v{{ evidence_attempt.record_version }}</span><b>{{ evidence_attempt.status.value }}</b></div>
-              {% if evidence_attempt.claims %}
-              <div class="coverage-row"><span>requirements: {{ evidence_attempt.claims.requirements_status.value }}</span><span>deadlines: {{ evidence_attempt.claims.deadlines_status.value }}</span></div>
-              <div class="claim-list">
-                {% for claim in evidence_attempt.claims.requirements %}<p><b>{{ claim.text }}</b><small>{{ claim.citation.field }} · {{ claim.citation.quote }}</small></p>{% endfor %}
-                {% for claim in evidence_attempt.claims.deadlines %}<p><b>{{ claim.label }} · {{ claim.value }}</b><small>{{ claim.citation.field }} · {{ claim.citation.quote }}</small></p>{% endfor %}
-              </div>
-              {% if evidence_attempt.claims.gaps %}<p class="ai-gaps">gaps · {{ evidence_attempt.claims.gaps|join(' · ') }}</p>{% endif %}
-              {% else %}<p class="ai-gaps">{{ evidence_attempt.error_code or 'claims unavailable' }}</p>{% endif %}
-              {% else %}<p class="ai-gaps">Requirements/deadlines ещё не извлечены для этой версии.</p>{% endif %}
-            </section>
-            <details>
-              <summary>Прослеживаемость</summary>
-              <div class="trace-grid">
-                <span>raw SHA</span><code>{{ record.evidence.raw_sha256 }}</code>
-                <span>ingest run</span><code>{{ record.evidence.ingestion_run_id }}</code>
-                <span>source</span><a href="{{ record.evidence.source_url }}" target="_blank" rel="noreferrer">официальная запись ↗</a>
-              </div>
-            </details>
-          </div>
-          <div class="card-actions">
-            <span class="decision">{{ recommendation.decision.value }}</span>
-            {% if ai_enabled %}
-            <button class="button ghost ai-button" data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}">Извлечь требования</button>
-            {% endif %}
-          </div>
-        </article>
+      <section class="opportunity-list" id="actionable-opportunities">
+        {% for item in actionable_cards %}
+        {{ opportunity_card(item, ai_enabled, true) }}
         {% else %}
-        <div class="empty-state"><strong>В выбранном срезе пока нет активных notices.</strong><p>Запустите ограниченную загрузку ниже или смените профиль.</p></div>
+        <div class="empty-state"><strong>Сейчас нет закупок для подачи или ручной проверки.</strong><p>Отклонённые matcher-ом записи доступны в audit trail ниже.</p></div>
         {% endfor %}
       </section>
 
-      <section class="lower-grid" id="analytics">
-        <article class="panel analytics-panel">
-          <div class="panel-head"><div><span class="eyebrow">Рынок</span><h2>Активность заказчиков</h2></div><span class="badge">all history</span></div>
-          <div class="buyer-chart">
-            {% set max_count = top_buyers[0][1] if top_buyers else 1 %}
-            {% for buyer, count in top_buyers %}
-            <div class="bar-row"><span>{{ buyer }}</span><div><i style="width: {{ (count / max_count * 100)|int }}%"></i></div><b>{{ count }}</b></div>
-            {% else %}<p class="muted-copy">История заказчиков появится после загрузки.</p>{% endfor %}
-          </div>
-          <p class="panel-note">Это наблюдаемая активность, не вероятность победы. Outcome-данные USAspending используются отдельно от active notices.</p>
-          <div class="outcome-list">
-            <div class="panel-head"><div><span class="eyebrow">Результаты</span><h3>Последние контракты</h3></div><span class="badge">raw linked</span></div>
-            {% for outcome in award_outcomes %}
-            <a class="outcome-row" href="{{ outcome.source_url }}" target="_blank" rel="noreferrer" title="raw SHA {{ outcome.raw_sha256 }}">
-              <span><b>{{ outcome.supplier_names|join(', ') if outcome.supplier_names else 'победитель unknown' }}</b><small>{{ outcome.buyer_name or 'заказчик unknown' }}</small></span>
-              <strong>{% if outcome.amount_status.value == 'found' %}{{ outcome.amount }} {{ outcome.currency }}{% else %}{{ outcome.amount_status.value }}{% endif %}</strong>
-            </a>
-            {% else %}<p class="muted-copy">Результаты появятся после bounded USAspending загрузки.</p>{% endfor %}
-          </div>
-        </article>
+      {% if rejected_cards %}
+      <details class="rejected-audit">
+        <summary>Рассмотрено и отклонено · {{ rejected_cards|length }}</summary>
+        <section class="opportunity-list" id="rejected-opportunities">
+          {% for item in rejected_cards %}{{ opportunity_card(item, ai_enabled, false) }}{% endfor %}
+        </section>
+      </details>
+      {% else %}
+      <section class="opportunity-list" id="rejected-opportunities" hidden></section>
+      {% endif %}
 
-        <article class="panel" id="loading">
+      {% if analytics %}
+      <section class="analytics-section" id="analytics">
+        <div class="section-head"><div><span class="eyebrow">Аналитика профиля</span><h2>Проверяемый срез данных</h2></div><span class="badge">Текущий срез active/planned</span></div>
+        <div class="analytics-grid">
+          <article class="panel analytics-panel wide">
+            <div class="panel-head"><div><span class="eyebrow">Decision funnel</span><h3>Результат matching</h3></div><span class="badge">{{ analytics.decisions.total }} рассмотрено</span></div>
+            <div class="stat-grid four">
+              <div><strong>{{ analytics.decisions.recommended }}</strong><span>recommended</span></div>
+              <div><strong>{{ analytics.decisions.review }}</strong><span>review</span></div>
+              <div><strong>{{ analytics.decisions.not_relevant }}</strong><span>not relevant</span></div>
+              <div><strong>{{ analytics.decisions.expired }}</strong><span>expired</span></div>
+            </div>
+          </article>
+          <article class="panel analytics-panel wide">
+            <div class="panel-head"><div><span class="eyebrow">Data coverage</span><h3>Полнота текущих notices</h3></div><span class="badge">из {{ analytics.coverage.total }}</span></div>
+            <div class="coverage-grid">
+              <div><b>{{ analytics.coverage.buyer_known }}/{{ analytics.coverage.total }}</b><span>заказчик</span></div>
+              <div><b>{{ analytics.coverage.classification_known }}/{{ analytics.coverage.total }}</b><span>классификаторы</span></div>
+              <div><b>{{ analytics.coverage.geography_known }}/{{ analytics.coverage.total }}</b><span>география</span></div>
+              <div><b>{{ analytics.coverage.amount_known }}/{{ analytics.coverage.total }}</b><span>сумма</span></div>
+              <div><b>{{ analytics.coverage.deadline_known }}/{{ analytics.coverage.total }}</b><span>срок</span></div>
+            </div>
+          </article>
+          <article class="panel analytics-panel">
+            <div class="panel-head"><div><span class="eyebrow">Current notices</span><h3>Заказчики</h3></div><span class="badge">current scope</span></div>
+            <div class="buyer-chart">
+              {% set max_count = analytics.buyers[0].count if analytics.buyers else 1 %}
+              {% for item in analytics.buyers[:5] %}
+              <div class="bar-row"><span>{{ item.label }}</span><div><i style="width: {{ (item.count / max_count * 100)|int }}%"></i></div><b>{{ item.count }}</b></div>
+              {% else %}<p class="muted-copy">Заказчик unknown во всём текущем срезе.</p>{% endfor %}
+            </div>
+          </article>
+          <article class="panel analytics-panel">
+            <div class="panel-head"><div><span class="eyebrow">Distributions</span><h3>Источники · категории · география</h3></div><span class="badge">current scope</span></div>
+            <div class="distribution-block"><b>Источники</b><div class="chip-set">{% for item in analytics.sources %}<span>{{ item.label }} · {{ item.count }}</span>{% endfor %}</div></div>
+            <div class="distribution-block"><b>Категории</b><div class="chip-set">{% for item in analytics.categories[:8] %}<span>{{ item.label }} · {{ item.count }}</span>{% else %}<span>unknown</span>{% endfor %}</div></div>
+            <div class="distribution-block"><b>География</b><div class="chip-set">{% for item in analytics.geographies[:8] %}<span>{{ item.label }} · {{ item.count }}</span>{% else %}<span>unknown</span>{% endfor %}</div></div>
+          </article>
+          <article class="panel analytics-panel">
+            <div class="panel-head"><div><span class="eyebrow">SCD2 history</span><h3>Изменения записей</h3></div><span class="badge">all saved versions</span></div>
+            <div class="stat-grid three">
+              <div><strong>{{ analytics.history.current_records }}</strong><span>current records</span></div>
+              <div><strong>{{ analytics.history.total_versions }}</strong><span>saved versions</span></div>
+              <div><strong>{{ analytics.history.changed_records }}</strong><span>records changed</span></div>
+            </div>
+          </article>
+          <article class="panel analytics-panel">
+            <div class="panel-head"><div><span class="eyebrow">Outcomes</span><h3>Победители и суммы</h3></div><span class="badge">current awards</span></div>
+            <div class="stat-grid three">
+              <div><strong>{{ analytics.outcomes.awards }}</strong><span>awards</span></div>
+              <div><strong>{{ analytics.outcomes.winner_known }}</strong><span>winner known</span></div>
+              <div><strong>{{ analytics.outcomes.amount_known }}</strong><span>amount known</span></div>
+            </div>
+            <div class="outcome-list">
+              {% for outcome in award_outcomes %}
+              <a class="outcome-row" href="{{ outcome.source_url }}" target="_blank" rel="noreferrer" title="raw SHA {{ outcome.raw_sha256 }}">
+                <span><b>{{ outcome.supplier_names|join(', ') if outcome.supplier_names else 'победитель unknown' }}</b><small>{{ outcome.buyer_name or 'заказчик unknown' }}</small></span>
+                <strong>{% if outcome.amount_status.value == 'found' %}{{ outcome.amount }} {{ outcome.currency }}{% else %}{{ outcome.amount_status.value }}{% endif %}</strong>
+              </a>
+              {% else %}<p class="muted-copy">Результаты появятся после bounded USAspending загрузки.</p>{% endfor %}
+            </div>
+          </article>
+        </div>
+        <p class="panel-note">Это наблюдаемые current/history данные и deterministic matching, не вероятность победы.</p>
+      </section>
+      {% else %}<section id="analytics"></section>{% endif %}
+
+        <article class="panel loading-panel" id="loading">
           <div class="panel-head"><div><span class="eyebrow">Контроль данных</span><h2>Bounded-загрузка</h2></div><span class="badge warm">ручной запуск</span></div>
           <form id="ingestion-form">
             <fieldset><legend>Источники</legend><label><input type="checkbox" name="sources" value="ted" checked> TED</label><label><input type="checkbox" name="sources" value="eis" checked> ЕИС RSS</label><label><input type="checkbox" name="sources" value="usaspending"> USA outcomes</label></fieldset>
@@ -197,7 +267,6 @@
             {% for run in runs %}<div><span class="pulse {{ 'ok' if run.status == 'succeeded' else 'muted' }}"></span><b>{{ run.source.value|upper }}</b><span>{{ run.status }} · {{ run.record_count }} записей</span><time>{{ run.started_at.strftime('%d.%m %H:%M') }}</time></div>{% endfor %}
           </div>
         </article>
-      </section>
 
       {% if selected %}
       <section class="panel profile-panel" id="profile" data-profile='{{ selected.model_dump(mode="json")|tojson }}'>

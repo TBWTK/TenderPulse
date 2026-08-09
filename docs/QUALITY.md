@@ -1,8 +1,8 @@
 ---
 title: Качество
 type: quality
-status: draft
-updated: 2026-08-08
+status: active
+updated: 2026-08-10
 ---
 
 # Качество
@@ -33,6 +33,14 @@ updated: 2026-08-08
   citations; client updates use DOM text nodes and never inject source/LLM text through `innerHTML`.
 - [x] Each new live cycle reads current DB profile versions, deterministically deduplicates TED CPV/USA
   keyword scope, persists versions/filters and fails before fetch unless exactly two distinct profiles exist.
+- [x] Default UI queue contains only `recommended`/`review`; rejected/expired records remain in a separate
+  audit view and cannot trigger AI extraction.
+- [x] Current validated AI evidence replaces the extraction action with an explicit coverage/result state.
+- [x] Sidebar order equals document order and active navigation follows click/scroll state.
+- [x] Typed product analytics exposes exact current notice, SCD2 history and award outcome scopes through
+  both API and dashboard; missing fields remain visible in coverage denominators.
+- [x] Both demo profiles produce distinct actionable/rejected queues end-to-end, and every card exposes
+  its version count plus raw SHA/run/source timeline.
 
 ## Regression gates
 
@@ -50,6 +58,8 @@ updated: 2026-08-08
 - [x] dbt's default local port is contract-tested against the Docker Compose published port.
 - [x] Runtime wiring reopens a DB session on every profile-provider call, so API/worker need no restart
   after a profile update.
+- [x] Product acceptance regression: 131 deterministic tests pass with 86.97% branch coverage; Ruff,
+  format and strict mypy pass; dbt completes 53/53; rebuilt API/worker containers are healthy.
 
 ## Verification commands
 

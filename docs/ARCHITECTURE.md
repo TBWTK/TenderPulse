@@ -1,8 +1,8 @@
 ---
 title: Архитектура
 type: architecture
-status: draft
-updated: 2026-08-08
+status: active
+updated: 2026-08-10
 ---
 
 # Архитектура
@@ -50,8 +50,13 @@ flowchart LR
   отсутствующие demo-профили, но никогда не реактивирует seed поверх пользовательской версии.
 - Runtime source scope читает те же current DB profiles, что matcher/alerts; `load_demo_profiles` допустим
   только для bootstrap/fixtures. Неожиданное число или дубликаты active profiles останавливают fetch.
+- `current_opportunities` — единственный владелец matching scope: только current notices со статусом
+  `active` или `planned`. Recommendation API, dashboard и alerts не определяют этот scope повторно.
 - Dashboard читает последний extraction attempt только для текущей record version. Payload migration
   добавляет явный coverage status старым attempts, не превращая отсутствие evidence в `not_present`.
+- `ProductAnalytics` — единая typed projection для API и dashboard. Decision/coverage/distribution
+  показатели читают current active/planned notices; history читает все SCD2 versions; outcomes — current
+  award lots. UI обязан показывать эти scope labels и не называть projection вероятностью победы.
 - Все внешние URL зафиксированы adapter config; пользователь не может превратить ingestion в SSRF.
 - TLS verification не отключается, секреты не логируются и не попадают в raw artifacts.
 - Код, schema, OpenAPI, docs, fixtures, tests и marts изменяются как одна projection группы понятий.
@@ -76,7 +81,7 @@ flowchart LR
 | dbt | analytics projections/tests | source facts | mart build fails loudly |
 | Matcher | deterministic score components | source parsing | returns unknown/gaps with evidence |
 | GigaChat adapter | OAuth cache, structured extraction | canonical truth | retryable/permanent error, deterministic fallback |
-| API/Web | versioned profile commands and current evidence projections | background execution | 4xx input, 409 state, 502 dependency |
+| API/Web | versioned profile commands, separated decision queue, product analytics and current evidence projections | background execution | 4xx input, 409 state, 502 dependency |
 | Alert dispatcher | idempotent delivery attempts | recommendation score | outbox retained with reason/retry state |
 
 ## Основной flow

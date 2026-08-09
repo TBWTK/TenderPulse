@@ -8,7 +8,12 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
-from tenderpulse.domain.models import ProcurementRecord, SourceCode
+from tenderpulse.domain.models import (
+    LifecycleStatus,
+    ProcurementRecord,
+    RecordKind,
+    SourceCode,
+)
 from tenderpulse.profiles import CompanyProfile
 
 
@@ -46,6 +51,18 @@ class Recommendation(BaseModel):
     decision: MatchDecision
     reasons: tuple[MatchReason, ...]
     gaps: tuple[GapCode, ...]
+
+
+def current_opportunities(
+    records: Iterable[ProcurementRecord],
+) -> tuple[ProcurementRecord, ...]:
+    """Return the canonical matching scope: current active or planned notices."""
+    return tuple(
+        record
+        for record in records
+        if record.kind is RecordKind.NOTICE
+        and record.lifecycle in {LifecycleStatus.ACTIVE, LifecycleStatus.PLANNED}
+    )
 
 
 class TenderMatcher:

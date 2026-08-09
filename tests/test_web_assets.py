@@ -34,3 +34,17 @@ def test_profile_form_does_not_advance_version_before_a_successful_save() -> Non
     assert "profile.version += 1" not in source
     assert "version: profile.version + 1" in source
     assert "JSON.stringify(update)" in source
+
+
+def test_sidebar_order_matches_document_order_and_tracks_active_section() -> None:
+    template = (WEB / "templates" / "dashboard.html").read_text()
+    javascript = (WEB / "static" / "app.js").read_text()
+    section_ids = ("opportunities", "analytics", "loading", "profile")
+
+    nav_positions = [template.index(f'href="#{section_id}"') for section_id in section_ids]
+    dom_positions = [template.index(f'id="{section_id}"') for section_id in section_ids]
+
+    assert nav_positions == sorted(nav_positions)
+    assert dom_positions == sorted(dom_positions)
+    assert "IntersectionObserver" in javascript
+    assert "aria-current" in javascript

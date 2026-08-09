@@ -87,6 +87,24 @@ class ProcurementRepository:
         )
         return tuple(self._to_version(row) for row in self._session.scalars(statement))
 
+    def list_all_lineages(
+        self,
+    ) -> dict[tuple[SourceCode, str], tuple[RecordVersion, ...]]:
+        statement = (
+            select(ProcurementRecordRow, ProcurementVersionRow)
+            .join(ProcurementVersionRow)
+            .order_by(
+                ProcurementRecordRow.source,
+                ProcurementRecordRow.source_record_id,
+                ProcurementVersionRow.version,
+            )
+        )
+        grouped: dict[tuple[SourceCode, str], list[RecordVersion]] = {}
+        for record_row, version_row in self._session.execute(statement):
+            key = (SourceCode(record_row.source), record_row.source_record_id)
+            grouped.setdefault(key, []).append(self._to_version(version_row))
+        return {key: tuple(versions) for key, versions in grouped.items()}
+
     def seed_profiles(self, profiles: tuple[CompanyProfile, ...]) -> None:
         if len({profile.slug for profile in profiles}) != len(profiles):
             raise ValueError("seed profiles must have distinct slugs")

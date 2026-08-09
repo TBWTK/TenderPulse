@@ -8,6 +8,26 @@ const errorMessage = (payload, fallback) => {
 
 const splitValues = (value, separator) => String(value).split(separator).map((item) => item.trim()).filter(Boolean);
 
+const navLinks = [...document.querySelectorAll('.nav a[href^="#"]')];
+const setActiveNavigation = (sectionId) => {
+  navLinks.forEach((link) => {
+    const active = link.getAttribute('href') === `#${sectionId}`;
+    link.classList.toggle('active', active);
+    if (active) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  });
+};
+navLinks.forEach((link) => link.addEventListener('click', () => setActiveNavigation(link.hash.slice(1))));
+if ('IntersectionObserver' in window) {
+  const sectionObserver = new IntersectionObserver((entries) => {
+    const visible = entries.filter((entry) => entry.isIntersecting)
+      .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+    if (visible?.target.id) setActiveNavigation(visible.target.id);
+  }, {rootMargin: '-15% 0px -65% 0px', threshold: [0.05, 0.25, 0.5]});
+  navLinks.map((link) => document.querySelector(link.hash)).filter(Boolean)
+    .forEach((section) => sectionObserver.observe(section));
+}
+
 const parseClassifications = (value) => {
   const result = {};
   splitValues(value, /\r?\n/).forEach((line) => {
