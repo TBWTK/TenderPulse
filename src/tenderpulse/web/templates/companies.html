@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Компании · TenderPulse{% endblock %}
+{% block content %}
+<header class="page-heading split-heading">
+  <div><span class="eyebrow">Настройка поиска</span><h1>Профили компаний</h1><p>Каждый профиль — отдельная версия бизнес-контекста: услуги, ограничения, бюджеты и география. Изменения сохраняются в истории.</p></div>
+  <a class="button primary" href="/companies/new">Добавить компанию</a>
+</header>
+<section class="company-grid" aria-label="Профили компаний">
+  {% for item in profiles %}
+  <article class="company-card {{ 'selected' if selected and item.slug == selected.slug else '' }}">
+    <div class="company-card-head"><span class="company-avatar">{{ item.name[:2]|upper }}</span><span class="version-badge">v{{ item.version }}</span></div>
+    <div><h2>{{ item.name }}</h2><p>{{ item.description }}</p></div>
+    <dl class="company-facts"><div><dt>Формат</dt><dd>{{ delivery_mode_labels.get(item.delivery_mode.value, item.delivery_mode.value) }}</dd></div><div><dt>Базовый регион</dt><dd>{{ region_labels.get(item.base_region, item.base_region) if item.base_region else 'не задан' }}</dd></div><div><dt>Услуги</dt><dd>{{ item.services|length }}</dd></div></dl>
+    <div class="chip-set">{% for service in item.services[:3] %}<span>{{ service }}</span>{% endfor %}</div>
+    <a class="button secondary full-width" href="/companies/{{ item.slug }}">Открыть и изменить</a>
+  </article>
+  {% else %}<div class="empty-state"><strong>Профилей пока нет.</strong><p>Создайте первую компанию для запуска сопоставления.</p></div>{% endfor %}
+</section>
+{% endblock %}

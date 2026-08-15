@@ -1,0 +1,29 @@
+{% macro opportunity_card(item, actionable) -%}
+{% set recommendation = item.recommendation %}
+{% set record = item.record %}
+{% set evidence_attempt = item.evidence_attempt %}
+{% set lineage = item.lineage %}
+<article class="tender-card {{ recommendation.decision.value }}">
+  <div class="score-pill" aria-label="Оценка совпадения {{ (recommendation.score * 100)|int }} процентов"><strong>{{ (recommendation.score * 100)|int }}</strong><span>%</span></div>
+  <div class="tender-content">
+    <div class="meta-line"><span class="source-tag">{{ record.source.value|upper }}</span><span>{{ record.source_record_id }}</span><span>{% if record.region_codes %}{% for code in record.region_codes %}{{ region_labels.get(code, code) }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}регион unknown{% endif %}</span><span>{{ record.deadline_at.strftime('%d.%m.%Y') if record.deadline_at else 'срок unknown' }}</span></div>
+    <h2><a href="/tenders/{{ record.source.value }}/{{ record.source_record_id }}?profile={{ selected.slug if selected else '' }}">{{ record.title }}</a></h2>
+    <p class="buyer">{{ record.buyer_name or 'Заказчик не указан' }}</p>
+    <div class="signal-row">
+      {% for reason in recommendation.reasons[:3] %}<span class="signal positive">+{{ (reason.contribution * 100)|int }} · {{ reason_labels.get(reason.code, reason.code) }}</span>{% endfor %}
+      {% for gap in recommendation.gaps[:2] %}<span class="signal warning">{{ diagnostic_labels.get(gap.value, gap.value) }}</span>{% endfor %}
+      {% for blocker in recommendation.blockers[:2] %}<span class="signal negative">{{ diagnostic_labels.get(blocker.value, blocker.value) }}</span>{% endfor %}
+    </div>
+    <div class="card-footnote"><span>История · {{ lineage|length }} {{ 'версия' if lineage|length == 1 else 'версии' }}</span><span>{% if evidence_attempt and evidence_attempt.status.value == 'validated' %}Требования проверены{% else %}Требования не проверены{% endif %}</span></div>
+    <section class="ai-evidence compact {{ evidence_attempt.status.value if evidence_attempt else 'empty' }}" data-evidence-output aria-live="polite">
+      {% if evidence_attempt and evidence_attempt.claims %}<span>requirements: {{ evidence_attempt.claims.requirements_status.value }}</span><span>deadlines: {{ evidence_attempt.claims.deadlines_status.value }}</span>{% else %}<span>Проверка выполняется по сохранённой версии данных</span>{% endif %}
+    </section>
+  </div>
+  <div class="card-actions">
+    <span class="decision-badge {{ recommendation.decision.value }}">{{ decision_labels.get(recommendation.decision.value, recommendation.decision.value) }}</span>
+    <a class="button primary" href="/tenders/{{ record.source.value }}/{{ record.source_record_id }}?profile={{ selected.slug if selected else '' }}">Открыть карточку</a>
+    <a class="official-link" href="{{ record.evidence.source_url }}" target="_blank" rel="noreferrer">Официальный сайт ↗</a>
+    {% if actionable and ai_enabled and not evidence_attempt %}<button class="button ghost ai-button" data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}" title="AI извлечёт обязательные требования и сроки из доступных полей сохранённой версии">Извлечь требования и сроки</button><small class="action-help">AI анализирует только сохранённую версию; результат не заменяет проверку документации.</small>{% elif actionable and evidence_attempt and evidence_attempt.status.value == 'validated' %}<span class="action-state">Проверено по доступным данным</span>{% elif actionable and ai_enabled %}<button class="button ghost ai-button" data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}">Повторить извлечение</button>{% endif %}
+  </div>
+</article>
+{%- endmacro %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_profile_fields.html" import profile_fields with context %}
+{% block title %}{{ selected.name }} · TenderPulse{% endblock %}
+{% block content %}
+<header class="page-heading split-heading"><div><a class="back-link" href="/companies">← Все компании</a><span class="eyebrow">Версионируемый профиль · v{{ selected.version }}</span><h1>{{ selected.name }}</h1><p>Изменения создают новую версию и автоматически влияют на matching и новые alerts. Предыдущая версия остаётся доступна.</p></div><a class="button secondary" href="/tenders?profile={{ selected.slug }}">Посмотреть тендеры</a></header>
+<div class="editor-layout">
+  <aside class="guidance-panel"><span class="eyebrow">Подсказка</span><h2>Как заполнить профиль</h2><ol><li><b>Опишите конкретные услуги.</b> Используйте формулировки, которые встречаются в закупках.</li><li><b>Уточните классификаторы.</b> Добавьте ОКПД2/CPV по направлениям компании.</li><li><b>Не завышайте географию.</b> Для физических работ перечислите реальные регионы.</li><li><b>Сохраните ограничения.</b> Лицензии, бюджеты и стоп-слова помогают не тратить время.</li></ol></aside>
+  <section class="panel profile-editor" id="profile" data-profile='{{ selected.model_dump(mode="json")|tojson }}'>
+    <form id="profile-form" class="profile-form-grid">
+      <label class="field wide"><span>Название</span><input name="name" value="{{ selected.name }}" required><small>Показывается в переключателе компаний.</small></label>
+      {{ profile_fields(selected) }}
+      <div class="form-actions wide"><button class="button primary" type="submit">Сохранить как v{{ selected.version + 1 }}</button><output id="profile-status" aria-live="polite">Сохранение создаст новую версию.</output></div>
+    </form>
+    <details class="history-panel"><summary>История профиля · {{ profile_history|length }} {{ 'версия' if profile_history|length == 1 else 'версии' }}</summary><div>{% for item in profile_history %}<span><b>v{{ item.version }}</b>{{ item.name }} · {{ delivery_mode_labels.get(item.delivery_mode.value, item.delivery_mode.value) }} · {{ item.service_regions|join(', ') if item.service_regions else 'регионы не заданы' }}</span>{% endfor %}</div></details>
+  </section>
+</div>
+{% endblock %}

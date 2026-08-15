@@ -1,7 +1,7 @@
 ---
 title: Текущее состояние
 type: state
-status: complete
+status: active
 updated: 2026-08-15
 ---
 
@@ -9,36 +9,41 @@ updated: 2026-08-15
 
 ## Active objective
 
-Реализовать TenderPulse MVP 2.0 как русскоязычный продукт для российских закупок: четыре
-редактируемых demo-компании и любая созданная пользователем компания получают объяснимую очередь
-тендеров с адекватной географией, требованиями, официальным переходом, аналитикой и полной lineage.
+Добиться пользовательской приёмки MVP 2.0 через новый понятный веб-интерфейс: разделить перегруженную
+страницу на самостоятельные рабочие разделы, ввести единый дизайн-код и сохранить все доказанные
+сценарии тендеров, компаний, аналитики, загрузки и прослеживаемости.
 
 ## Acceptance criteria
 
-- [x] Все active opportunities, recommendations, analytics и alerts относятся только к российским
-  закупкам; TED/USAspending не попадают в пользовательские current projections или новые live cycles.
-- [x] Seed содержит четыре различимых versioned-профиля: автосервис, IT, благоустройство и клининг;
-  пользователь может выбрать и изменить каждый без сброса при повторном bootstrap.
-- [x] Пользователь может создать пятую и последующие компании, видеть историю профиля и после restart
-  получать тот же matching/ingestion/alert pipeline без ограничения «ровно два профиля».
-- [x] Профиль хранит описание, услуги, positive/negative keywords, классификаторы, типы заказчиков,
-  бюджет, base/service regions, delivery mode, travel и contractor policy с русскими подсказками UI.
-- [x] Explainable geography использует российские region codes и service mode: московский onsite
-  автосервис отклоняет Камчатку без подрядчиков, contractor coverage меняет решение с evidence,
-  remote IT остаётся допустимым для Владивостока, unknown location остаётся явным gap/blocker.
-- [x] Русский UI предоставляет список/создание/редактирование компаний, поиск/фильтры/сортировку
-  тендеров, отдельный rejected audit и карточку закупки с reasons, blockers и официальным source link.
-- [x] AI requirements/deadlines работают только по сохранённой record version, имеют citations либо
-  честный `unknown`; карточка сохраняет raw SHA/run/source и SCD2 timeline.
-- [x] Scoped analytics показывает decision funnel, coverage, категории/ОКПД2, регионы, заказчиков,
-  freshness, ближайшие deadlines, динамику, geography rejects, gaps/blockers, outcomes и profile quality.
-- [x] Alerts создаются только для actionable российских закупок, содержат region/deadline/source и
-  остаются идемпотентными по версиям профиля/record/policy.
-- [x] Все 15 обязательных E2E-сценариев из цели доказаны deterministic tests и browser inspection;
-  полный pytest/coverage, Ruff/format/mypy, dbt, Docker health и project-control audit проходят.
+- [x] Глобальная навигация ведёт на самостоятельные маршруты: обзор, тендеры, аналитика, компании и
+  загрузка данных; активный раздел, выбранная компания и назначение страницы понятны без прокрутки.
+- [x] Обзор показывает только следующий полезный шаг: actionable-счётчики, ближайшие сроки,
+  свежесть данных, последние alerts и короткие переходы; на нём нет редакторов и длинных аудитов.
+- [x] Тендеры имеют компактные фильтры, ясную иерархию карточки и отдельное представление отклонённых;
+  detail сохраняет официальную ссылку, географическое объяснение, requirements и lineage.
+- [x] Компании разделены на каталог, отдельный редактор и отдельное создание; сложные поля сгруппированы,
+  снабжены подсказками, а история версий не конкурирует с основным действием.
+- [x] Аналитика и загрузка данных находятся на отдельных страницах и не содержат несвязанных форм;
+  аналитические scope/unknown и bounded ЕИС-контракт остаются явными.
+- [x] Единый дизайн-код определяет типографику, цвет, отступы, состояния, карточки, кнопки, формы и
+  responsive-поведение; при ширине 390 px нет горизонтального переполнения и потери действий.
+- [x] Семантические landmarks, видимый keyboard focus, labels, skip-link и понятные статусы обеспечивают
+  базовую доступность; критичный сценарий не зависит только от цвета или hover.
+- [x] Все существующие business/API/evidence/matching тесты остаются зелёными; новые route-isolation,
+  navigation, responsive и browser journey проверки доказывают отсутствие прежней перегрузки.
 
 ## Current verified state
 
+- UX-релиз 15.08.2026: `/`, `/tenders`, `/analytics`, `/companies`, `/companies/new`,
+  `/companies/{slug}` и `/data` имеют отдельные назначения и общий route navigation/profile context.
+- Главная уменьшена с `6800` до `1095 px` при viewport `1280×720`, с `57` до `10` content blocks и
+  с `5` до `0` форм; это меньше двух viewport вместо прежних 9,4.
+- Browser inspection всех семи journeys: правильный active state, `0` unlabeled controls, skip-link,
+  отсутствие horizontal overflow. На `390×844` все пять nav-действий видимы в пределах `10..380 px`.
+- Очередь показывает `recommended/review`; `10` отклонённых записей свёрнуты отдельно и имеют `0`
+  AI-actions. Кнопка объясняет, что извлекает требования/сроки только из сохранённой версии.
+- Финальный regression: `160` tests, branch coverage `87.43%`; Ruff/format/strict mypy — pass;
+  dbt `PASS=54 WARN=0 ERROR=0`; `git diff --check` — pass; пересобранные api/worker/db/minio — healthy.
 - Финальный regression 15.08.2026: `157` deterministic tests проходят с branch coverage `87.21%`;
   Ruff, format и strict mypy проходят, dbt — `54/54`, Docker Compose — healthy.
 - Browser E2E подтвердил четыре отраслевые очереди, Москва/Камчатка, remote IT во Владивостоке,
@@ -47,17 +52,15 @@ updated: 2026-08-15
   `[1, 2]` и мебельная рекомендация `recommended` сохранились в PostgreSQL.
 - Current API/UI/analytics/alerts и журнал загрузок показывают только ЕИС/RU; legacy foreign raw/history
   сохранены для аудита, но не попадают в пользовательский current-контур.
+- UX-аудит 15.08.2026: технически зелёная главная имеет `6800 px` scroll height при viewport `720 px`,
+  `57` section/article blocks, `5` форм и восемь разных h1/h2-задач; пользователь MVP не принял.
 
 ## Changed areas
 
-- Intent checkpoint: цель MVP 2.0, source boundary, capability evals и этапы разработки.
-- Profile/source checkpoint: расширенный profile contract, four-profile seed, create/history API,
-  single-active-version DB invariant и ЕИС-only current/live source policy.
-- Geography/data/product checkpoint: canonical regions/delivery mode, blockers, ЕИС notice/contract
-  parser, Russian-only dbt staging, six-notice demo, award outcome, filters/sort/detail/create UI,
-  deadline/budget/diagnostic/profile-quality analytics и enriched alerts.
-- Handoff checkpoint: русские analytics/status labels, current-source run history, сброс фильтров при
-  смене компании, браузерные сценарии и Docker restart persistence.
+- Delivered UX mutation: server-rendered page routes/templates, shared navigation/layout/design tokens,
+  focused tender/company/analytics/data pages, responsive and accessibility contracts.
+- Not affected: canonical procurement model, matching/geography, persistence/schema, ingestion bounds,
+  AI evidence, alert policy, dbt marts and external source adapters.
 
 ## Decisions made
 
@@ -70,10 +73,13 @@ updated: 2026-08-15
 - Четыре профиля — обязательный seed, а не runtime limit. Любое число active user profiles допустимо;
   ingestion остаётся bounded и сохраняет использованные profile versions.
 - Вероятность победы и анализ конкурентов не вычисляются; historical winners/amounts остаются facts.
+- Один длинный dashboard больше не является владельцем всего UI. FastAPI page routes владеют задачами,
+  общий layout — навигацией/design tokens, а API/domain contracts остаются без изменений.
 
 ## Next exact step
 
-Активного шага разработки нет; следующая продуктовая стадия начинается только с новой проверяемой цели.
+Провести повторную пользовательскую приёмку в локальном приложении `http://127.0.0.1:8010`;
+до явного подтверждения пользователя проект остаётся технически готовым к review, но MVP не объявляется принятым.
 
 ## Blockers
 
@@ -85,6 +91,8 @@ updated: 2026-08-15
 - Автоматическая подача заявки или юридическое заключение о допуске.
 - Неограниченная выгрузка, скрытый scraping и user-provided source URLs.
 - Production multi-tenancy, auth/RBAC и публичное deployment.
+- Изменение matching, procurement schema, dbt-метрик или live-source контрактов.
+- SPA-фреймворк, визуальный page builder и внешняя дизайн-система.
 
 ## Verification
 
@@ -94,5 +102,6 @@ make lint
 make dbt-test
 docker compose config --quiet
 docker compose ps
+git diff --check
 python3 /Users/tbwtk/.codex/skills/project-control/scripts/project_control.py audit .
 ```

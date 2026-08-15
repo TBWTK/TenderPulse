@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_opportunity_card.html" import opportunity_card with context %}
+{% block title %}Тендеры · TenderPulse{% endblock %}
+{% block content %}
+<header class="page-heading split-heading">
+  <div><span class="eyebrow">Рабочая очередь</span><h1>Тендеры для {{ selected.name if selected else 'компании' }}</h1><p>В основной выборке только закупки для подачи или ручной проверки. Нерелевантные записи доступны ниже как объяснимый журнал.</p></div>
+  <div class="heading-stat"><strong>{{ actionable_cards|length }}</strong><span>требуют внимания</span></div>
+</header>
+
+<form class="filter-bar" method="get" action="/tenders" aria-label="Фильтры тендеров">
+  <input type="hidden" name="profile" value="{{ selected.slug if selected else '' }}">
+  <label class="search-field"><span>Поиск</span><input type="search" name="search" value="{{ filters.search }}" placeholder="Предмет, заказчик или номер"></label>
+  <label><span>Решение</span><select name="decision">{% for value, label in [('all', 'Все'), ('actionable', 'К рассмотрению'), ('recommended', 'Рекомендовано'), ('review', 'Нужно проверить'), ('rejected', 'Отклонено'), ('expired', 'Срок истёк')] %}<option value="{{ value }}" {{ 'selected' if filters.decision == value else '' }}>{{ label }}</option>{% endfor %}</select></label>
+  <label><span>Регион</span><select name="region"><option value="all">Все регионы</option>{% for value in available_regions %}<option value="{{ value }}" {{ 'selected' if filters.region == value else '' }}>{{ region_labels.get(value, value) }} ({{ value }})</option>{% endfor %}</select></label>
+  <label><span>Сортировка</span><select name="sort">{% for value, label in [('relevance', 'По релевантности'), ('deadline', 'По сроку'), ('region', 'По региону'), ('amount', 'По сумме'), ('source', 'По источнику')] %}<option value="{{ value }}" {{ 'selected' if filters.sort == value else '' }}>{{ label }}</option>{% endfor %}</select></label>
+  <button class="button primary" type="submit">Применить</button>
+  <a class="button quiet" href="/tenders?profile={{ selected.slug if selected else '' }}">Сбросить</a>
+</form>
+
+<section class="alert-bar" aria-label="Уведомления">
+  <div><span class="status-dot ok"></span><span>{{ alerts|selectattr('read_at', 'none')|list|length }} непрочитанных alerts</span></div>
+  {% if not alerts %}<button class="button secondary" id="sync-alerts" data-profile="{{ selected.slug if selected else '' }}">Сформировать alerts</button>{% else %}<span>Новые рекомендации сохраняются с версией профиля и raw SHA</span>{% endif %}
+</section>
+
+<section class="tender-list" id="actionable-opportunities" aria-labelledby="actionable-title">
+  <div class="section-heading"><div><span class="eyebrow">Приоритет</span><h2 id="actionable-title">К рассмотрению</h2></div><span class="count-badge">{{ actionable_cards|length }}</span></div>
+  {% for item in actionable_cards %}{{ opportunity_card(item, true) }}{% else %}<div class="empty-state"><strong>По выбранным фильтрам ничего не найдено.</strong><p>Сбросьте фильтры или проверьте профиль компании.</p></div>{% endfor %}
+</section>
+
+{% if rejected_cards %}
+<details class="rejected-audit">
+  <summary>Рассмотрено и отклонено · {{ rejected_cards|length }}</summary>
+  <section class="tender-list rejected-list" id="rejected-opportunities" aria-label="Журнал отклонённых закупок">{% for item in rejected_cards %}{{ opportunity_card(item, false) }}{% endfor %}</section>
+</details>
+{% else %}<section id="rejected-opportunities" hidden></section>{% endif %}
+{% endblock %}

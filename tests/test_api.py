@@ -369,39 +369,71 @@ def test_arbitrary_profile_can_be_created_and_history_is_exposed(
     assert "fifth-company" in {item["slug"] for item in client.get("/api/profiles").json()}
 
 
-def test_dashboard_renders_product_data(it_notice: ProcurementRecord) -> None:
-    client = _client((it_notice,))
-
-    response = client.get("/?profile=it-russia-integrator")
-
-    assert response.status_code == 200
-    assert "TenderPulse" in response.text
-    assert "Российская IT-интеграция" in response.text
-    assert "Cloud data platform implementation" in response.text
-    assert "raw SHA" in response.text
-    assert 'name="capabilities"' in response.text
-    assert 'name="classifications"' in response.text
-    assert 'name="countries"' in response.text
-    assert 'name="min_amount"' in response.text
-    assert 'name="max_amount"' in response.text
-    assert "Только официальный ЕИС RSS" in response.text
-
-
-def test_dashboard_is_russian_guided_filterable_and_exposes_full_profile_contract(
+def test_focused_page_routes_render_product_data_without_cross_task_forms(
     it_notice: ProcurementRecord,
 ) -> None:
     client = _client((it_notice,))
 
-    response = client.get("/?profile=it-russia-integrator")
+    overview = client.get("/?profile=it-russia-integrator")
+    tenders = client.get("/tenders?profile=it-russia-integrator")
+    analytics = client.get("/analytics?profile=it-russia-integrator")
+    companies = client.get("/companies?profile=it-russia-integrator")
+    company = client.get("/companies/it-russia-integrator")
+    company_new = client.get("/companies/new")
+    data = client.get("/data?profile=it-russia-integrator")
+
+    assert all(
+        response.status_code == 200
+        for response in (overview, tenders, analytics, companies, company, company_new, data)
+    )
+    assert "Рабочий обзор" in overview.text
+    assert "Ближайший подтверждённый срок" in overview.text
+    assert "Cloud data platform implementation" in tenders.text
+    assert "Воронка решений" in analytics.text
+    assert "Профили компаний" in companies.text
+    assert 'id="profile-form"' in company.text
+    assert 'id="create-profile-form"' in company_new.text
+    assert "Только официальный ЕИС RSS" in data.text
+    assert "Cloud data platform implementation" not in overview.text
+    assert 'id="profile-form"' not in overview.text
+    assert 'id="ingestion-form"' not in overview.text
+    assert 'id="profile-form"' not in tenders.text
+    assert 'id="ingestion-form"' not in analytics.text
+    assert 'id="create-profile-form"' not in companies.text
+
+
+def test_global_navigation_is_russian_route_based_and_marks_the_active_page(
+    it_notice: ProcurementRecord,
+) -> None:
+    client = _client((it_notice,))
+
+    pages = {
+        "/?profile=it-russia-integrator": ("Обзор", "/"),
+        "/tenders?profile=it-russia-integrator": ("Тендеры", "/tenders"),
+        "/analytics?profile=it-russia-integrator": ("Аналитика", "/analytics"),
+        "/companies?profile=it-russia-integrator": ("Компании", "/companies"),
+        "/data?profile=it-russia-integrator": ("Данные", "/data"),
+    }
+
+    for path, (active_label, active_path) in pages.items():
+        response = client.get(path)
+        assert response.status_code == 200
+        for label in ("Обзор", "Тендеры", "Аналитика", "Компании", "Данные"):
+            assert label in response.text
+        assert f'href="{active_path}" aria-current="page"' in response.text
+        assert f">{active_label}<" in response.text
+        assert 'href="#main-content"' in response.text
+
+
+def test_company_editor_is_guided_and_exposes_full_profile_contract(
+    it_notice: ProcurementRecord,
+) -> None:
+    client = _client((it_notice,))
+
+    response = client.get("/companies/it-russia-integrator")
 
     assert response.status_code == 200
-    for label in ("Тендеры", "Аналитика", "Компании", "Загрузка данных"):
-        assert label in response.text
     for field in (
-        "search",
-        "decision",
-        "region",
-        "sort",
         "description",
         "services",
         "capabilities",
@@ -416,23 +448,11 @@ def test_dashboard_is_russian_guided_filterable_and_exposes_full_profile_contrac
         "participation_constraints",
     ):
         assert f'name="{field}"' in response.text
-    assert 'id="create-profile-form"' in response.text
     assert "Как заполнить профиль" in response.text
     assert "История профиля · 1 версия" in response.text
-    for label in (
-        "Воронка решений",
-        "Полнота данных",
-        "Текущие закупки",
-        "Распределения",
-        "История SCD2",
-        "Результаты закупок",
-        "Аудит причин",
-        "Качество профиля",
-        "Календарь сроков",
-    ):
-        assert label in response.text
-    assert "Decision funnel" not in response.text
     assert "Классификаторы · SYSTEM: префикс, префикс" in response.text
+    assert 'id="create-profile-form"' not in response.text
+    assert 'id="ingestion-form"' not in response.text
 
 
 def test_dashboard_amount_formatter_is_compact_and_russian_readable() -> None:
@@ -441,18 +461,19 @@ def test_dashboard_amount_formatter_is_compact_and_russian_readable() -> None:
     assert _format_amount(None) == "—"
 
 
-def test_dashboard_search_and_region_filters_apply_before_rendering(
+def test_tender_search_and_region_filters_apply_before_rendering(
     it_notice: ProcurementRecord,
     unrelated_notice: ProcurementRecord,
 ) -> None:
     client = _client((it_notice, unrelated_notice))
 
-    response = client.get("/?profile=it-russia-integrator&search=cloud&region=RU-PRI&sort=deadline")
+    response = client.get(
+        "/tenders?profile=it-russia-integrator&search=cloud&region=RU-PRI&sort=deadline"
+    )
 
     assert response.status_code == 200
-    tender_queue = response.text.split('id="analytics"', maxsplit=1)[0]
-    assert it_notice.title in tender_queue
-    assert unrelated_notice.title not in tender_queue
+    assert it_notice.title in response.text
+    assert unrelated_notice.title not in response.text
     assert 'value="cloud"' in response.text
     assert 'value="RU-PRI" selected' in response.text
 
@@ -538,7 +559,7 @@ def test_four_demo_profiles_have_distinct_actionable_and_rejected_views(
         ("landscaping-moscow", landscaping_notice.title, unrelated_notice.title),
         ("cleaning-moscow", cleaning_notice.title, unrelated_notice.title),
     ):
-        response = client.get(f"/?profile={profile}")
+        response = client.get(f"/tenders?profile={profile}")
         actionable, rejected = response.text.split('id="rejected-opportunities"', maxsplit=1)
         actionable = actionable.split('id="actionable-opportunities"', maxsplit=1)[1]
 
@@ -548,13 +569,13 @@ def test_four_demo_profiles_have_distinct_actionable_and_rejected_views(
         assert rejected_title in rejected
 
 
-def test_dashboard_separates_actionable_queue_from_rejected_audit(
+def test_tender_page_separates_actionable_queue_from_rejected_audit(
     it_notice: ProcurementRecord,
     unrelated_notice: ProcurementRecord,
 ) -> None:
     client = _client((it_notice, unrelated_notice), evidence_generator=StubGenerator())
 
-    response = client.get("/?profile=it-russia-integrator")
+    response = client.get("/tenders?profile=it-russia-integrator")
 
     assert response.status_code == 200
     actionable, rejected = response.text.split('id="rejected-opportunities"', maxsplit=1)
@@ -565,10 +586,11 @@ def test_dashboard_separates_actionable_queue_from_rejected_audit(
     assert "Рассмотрено и отклонено · 1" in response.text
     assert actionable.count('class="button ghost ai-button"') == 1
     assert 'class="button ghost ai-button"' not in rejected
-    assert "Проверить требования в доступных данных" in actionable
+    assert "Извлечь требования и сроки" in actionable
+    assert "AI анализирует только сохранённую версию" in actionable
 
 
-def test_dashboard_replaces_cached_validated_ai_action_with_coverage_state(
+def test_tender_page_replaces_cached_validated_ai_action_with_coverage_state(
     it_notice: ProcurementRecord,
 ) -> None:
     client = _client((it_notice,), evidence_generator=StubGenerator())
@@ -576,7 +598,7 @@ def test_dashboard_replaces_cached_validated_ai_action_with_coverage_state(
         f"/api/records/{it_notice.source.value}/{it_notice.source_record_id}/evidence/extract"
     )
 
-    response = client.get("/?profile=it-russia-integrator")
+    response = client.get("/tenders?profile=it-russia-integrator")
 
     assert extracted.status_code == 200
     assert response.status_code == 200
@@ -691,7 +713,7 @@ def test_product_analytics_explains_geography_rejects_deadlines_budget_and_profi
     assert payload["profile_quality"] == {"score": 100, "missing_fields": []}
 
 
-def test_dashboard_renders_version_timeline_and_truthful_analytics_scope(
+def test_tender_detail_owns_version_timeline_and_analytics_owns_scope(
     it_notice: ProcurementRecord,
 ) -> None:
     current = it_notice.model_copy(
@@ -702,17 +724,24 @@ def test_dashboard_renders_version_timeline_and_truthful_analytics_scope(
     )
     client = _client((current,), historical_records=(it_notice,))
 
-    response = client.get("/?profile=it-russia-integrator")
+    tenders = client.get("/tenders?profile=it-russia-integrator")
+    detail = client.get(
+        f"/tenders/{it_notice.source.value}/{it_notice.source_record_id}"
+        "?profile=it-russia-integrator"
+    )
+    analytics = client.get("/analytics?profile=it-russia-integrator")
 
-    assert response.status_code == 200
-    assert "История · 2 версии" in response.text
-    assert it_notice.evidence.raw_sha256 in response.text
-    assert current.evidence.raw_sha256 in response.text
-    assert "Активные и планируемые закупки" in response.text
-    assert "all history" not in response.text
+    assert tenders.status_code == detail.status_code == analytics.status_code == 200
+    assert "История · 2 версии" in tenders.text
+    assert it_notice.evidence.raw_sha256 not in tenders.text
+    assert current.evidence.raw_sha256 not in tenders.text
+    assert it_notice.evidence.raw_sha256 in detail.text
+    assert current.evidence.raw_sha256 in detail.text
+    assert "Активные и планируемые закупки" in analytics.text
+    assert "all history" not in analytics.text
 
 
-def test_dashboard_renders_persisted_ai_requirements_deadlines_and_citations(
+def test_tender_detail_renders_persisted_ai_requirements_deadlines_and_citations(
     it_notice: ProcurementRecord,
 ) -> None:
     client = _client((it_notice,), evidence_generator=StubGenerator())
@@ -720,7 +749,10 @@ def test_dashboard_renders_persisted_ai_requirements_deadlines_and_citations(
         f"/api/records/{it_notice.source.value}/{it_notice.source_record_id}/evidence/extract"
     )
 
-    response = client.get("/?profile=it-russia-integrator")
+    response = client.get(
+        f"/tenders/{it_notice.source.value}/{it_notice.source_record_id}"
+        "?profile=it-russia-integrator"
+    )
 
     assert extraction.status_code == 200
     assert response.status_code == 200

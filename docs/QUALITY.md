@@ -1,11 +1,42 @@
 ---
 title: Качество
 type: quality
-status: complete
+status: active
 updated: 2026-08-15
 ---
 
 # Качество
+
+## MVP 2.0 UX acceptance — active
+
+| Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- | --- |
+| Раздельные рабочие задачи | Route/HTML contract | TestClient fixtures | `tests/test_api.py` | `/`, `/tenders`, `/analytics`, `/companies`, `/data` имеют один dominant purpose | pass |
+| Понятная глобальная навигация | Semantic/static contract | templates + Browser | `tests/test_web_assets.py` + DOM inspection | реальный route nav, active state, profile context, skip-link | pass |
+| Неперегруженный обзор | Browser measurement | Docker, 1280×720 | DOM metrics + screenshot | нет форм/длинных каталогов; высота не более 3 viewport | pass |
+| Тендерный workflow | Integration + browser journey | seeded PostgreSQL | filters → detail → official href | очередь, rejected audit и evidence не потеряны | pass |
+| Управление компаниями | Integration + browser journey | seeded + user profile | catalog → editor/new → version history | создание/редактирование разделены и сохраняют pipeline | pass |
+| Аналитика и ingestion isolation | Route contract | TestClient fixtures | page content assertions | метрики и bounded ЕИС controls не смешаны с профилями | pass |
+| Responsive/accessibility | Static + browser inspection | 390×844 viewport | overflow, landmarks, focus, labels | `scrollWidth == clientWidth`, действия доступны с клавиатуры | pass |
+| Регрессия бизнеса | Full suite | local + Docker PostgreSQL | `make verify`, `make dbt-test` | прежние capability evals и data tests зелёные | pass |
+
+Baseline evidence: текущая `/` имеет `6800 px` высоты при viewport `720 px`, `57` content blocks,
+`5` форм и `8` h1/h2-задач. Техническая корректность не закрывает пользовательскую приёмку.
+Fail-first evidence: выборочный запуск новых route/template/accessibility tests — `9 failed, 3 passed`;
+сигнатуры ошибок подтверждают отсутствие focused routes/base layout, route-preserving profile switch и design tokens.
+
+## MVP 2.0 UX final evidence — 2026-08-15
+
+- `160` tests pass; branch coverage `87.43%`; Ruff/format/strict mypy pass.
+- dbt: `PASS=54 WARN=0 ERROR=0`; rebuilt Docker services are healthy.
+- `git diff --check` passes before delivery; no schema migration or external dependency was added.
+- Overview: `1095 px` at `1280×720`, `10` content blocks, `0` forms versus baseline
+  `6800 px`, `57` blocks and `5` forms.
+- Browser route audit covers overview, tenders, analytics, company catalog/editor/new, data and detail;
+  every route has active navigation, skip-link, labels and no horizontal overflow.
+- Mobile `390×844`: `scrollWidth == clientWidth == 390`; all five nav items fit within the viewport.
+- Tender audit keeps rejected records collapsed with no AI action; detail retains official transition,
+  requirements/deadlines, raw SHA, ingestion run, history and outcomes.
 
 ## MVP 2.0 capability evals — complete
 
@@ -43,16 +74,16 @@ updated: 2026-08-15
 - [x] Full company-profile input is normalized and versioned; invalid classification/country/budget
   states fail validation, changed versions alter ranking and create a version-specific alert snapshot.
 - [x] Replaying bootstrap preserves the current user profile version instead of reactivating demo v1.
-- [x] Dashboard reload projects the latest current-record AI attempt with coverage, claims, gaps and
+- [x] Tender pages project the latest current-record AI attempt with coverage, claims, gaps and
   citations; client updates use DOM text nodes and never inject source/LLM text through `innerHTML`.
 - [x] Each new live cycle reads all current DB profile versions, persists versions/date/limit and fails
   before fetch on empty/duplicate profiles, foreign sources or an ЕИС limit above 50.
 - [x] Default UI queue contains only `recommended`/`review`; rejected/expired records remain in a separate
   audit view and cannot trigger AI extraction.
 - [x] Current validated AI evidence replaces the extraction action with an explicit coverage/result state.
-- [x] Sidebar order equals document order and active navigation follows click/scroll state.
+- [x] Global route navigation has a semantic active state and keeps the selected company context.
 - [x] Typed product analytics exposes exact current notice, SCD2 history and award outcome scopes through
-  both API and dashboard; missing fields remain visible in coverage denominators.
+  both API and `/analytics`; missing fields remain visible in coverage denominators.
 - [x] Four demo profiles produce distinct actionable/rejected queues end-to-end, and every card exposes
   an internal detail, official transition and raw SHA/run/source timeline.
 
@@ -63,7 +94,7 @@ updated: 2026-08-15
 - [x] dbt source/not-null/unique/relationships/accepted-values tests pass for all marts.
 - [x] Ruff formatting/lint and strict mypy pass.
 - [x] Docker Compose config and container health checks pass.
-- [x] Server-rendered dashboard, API product flows and static DOM-safety contracts pass integration tests.
+- [x] Server-rendered focused pages, API product flows and static DOM-safety contracts pass integration tests.
 - [x] Live TED/ЕИС/USA/GigaChat smokes are bounded and record no secret values; ЕИС replay preserves one
   canonical version while recording each run and raw hash.
 - [x] In-app alert replay is idempotent and new record/profile versions produce distinct events.
@@ -114,3 +145,21 @@ For a behavioral change, commit order within the diff is conceptual: acceptance/
 signature → implementation → regression. `docs/STATE.md` records only fresh command evidence; documentation
 alone cannot close a criterion. A source fixture is evidence of a parser contract, not proof that the live
 source is available today.
+
+<!-- immune-project-engineering:quality:start -->
+## Карта acceptance и evidence
+
+| Требование/риск | Тип evidence | Fixture/среда | Команда или inspection | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- | --- |
+| UX-IA | contract + E2E | fixtures + Docker browser | route tests + screenshots | focused routes и отдельные company forms | pass |
+| UX-A11Y | static + E2E | templates + 390/1280 viewport | semantic/focus/overflow checks | landmarks и controls без overflow | pass |
+| UX-REG | regression + data | local + Docker PostgreSQL | `make verify`, `make dbt-test` | business/data gates не деградируют | pass |
+
+## Портфель проверок
+
+Выбраны business journeys, static semantics, route/API contracts, integration/regression, browser desktop
+и mobile accessibility, Docker health/restart и dbt coherence. Security проверяет отсутствие новых
+external inputs/dependencies и DOM text safety. Property/fuzz, concurrency и load не добавляют новой
+уверенности для template/IA mutation; существующие domain suites покрывают их по своим рискам.
+Live source/LLM smoke не запускается, потому что внешний contract не меняется.
+<!-- immune-project-engineering:quality:end -->

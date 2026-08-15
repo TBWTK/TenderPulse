@@ -1,7 +1,7 @@
 ---
 title: Этапы проекта
 type: roadmap
-status: complete
+status: active
 updated: 2026-08-15
 ---
 
@@ -25,5 +25,6 @@ updated: 2026-08-15
 | MVP 2.0 product UI | Понятный русский company/tender workflow | Guided profile, filters/sort/detail, four-profile + create-company deterministic E2E | done |
 | MVP 2.0 analytics | География, deadlines, dynamics, blockers и quality | Typed API/UI scopes, deterministic projection tests и dbt coherence | done |
 | MVP 2.0 handoff | Воспроизводимый Docker MVP и Git checkpoint | Full regression/dbt/health/browser/audit, restart persistence и verified push | done |
+| MVP 2.0 UX acceptance | Раздельный, доступный и визуально цельный рабочий интерфейс | Route isolation, design system, responsive browser journeys, stakeholder re-review | ready for review |
 
 Допустимые статусы: `planned`, `active`, `blocked`, `done`.

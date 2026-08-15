@@ -51,19 +51,60 @@ def test_company_switch_starts_with_an_unfiltered_recommendation_queue() -> None
     switch_handler = source.split("profileSwitch?.addEventListener('change'", maxsplit=1)[1].split(
         "const detailProfileSwitch", maxsplit=1
     )[0]
-    assert "new URL('/', window.location.origin)" in switch_handler
+    assert "new URL(window.location.pathname, window.location.origin)" in switch_handler
     assert "url.searchParams.set('profile', profileSwitch.value)" in switch_handler
 
 
-def test_sidebar_order_matches_document_order_and_tracks_active_section() -> None:
-    template = (WEB / "templates" / "dashboard.html").read_text()
-    javascript = (WEB / "static" / "app.js").read_text()
-    section_ids = ("opportunities", "analytics", "companies", "loading")
+def test_shared_layout_has_route_navigation_profile_context_and_skip_link() -> None:
+    template = (WEB / "templates" / "base.html").read_text()
+    routes = ("/", "/tenders", "/analytics", "/companies", "/data")
 
-    nav_positions = [template.index(f'href="#{section_id}"') for section_id in section_ids]
-    dom_positions = [template.index(f'id="{section_id}"') for section_id in section_ids]
+    positions = [template.index(f'href="{route}"') for route in routes]
 
-    assert nav_positions == sorted(nav_positions)
-    assert dom_positions == sorted(dom_positions)
-    assert "IntersectionObserver" in javascript
-    assert "aria-current" in javascript
+    assert positions == sorted(positions)
+    assert 'href="#main-content"' in template
+    assert 'id="main-content"' in template
+    assert 'aria-label="Основная навигация"' in template
+    assert 'aria-current="page"' in template
+    assert 'id="profile-switch"' in template
+
+
+def test_page_templates_keep_mutation_forms_on_their_owner_pages() -> None:
+    templates = {
+        name: (WEB / "templates" / name).read_text()
+        for name in (
+            "overview.html",
+            "tenders.html",
+            "analytics.html",
+            "companies.html",
+            "company_detail.html",
+            "company_new.html",
+            "data.html",
+        )
+    }
+
+    assert 'id="profile-form"' in templates["company_detail.html"]
+    assert 'id="create-profile-form"' in templates["company_new.html"]
+    assert 'id="ingestion-form"' in templates["data.html"]
+    assert 'id="eis-upload-form"' in templates["data.html"]
+    for name in ("overview.html", "tenders.html", "analytics.html", "companies.html"):
+        assert 'id="profile-form"' not in templates[name]
+        assert 'id="create-profile-form"' not in templates[name]
+        assert 'id="ingestion-form"' not in templates[name]
+
+
+def test_design_system_defines_focus_responsive_and_reduced_motion_contracts() -> None:
+    stylesheet = (WEB / "static" / "app.css").read_text()
+
+    for token in (
+        "--color-ink",
+        "--color-surface",
+        "--color-accent",
+        "--space-1",
+        "--radius-md",
+        "--shadow-sm",
+    ):
+        assert token in stylesheet
+    assert ":focus-visible" in stylesheet
+    assert "@media (max-width: 720px)" in stylesheet
+    assert "@media (prefers-reduced-motion: reduce)" in stylesheet

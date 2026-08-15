@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="TenderPulse — объяснимый поиск российских государственных закупок">
+  <title>{% block title %}TenderPulse{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v=20260815-ui4">
+  <script defer src="{{ url_for('static', path='/app.js') }}?v=20260815-ui4"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Перейти к содержанию</a>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="TenderPulse, на главную">
+        <span class="brand-mark" aria-hidden="true">TP</span>
+        <span><strong>TenderPulse</strong><small>закупки без информационного шума</small></span>
+      </a>
+      <nav class="main-nav" aria-label="Основная навигация">
+        <a href="/"{% if active_page == 'overview' %} aria-current="page"{% endif %}>Обзор</a>
+        <a href="/tenders"{% if active_page == 'tenders' %} aria-current="page"{% endif %}>Тендеры</a>
+        <a href="/analytics"{% if active_page == 'analytics' %} aria-current="page"{% endif %}>Аналитика</a>
+        <a href="/companies"{% if active_page == 'companies' %} aria-current="page"{% endif %}>Компании</a>
+        <a href="/data"{% if active_page == 'data' %} aria-current="page"{% endif %}>Данные</a>
+      </nav>
+      {% if profiles %}
+      <label class="profile-switch" for="profile-switch">
+        <span>Компания</span>
+        <select id="profile-switch" aria-label="Выберите профиль компании">
+          {% for item in profiles %}
+          <option value="{{ item.slug }}" {{ 'selected' if selected and item.slug == selected.slug else '' }}>{{ item.name }} · v{{ item.version }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+    </div>
+  </header>
+  <main id="main-content" class="page-shell" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="app-footer">
+    <span>TenderPulse · российский сегмент</span>
+    <span>Unknown остаётся unknown · решения объяснимы</span>
+  </footer>
+</body>
+</html>

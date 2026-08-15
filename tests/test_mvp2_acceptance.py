@@ -128,7 +128,7 @@ def test_profile_change_and_fifth_company_survive_reseed_and_use_same_pipeline()
 
 class _EnabledEvidenceGenerator:
     def extract_arguments(self, _evidence: str):  # pragma: no cover - GET must not invoke it
-        raise AssertionError("dashboard GET must not call the LLM")
+        raise AssertionError("page GET must not call the LLM")
 
 
 def test_seeded_ui_detail_lineage_analytics_outcome_and_rejected_audit_are_coherent() -> None:
@@ -137,14 +137,14 @@ def test_seeded_ui_detail_lineage_analytics_outcome_and_rejected_audit_are_coher
         create_app(factory, now=lambda: NOW, evidence_generator=_EnabledEvidenceGenerator())
     )
 
-    dashboard = client.get("/?profile=auto-service-moscow")
+    tenders = client.get("/tenders?profile=auto-service-moscow")
     detail = client.get("/tenders/eis/0123456789026000001?profile=auto-service-moscow")
     lineage = client.get("/api/records/eis/0123456789026000001/lineage")
     analytics = client.get("/api/analytics/product/auto-service-moscow")
     outcomes = client.get("/api/analytics/award-outcomes")
 
-    assert dashboard.status_code == detail.status_code == 200
-    actionable, rejected = dashboard.text.split('id="rejected-opportunities"', maxsplit=1)
+    assert tenders.status_code == detail.status_code == 200
+    actionable, rejected = tenders.text.split('id="rejected-opportunities"', maxsplit=1)
     assert "Техническое обслуживание и ремонт автомобилей" in actionable
     assert "Ремонт служебных автомобилей в Камчатском крае" in rejected
     assert 'class="button ghost ai-button"' not in rejected

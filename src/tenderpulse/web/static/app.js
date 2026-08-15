@@ -8,26 +8,6 @@ const errorMessage = (payload, fallback) => {
 
 const splitValues = (value, separator) => String(value).split(separator).map((item) => item.trim()).filter(Boolean);
 
-const navLinks = [...document.querySelectorAll('.nav a[href^="#"]')];
-const setActiveNavigation = (sectionId) => {
-  navLinks.forEach((link) => {
-    const active = link.getAttribute('href') === `#${sectionId}`;
-    link.classList.toggle('active', active);
-    if (active) link.setAttribute('aria-current', 'location');
-    else link.removeAttribute('aria-current');
-  });
-};
-navLinks.forEach((link) => link.addEventListener('click', () => setActiveNavigation(link.hash.slice(1))));
-if ('IntersectionObserver' in window) {
-  const sectionObserver = new IntersectionObserver((entries) => {
-    const visible = entries.filter((entry) => entry.isIntersecting)
-      .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
-    if (visible?.target.id) setActiveNavigation(visible.target.id);
-  }, {rootMargin: '-15% 0px -65% 0px', threshold: [0.05, 0.25, 0.5]});
-  navLinks.map((link) => document.querySelector(link.hash)).filter(Boolean)
-    .forEach((section) => sectionObserver.observe(section));
-}
-
 const parseClassifications = (value) => {
   const result = {};
   splitValues(value, /\r?\n/).forEach((line) => {
@@ -90,7 +70,10 @@ const renderEvidence = (container, payload) => {
 
 const profileSwitch = document.querySelector('#profile-switch');
 profileSwitch?.addEventListener('change', () => {
-  const url = new URL('/', window.location.origin);
+  const url = new URL(window.location.pathname, window.location.origin);
+  if (url.pathname.startsWith('/companies/') && url.pathname !== '/companies/new') {
+    url.pathname = `/companies/${encodeURIComponent(profileSwitch.value)}`;
+  }
   url.searchParams.set('profile', profileSwitch.value);
   window.location.assign(url);
 });
@@ -153,7 +136,7 @@ document.querySelectorAll('.ai-button').forEach((button) => {
       const response = await fetch(`/api/records/${button.dataset.source}/${button.dataset.record}/evidence/extract`, {method: 'POST'});
       const payload = await response.json();
       if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка извлечения'));
-      renderEvidence(button.closest('.opportunity').querySelector('[data-evidence-output]'), payload);
+      renderEvidence(button.closest('.tender-card').querySelector('[data-evidence-output]'), payload);
       button.textContent = payload.status === 'validated' ? 'Evidence сохранён' : `Статус: ${payload.status}`;
     } catch (error) {
       button.textContent = `Не выполнено: ${error.message}`;
@@ -246,8 +229,8 @@ createProfileForm?.addEventListener('submit', async (event) => {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка создания профиля'));
-    status.textContent = 'Профиль создан. Открываю рекомендации…';
-    window.setTimeout(() => window.location.assign(`/?profile=${encodeURIComponent(payload.slug)}#companies`), 500);
+    status.textContent = 'Профиль создан. Открываю карточку…';
+    window.setTimeout(() => window.location.assign(`/companies/${encodeURIComponent(payload.slug)}`), 500);
   } catch (error) {
     status.textContent = `Не создано: ${error.message}`;
   }

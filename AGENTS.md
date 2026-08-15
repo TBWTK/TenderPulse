@@ -29,3 +29,16 @@ These rules are acceptance constraints, not style preferences.
 - Live-source and live-LLM calls are opt-in smoke tests; deterministic fixtures own CI behavior.
 - Never disable TLS verification. Keep `.env`, access tokens, and company-confidential data out of Git and logs.
 - Keep source-specific parsing behind adapters. The canonical procurement model is the only authority for downstream analytics and matching.
+
+<!-- immune-project-engineering:start -->
+## IMMUNE engineering contract
+
+- Treat `docs/IMMUNE.md` as the authority for engineering principles and precedence.
+- Work in this order: verified business intent → architecture → tests/evals → implementation.
+- Before editing, read `docs/README.md`, `docs/STATE.md`, `docs/AUDIT.md`, `docs/IMMUNE.md`, and the directly relevant owner documents.
+- Change concepts coherently across requirements, code, schemas/data, APIs/events, config, Docker/operations, docs, tests/evals, migrations, security, and observability.
+- Expose unexpected and unknown states; do not silently guess or hide failures behind broad exception handling.
+- Keep one owner per truth. Keep this file concise and link to durable docs instead of copying product rules.
+- Treat Docker and Git as product contracts. Keep the actual default branch releasable and preserve unrelated user changes.
+- Update agent instructions when repository commands, layout, invariants, ownership, or verification gates change.
+<!-- immune-project-engineering:end -->

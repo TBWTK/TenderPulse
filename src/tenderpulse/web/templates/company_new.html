@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_profile_fields.html" import profile_fields with context %}
+{% block title %}Новая компания · TenderPulse{% endblock %}
+{% block content %}
+<header class="page-heading"><a class="back-link" href="/companies">← Все компании</a><span class="eyebrow">Новый профиль</span><h1>Добавить компанию</h1><p>Заполните минимальный бизнес-контекст. Профиль сразу пройдёт через ту же логику сопоставления, что и тестовые компании.</p></header>
+<div class="editor-layout">
+  <aside class="guidance-panel"><span class="eyebrow">Перед началом</span><h2>Что подготовить</h2><ul><li>перечень услуг и компетенций;</li><li>коды ОКПД2 или CPV;</li><li>регионы реальной работы;</li><li>минимальный и максимальный бюджет;</li><li>ограничения участия.</li></ul></aside>
+  <section class="panel profile-editor">
+    <form id="create-profile-form" class="profile-form-grid">
+      <label class="field"><span>Slug</span><input name="slug" pattern="[a-z0-9-]+" placeholder="my-company" required><small>Технический идентификатор латиницей.</small></label>
+      <label class="field"><span>Название</span><input name="name" placeholder="ООО Моя компания" required></label>
+      {{ profile_fields() }}
+      <div class="form-actions wide"><button class="button primary" type="submit">Создать компанию</button><output id="create-profile-status" aria-live="polite">После создания откроется профиль версии 1.</output></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

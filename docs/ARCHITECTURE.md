@@ -54,9 +54,9 @@ flowchart LR
   dbt и alerts не скрывают foreign records собственными эвристиками.
 - `domain.geography` — один typed owner ISO `RU-*`, delivery mode и reach assessment. Matcher может
   вернуть geography reason, risk (`review`) или blocker (`not_relevant`); unknown не становится match.
-- Dashboard читает последний extraction attempt только для текущей record version. Payload migration
+- Тендерная страница читает последний extraction attempt только для текущей record version. Payload migration
   добавляет явный coverage status старым attempts, не превращая отсутствие evidence в `not_present`.
-- `ProductAnalytics` — единая typed projection для API и dashboard. Decision/coverage/distribution
+- `ProductAnalytics` — единая typed projection для API и страницы аналитики. Decision/coverage/distribution
   показатели читают current active/planned notices; history читает все SCD2 versions; outcomes — current
   award lots. UI обязан показывать эти scope labels и не называть projection вероятностью победы.
 - Все внешние URL зафиксированы adapter config; пользователь не может превратить ingestion в SSRF.
@@ -85,6 +85,26 @@ flowchart LR
 | GigaChat adapter | OAuth cache, structured extraction | canonical truth | retryable/permanent error, deterministic fallback |
 | API/Web | versioned profile commands, separated decision queue, product analytics and current evidence projections | background execution | 4xx input, 409 state, 502 dependency |
 | Alert dispatcher | idempotent delivery attempts | recommendation score | outbox retained with reason/retry state |
+
+## Web information architecture
+
+Server-rendered FastAPI/Jinja остаётся технологическим владельцем UI: для этого MVP SPA не добавляет
+ценности, но создаёт второй API/state owner. Общий layout владеет design tokens, global navigation,
+profile context, accessibility landmarks и responsive shell. Каждый page route владеет одной задачей:
+
+| Маршрут | Основная задача | Не показывает |
+| --- | --- | --- |
+| `/` | краткий обзор и следующий шаг | редакторы, полную аналитику, ingestion forms |
+| `/tenders` | поиск, фильтры, actionable/rejected queue | company editor, data loading |
+| `/analytics` | профильные метрики и объяснимые scopes | tender cards и mutation forms |
+| `/companies` | каталог профилей | полный редактор и ingestion |
+| `/companies/new` | создание компании | аналитические/тендерные панели |
+| `/companies/{slug}` | редактирование и version history | каталог закупок и ingestion |
+| `/data` | freshness, bounded ЕИС run/upload и run history | профили и аналитику |
+
+Domain/API contracts не меняются. Page-context builders проецируют существующие typed owners; шаблоны
+не пересчитывают matching, geography или analytics. Profile switch сохраняет текущий task route, а
+tender filters существуют только на `/tenders`.
 
 ## Основной flow
 
@@ -119,3 +139,20 @@ flowchart LR
 - [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md).
 - [ADR-003: official ЕИС RSS and TLS boundary](decisions/ADR-003-eis-rss-and-tls-boundary.md).
 - [ADR-004: Russian source and geography boundary](decisions/ADR-004-russian-source-and-geography-boundary.md).
+
+<!-- immune-project-engineering:architecture:start -->
+## Технологический выбор
+
+Python 3.12/FastAPI/Jinja остаются page/API owner: текущие typed domain contracts, TestClient suite и
+Docker runtime уже доказаны, а route-based UI не требует client framework. Vanilla CSS/JS владеют design
+tokens, progressive interaction и responsive layout. CSS-only patch не разделяет задачи; SPA создаёт
+второй toolchain/state owner без подтверждённой MVP-потребности.
+
+## Docker-контур
+
+Compose содержит `api`, `worker`, one-shot `init`, PostgreSQL/pgvector и MinIO. Один Python image
+собирает API/worker/init; templates/static входят без отдельного frontend build. `init` идемпотентно
+применяет Alembic и seed; DB/MinIO имеют volumes, API/worker — health checks и stdout logs. Секреты
+приходят через `.env`, не входят в image/Git. Локально API опубликован на `127.0.0.1:8010`; production
+deployment пока non-goal. Rollback — предыдущий image/commit без schema downgrade; UI migration не нужна.
+<!-- immune-project-engineering:architecture:end -->

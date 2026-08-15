@@ -32,8 +32,8 @@ TenderPulse превращает ограниченные, регулярно о
   а не лимит: пользователь может создавать и версионировать собственные компании.
 - География учитывает регион выполнения и реальную delivery model (`onsite`, `remote`, `hybrid`),
   contractor coverage и unknown; совпадение страны `RU` само по себе не является преимуществом.
-- Русский guided UI объединяет управление компаниями, actionable/rejected тендеры, detail/evidence,
-  официальный переход, scoped analytics и alerts.
+- Русский guided UI разделяет обзор, actionable/rejected тендеры, scoped analytics, каталог/редактор
+  компаний и bounded-загрузку на самостоятельные маршруты с единым profile context.
 
 ### Сохранённая foundation MVP 1.0
 
@@ -88,3 +88,8 @@ TenderPulse превращает ограниченные, регулярно о
 - [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md)
 - [ADR-003: official ЕИС RSS and TLS boundary](decisions/ADR-003-eis-rss-and-tls-boundary.md)
 - [ADR-004: Russian source and geography boundary](decisions/ADR-004-russian-source-and-geography-boundary.md)
+
+<!-- immune-project-engineering:docs:start -->
+- [Аудит и достаточность контекста](AUDIT.md)
+- [Инженерные принципы IMMUNE](IMMUNE.md)
+<!-- immune-project-engineering:docs:end -->

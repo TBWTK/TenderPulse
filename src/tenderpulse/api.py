@@ -1,4 +1,5 @@
 from collections.abc import Callable, Generator
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -98,6 +99,26 @@ DELIVERY_MODE_LABELS = {
     "hybrid": "Гибридно",
     "unknown": "Формат не определён",
 }
+NAV_ITEMS = (
+    ("overview", "/", "Обзор"),
+    ("tenders", "/tenders", "Тендеры"),
+    ("analytics", "/analytics", "Аналитика"),
+    ("companies", "/companies", "Компании"),
+    ("data", "/data", "Данные"),
+)
+
+
+@dataclass(frozen=True)
+class WebWorkspace:
+    repository: ProcurementRepository
+    profiles: tuple[CompanyProfile, ...]
+    selected: CompanyProfile | None
+    records: tuple[ProcurementRecord, ...]
+    opportunities: tuple[ProcurementRecord, ...]
+    recommendations: tuple[Recommendation, ...]
+    lineages: dict[tuple[SourceCode, str], tuple[RecordVersion, ...]]
+    award_outcomes: tuple[AwardOutcomeView, ...]
+    analytics: ProductAnalytics | None
 
 
 def _format_amount(value: Decimal | None) -> str:
@@ -394,8 +415,9 @@ def create_app(
         session: SessionDep,
         profile: str | None = None,
     ) -> HTMLResponse:
-        repository = ProcurementRepository(session)
-        records = current_product_records(repository.list_current_records())
+        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        repository = workspace.repository
+        records = workspace.records
         record = next(
             (
                 item
@@ -406,10 +428,7 @@ def create_app(
         )
         if record is None:
             raise HTTPException(status_code=404, detail="procurement record not found")
-        profiles = repository.list_profiles()
-        selected = repository.get_profile(profile) if profile is not None else None
-        if selected is None and profiles:
-            selected = profiles[0]
+        selected = workspace.selected
         recommendation = TenderMatcher(now=now).match(selected, record) if selected else None
         attempts = AIExtractionRepository(session).list_attempts(source, source_record_id)
         record_codes = {(item.system, item.code) for item in record.classifications}
@@ -428,29 +447,63 @@ def create_app(
                 }
             )
         )
-        return templates.TemplateResponse(
-            request=request,
-            name="tender_detail.html",
-            context={
+        context = _web_context(workspace, active_page="tenders", now=now)
+        context.update(
+            {
                 "record": record,
-                "profiles": profiles,
-                "selected": selected,
                 "recommendation": recommendation,
                 "evidence_attempt": attempts[-1] if attempts else None,
                 "lineage": repository.lineage(source, source_record_id),
                 "related_outcomes": related_outcomes,
                 "ai_enabled": evidence_generator is not None,
-                "decision_labels": DECISION_LABELS,
-                "reason_labels": REASON_LABELS,
-                "diagnostic_labels": DIAGNOSTIC_LABELS,
-                "region_labels": REGION_LABELS,
-                "lifecycle_labels": LIFECYCLE_LABELS,
-                "delivery_mode_labels": DELIVERY_MODE_LABELS,
-            },
+            }
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="tender_detail.html",
+            context=context,
         )
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    def dashboard(
+    def overview(
+        request: Request,
+        session: SessionDep,
+        profile: str | None = None,
+    ) -> HTMLResponse:
+        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        context = _web_context(workspace, active_page="overview", now=now)
+        actionable = tuple(
+            item
+            for item in workspace.recommendations
+            if item.decision.value in {"recommended", "review"}
+        )
+        alerts = (
+            AlertRepository(session).list_for_profile(workspace.selected.slug)
+            if workspace.selected
+            else ()
+        )
+        context.update(
+            {
+                "record_count": len(workspace.records),
+                "opportunity_count": len(workspace.opportunities),
+                "actionable_count": len(actionable),
+                "recommended_count": sum(
+                    item.decision.value == "recommended" for item in actionable
+                ),
+                "rejected_count": len(workspace.recommendations) - len(actionable),
+                "unread_alert_count": sum(alert.read_at is None for alert in alerts),
+                "analytics": workspace.analytics,
+                "freshness": IngestionRepository(session).source_freshness(now=now()),
+            }
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="overview.html",
+            context=context,
+        )
+
+    @app.get("/tenders", response_class=HTMLResponse, include_in_schema=False)
+    def tenders(
         request: Request,
         session: SessionDep,
         profile: str | None = None,
@@ -473,37 +526,24 @@ def create_app(
             raise HTTPException(status_code=422, detail="unsupported decision filter")
         if sort not in allowed_sorts:
             raise HTTPException(status_code=422, detail="unsupported opportunity sort")
-        repository = ProcurementRepository(session)
-        profiles = repository.list_profiles()
-        selected = repository.get_profile(profile) if profile is not None else None
-        if selected is None and profiles:
-            selected = profiles[0]
-        records = current_product_records(repository.list_current_records())
-        opportunities = current_opportunities(records)
-        all_ranked = TenderMatcher(now=now).rank(selected, opportunities) if selected else []
+        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
         filtered_opportunities = _filter_opportunities(
-            opportunities,
+            workspace.opportunities,
             search=search,
             region=region,
         )
         filtered_keys = {record.natural_key for record in filtered_opportunities}
         ranked = [
             item
-            for item in all_ranked
+            for item in workspace.recommendations
             if f"{item.record_source.value}:{item.record_source_id}" in filtered_keys
             and _decision_matches(item.decision.value, decision)
         ]
         record_by_key = {
-            (record.source, record.source_record_id): record for record in opportunities
+            (record.source, record.source_record_id): record for record in workspace.opportunities
         }
         ranked = _sort_recommendations(ranked, record_by_key, sort=sort)
         extraction_repository = AIExtractionRepository(session)
-        product_keys = {(record.source, record.source_record_id) for record in records}
-        lineages = {
-            key: versions
-            for key, versions in repository.list_all_lineages().items()
-            if key in product_keys
-        }
         actionable_cards: list[dict[str, object]] = []
         rejected_cards: list[dict[str, object]] = []
         for recommendation in ranked:
@@ -516,7 +556,7 @@ def create_app(
                 "recommendation": recommendation,
                 "record": record,
                 "evidence_attempt": attempts[-1] if attempts else None,
-                "lineage": lineages[(record.source, record.source_record_id)],
+                "lineage": workspace.lineages[(record.source, record.source_record_id)],
             }
             target = (
                 actionable_cards
@@ -524,56 +564,124 @@ def create_app(
                 else rejected_cards
             )
             target.append(card)
-        award_outcomes = repository.list_award_outcomes()
-        analytics = (
-            build_product_analytics(
-                current_records=records,
-                opportunities=opportunities,
-                recommendations=all_ranked,
-                lineages=lineages,
-                award_outcomes=award_outcomes,
-                profile=selected,
-                as_of=now(),
-            )
-            if selected
-            else None
+        context = _web_context(workspace, active_page="tenders", now=now)
+        context.update(
+            {
+                "actionable_cards": actionable_cards,
+                "rejected_cards": rejected_cards,
+                "opportunity_count": len(workspace.opportunities),
+                "recommended_count": sum(
+                    recommendation.decision.value == "recommended"
+                    for recommendation in workspace.recommendations
+                ),
+                "available_regions": sorted(
+                    {code for record in workspace.opportunities for code in record.region_codes}
+                ),
+                "filters": {
+                    "search": search,
+                    "decision": decision,
+                    "region": region,
+                    "sort": sort,
+                },
+                "ai_enabled": evidence_generator is not None,
+                "alerts": (
+                    AlertRepository(session).list_for_profile(workspace.selected.slug)
+                    if workspace.selected
+                    else ()
+                ),
+            }
         )
-        context = {
-            "profiles": profiles,
-            "selected": selected,
-            "profile_history": (repository.list_profile_history(selected.slug) if selected else ()),
-            "workspace_date": _format_workspace_date(now()),
-            "actionable_cards": actionable_cards,
-            "rejected_cards": rejected_cards,
-            "record_count": len(records),
-            "opportunity_count": len(opportunities),
-            "recommended_count": sum(
-                recommendation.decision.value == "recommended" for recommendation in all_ranked
-            ),
-            "available_regions": sorted(
-                {code for record in opportunities for code in record.region_codes}
-            ),
-            "filters": {
-                "search": search,
-                "decision": decision,
-                "region": region,
-                "sort": sort,
-            },
-            "decision_labels": DECISION_LABELS,
-            "reason_labels": REASON_LABELS,
-            "diagnostic_labels": DIAGNOSTIC_LABELS,
-            "region_labels": REGION_LABELS,
-            "run_status_labels": RUN_STATUS_LABELS,
-            "freshness": IngestionRepository(session).source_freshness(now=now()),
-            "runs": IngestionRepository(session).list_current_product_runs(limit=6),
-            "analytics": analytics,
-            "award_outcomes": award_outcomes[:5],
-            "ai_enabled": evidence_generator is not None,
-            "alerts": (
-                AlertRepository(session).list_for_profile(selected.slug) if selected else ()
-            ),
-        }
-        return templates.TemplateResponse(request=request, name="dashboard.html", context=context)
+        return templates.TemplateResponse(request=request, name="tenders.html", context=context)
+
+    @app.get("/analytics", response_class=HTMLResponse, include_in_schema=False)
+    def analytics_page(
+        request: Request,
+        session: SessionDep,
+        profile: str | None = None,
+    ) -> HTMLResponse:
+        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        context = _web_context(workspace, active_page="analytics", now=now)
+        context.update(
+            {
+                "analytics": workspace.analytics,
+                "award_outcomes": workspace.award_outcomes[:5],
+            }
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="analytics.html",
+            context=context,
+        )
+
+    @app.get("/companies", response_class=HTMLResponse, include_in_schema=False)
+    def companies_page(
+        request: Request,
+        session: SessionDep,
+        profile: str | None = None,
+    ) -> HTMLResponse:
+        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        context = _web_context(workspace, active_page="companies", now=now)
+        return templates.TemplateResponse(
+            request=request,
+            name="companies.html",
+            context=context,
+        )
+
+    @app.get("/companies/new", response_class=HTMLResponse, include_in_schema=False)
+    def company_new_page(
+        request: Request,
+        session: SessionDep,
+        profile: str | None = None,
+    ) -> HTMLResponse:
+        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        context = _web_context(workspace, active_page="companies", now=now)
+        return templates.TemplateResponse(
+            request=request,
+            name="company_new.html",
+            context=context,
+        )
+
+    @app.get(
+        "/companies/{profile_slug}",
+        response_class=HTMLResponse,
+        include_in_schema=False,
+    )
+    def company_detail_page(
+        request: Request,
+        profile_slug: str,
+        session: SessionDep,
+    ) -> HTMLResponse:
+        repository = ProcurementRepository(session)
+        if repository.get_profile(profile_slug) is None:
+            raise HTTPException(status_code=404, detail="company profile not found")
+        workspace = _load_web_workspace(session, profile_slug=profile_slug, now=now)
+        context = _web_context(workspace, active_page="companies", now=now)
+        context.update(
+            {
+                "profile_history": repository.list_profile_history(profile_slug),
+            }
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="company_detail.html",
+            context=context,
+        )
+
+    @app.get("/data", response_class=HTMLResponse, include_in_schema=False)
+    def data_page(
+        request: Request,
+        session: SessionDep,
+        profile: str | None = None,
+    ) -> HTMLResponse:
+        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        context = _web_context(workspace, active_page="data", now=now)
+        context.update(
+            {
+                "freshness": IngestionRepository(session).source_freshness(now=now()),
+                "runs": IngestionRepository(session).list_current_product_runs(limit=12),
+            }
+        )
+        return templates.TemplateResponse(request=request, name="data.html", context=context)
 
     return app
 
@@ -581,6 +689,77 @@ def create_app(
 def _format_workspace_date(value: datetime) -> str:
     local_value = value.astimezone(WORKSPACE_TIMEZONE)
     return f"{local_value.day} {RU_MONTHS[local_value.month - 1]} {local_value.year}"
+
+
+def _load_web_workspace(
+    session: Session,
+    *,
+    profile_slug: str | None,
+    now: Callable[[], datetime],
+) -> WebWorkspace:
+    repository = ProcurementRepository(session)
+    profiles = repository.list_profiles()
+    selected = repository.get_profile(profile_slug) if profile_slug is not None else None
+    if selected is None and profiles:
+        selected = profiles[0]
+    records = current_product_records(repository.list_current_records())
+    opportunities = current_opportunities(records)
+    recommendations = tuple(
+        TenderMatcher(now=now).rank(selected, opportunities) if selected else ()
+    )
+    product_keys = {(record.source, record.source_record_id) for record in records}
+    lineages = {
+        key: versions
+        for key, versions in repository.list_all_lineages().items()
+        if key in product_keys
+    }
+    award_outcomes = repository.list_award_outcomes()
+    analytics = (
+        build_product_analytics(
+            current_records=records,
+            opportunities=opportunities,
+            recommendations=list(recommendations),
+            lineages=lineages,
+            award_outcomes=award_outcomes,
+            profile=selected,
+            as_of=now(),
+        )
+        if selected
+        else None
+    )
+    return WebWorkspace(
+        repository=repository,
+        profiles=profiles,
+        selected=selected,
+        records=records,
+        opportunities=opportunities,
+        recommendations=recommendations,
+        lineages=lineages,
+        award_outcomes=award_outcomes,
+        analytics=analytics,
+    )
+
+
+def _web_context(
+    workspace: WebWorkspace,
+    *,
+    active_page: str,
+    now: Callable[[], datetime],
+) -> dict[str, object]:
+    return {
+        "active_page": active_page,
+        "nav_items": NAV_ITEMS,
+        "profiles": workspace.profiles,
+        "selected": workspace.selected,
+        "workspace_date": _format_workspace_date(now()),
+        "decision_labels": DECISION_LABELS,
+        "reason_labels": REASON_LABELS,
+        "diagnostic_labels": DIAGNOSTIC_LABELS,
+        "region_labels": REGION_LABELS,
+        "run_status_labels": RUN_STATUS_LABELS,
+        "lifecycle_labels": LIFECYCLE_LABELS,
+        "delivery_mode_labels": DELIVERY_MODE_LABELS,
+    }
 
 
 def _filter_opportunities(

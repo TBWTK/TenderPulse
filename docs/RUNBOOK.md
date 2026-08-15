@@ -28,7 +28,11 @@ run, но не создаёт canonical version без изменения. По�
 
 ## Пользовательский workflow
 
-- `/` — русская очередь, filters/sort, аналитика, компании и bounded ingestion.
+- `/` — короткий рабочий обзор выбранной компании без mutation-форм и длинных списков.
+- `/tenders?profile={slug}` — actionable-очередь, фильтры и отдельный свёрнутый rejected audit.
+- `/analytics?profile={slug}` — scoped аналитика matching/current/history/outcomes.
+- `/companies`, `/companies/new`, `/companies/{slug}` — каталог, создание и отдельный редактор профиля.
+- `/data?profile={slug}` — freshness, bounded ЕИС run/upload и история запусков.
 - `/tenders/{source}/{source_record_id}?profile={slug}` — внутренняя карточка с requirements,
   geography, lineage, результатами и отдельным официальным переходом.
 - `GET/POST /api/profiles`, `PUT /api/profiles/{slug}`, `GET /api/profiles/{slug}/history` — создание,
@@ -65,7 +69,9 @@ zakupki.gov.ru URL, region/delivery mode, deadline, CPV/ОКПД2 и award winne
 ## GigaChat
 
 Задайте `GIGACHAT_API_KEY`, `GIGACHAT_SCOPE` и CA bundle. Токены живут только в HTTP-клиенте и не
-попадают в raw/log. Кнопка requirements вызывает `POST /api/records/{source}/{id}/evidence/extract`.
+попадают в raw/log. Кнопка «Извлечь требования и сроки» вызывает
+`POST /api/records/{source}/{id}/evidence/extract` и анализирует только доступные поля сохранённой
+версии; это не замена проверки полной документации.
 Attempt привязан к current record version и содержит prompt/model/input/output hashes, validation
 status и verbatim citations. `unknown` означает недостаток evidence, не отсутствие требования.
 
