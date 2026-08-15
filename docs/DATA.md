@@ -2,7 +2,7 @@
 title: Данные
 type: data
 status: active
-updated: 2026-08-10
+updated: 2026-08-15
 ---
 
 # Данные
@@ -11,7 +11,7 @@ updated: 2026-08-10
 
 | Сущность | Назначение | Владелец | Идентификатор |
 | --- | --- | --- | --- |
-| Source | allowlisted contract/config | platform | stable code: `ted`, `eis`, `usaspending` |
+| Source | allowlisted contract/config | platform | current: `eis`; `ted`/`usaspending` legacy |
 | Ingestion run | параметры, cursor, counts, status/errors | worker | UUID |
 | Raw artifact | неизменяемый source response | raw store | SHA-256 + object URI |
 | Procurement record | общий lifecycle container | normalizer | UUID + source natural key |
@@ -54,8 +54,8 @@ updated: 2026-08-10
 12. Profile PUT принимает только следующую версию, нормализует и дедуплицирует matching-поля, закрывает
     прежнюю активную версию и сохраняет новую. Demo seed создаёт только отсутствующий slug и не меняет
     уже существующую активную пользовательскую версию; одновременно активна ровно одна версия slug-а.
-    Каждый следующий live cycle перечитывает обе active versions: TED получает union CPV prefixes,
-    USAspending — union keywords; `profile_versions` и итоговые filters сохраняются в request parameters run-а.
+    Каждый следующий live cycle перечитывает все distinct active versions; `profile_versions`, даты и
+    limit сохраняются в request parameters ЕИС run-а. Четыре demo-профиля — seed, не runtime-limit.
 13. Начиная с Alembic `0006`, каждый сохранённый AI payload имеет явные `requirements_status` и
     `deadlines_status`. Для legacy payload непустая категория становится `found`, пустая — `unknown`;
     миграция не утверждает `not_present` без доказательства модели.
@@ -67,9 +67,10 @@ updated: 2026-08-10
 
 | Projection | Фактический scope | Показатели |
 | --- | --- | --- |
-| Matching / coverage / distributions | current active/planned notices | decision funnel, known fields, source, classification, geography, buyer |
+| Matching / coverage / distributions | current ЕИС/RU active/planned notices | decision funnel, known fields, source, classification, region, buyer, blockers/gaps |
 | History | все сохранённые SCD2 versions и их current flags | current records, total versions, records with changes |
-| Outcomes | current award lots | award count, known winner, known amount, buyer/winner/amount evidence |
+| Outcomes | current ЕИС/RU award lots | award count, known winner, known amount, buyer/winner/amount evidence |
+| Deadline/budget/profile | тот же current opportunity scope + selected profile | nearest future deadlines, mean/median known budget, profile completeness |
 
 `unknown` включается в denominator coverage, но не превращается в отдельную выдуманную категорию.
 Профиль влияет на decision funnel, но не изменяет canonical coverage/distributions текущего notice scope.
@@ -79,7 +80,7 @@ updated: 2026-08-10
 
 ## Provenance и чувствительность
 
-- TED/ЕИС/USAspending records — публичные данные, но их лицензия/source URL сохраняются рядом с artifact.
+- ЕИС current и legacy foreign records — публичные данные; source URL сохраняется рядом с artifact.
 - Профиль компании может содержать коммерчески чувствительные сведения; он не отправляется внешней
   модели целиком и не попадает в telemetry/raw source storage.
 - Raw artifact содержит только ответ allowlisted procurement source, не `.env` и не access token.
@@ -93,7 +94,7 @@ updated: 2026-08-10
 
 ```mermaid
 flowchart LR
-  Source["TED / ЕИС / USAspending"] --> Raw["Immutable raw + SHA-256"]
+  Source["ЕИС RSS / XML / ZIP"] --> Raw["Immutable raw + SHA-256"]
   Raw --> Contract["Source contract"] --> Canonical["Canonical SCD2"]
   Canonical --> DBT["dbt marts"] --> API["API / analytics"]
   Canonical --> Matcher["Profile matching"] --> Evidence["Recommendation evidence"]
@@ -103,6 +104,22 @@ flowchart LR
 
 | Source | Natural key | Active opportunity | Outcome/history | Known MVP risk |
 | --- | --- | --- | --- | --- |
-| TED | publication number + procedure/lot IDs | yes | result notices, sometimes incomplete winner | multilingual arrays and lot alignment |
-| ЕИС | 19-digit registry number | yes, live RSS 44-ФЗ | bounded XML/ZIP protocols/contracts | RSS omits CPV/deadline; issuing CA and layouts can rotate |
-| USAspending | generated award ID / PIID | no | yes | time filters apply to transactions, not notice lifecycle |
+| ЕИС | 19-digit registry/contract number | yes, live RSS 44-ФЗ | bounded XML/ZIP notices/contracts | RSS часто omits region/CPV/deadline; issuing CA/layouts can rotate |
+| TED / USAspending | legacy natural keys | no current product role | preserved immutable history | adapters не вызываются live в MVP 2.0 |
+
+## MVP 2.0: матрица российских источников
+
+Матрица проверена 15.08.2026. `candidate` означает, что публичные карточки существуют, но устойчивый
+машиночитаемый контракт не доказан; это запрещает adapter, а не создаёт разрешение на HTML scraping.
+
+| Источник | Доступ | Доступные facts | Ограничения / gaps | Решение MVP 2.0 |
+| --- | --- | --- | --- | --- |
+| ЕИС RSS 44-ФЗ | официальный anonymous HTTPS RSS | registry ID, title, buyer, amount/currency, stage, published time, official URL | первая страница; ≤31 дней, ≤50 records, ≤2 MiB; region/deadline/ОКПД2 могут отсутствовать | основной bounded live source |
+| ЕИС XML/ZIP export | официальный bounded package/import | notice details, lots, classifications; layouts могут содержать history/result | до 10 MiB upload, 50 members, 20 MiB unpacked, schema/layout rotation | details/history/outcome fallback с raw evidence |
+| ЕИС notice page/documents | официальный public HTML/files | карточка, документация, platform link | не bulk API; attachment safety/format coverage требует отдельного contract | обязательный outbound link; extraction только после безопасного adapter |
+| Росэлторг public search/cards | официальный public HTML | 44-ФЗ/223-ФЗ/commercial title, region, price, deadline, card/documents | публичный procurement API/RSS/export в проверенных материалах не найден | candidate/destination, без ingestion scraping |
+| RTS-tender, Сбер А, иные ЭТП | публичные platform cards | platform-specific procedure data | единый доказанный public API отсутствует; 44-ФЗ уже агрегируется ЕИС | candidate; сначала отдельный source contract/eval |
+| ГИС Торги | государственные имущественные/правовые торги | property/right notices | не тот же procurement scope товаров/работ/услуг | не включать в opportunities без нового бизнес-scope |
+
+Foreign records MVP 1.0 физически сохраняются как историческое evidence, но `current Russian product`
+выбирает только российский source scope. Удаление raw/history не требуется и не подменяет projection rule.

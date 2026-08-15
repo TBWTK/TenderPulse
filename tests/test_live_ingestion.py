@@ -39,9 +39,9 @@ class FixtureSourceClient:
         )
 
 
-class FailingTedClient(FixtureSourceClient):
-    def fetch_ted(self, query) -> FetchResult:
-        raise SourceFetchError("ted_http_503", "TED returned HTTP 503", retryable=True)
+class FailingEisClient(FixtureSourceClient):
+    def fetch_eis(self, query) -> FetchResult:
+        raise SourceFetchError("eis_http_503", "EIS returned HTTP 503", retryable=True)
 
 
 class CapturingSourceClient(FixtureSourceClient):
@@ -73,7 +73,7 @@ def _factory() -> sessionmaker[Session]:
     return sessionmaker(engine, expire_on_commit=False)
 
 
-def test_live_cycle_ingests_bounded_ted_eis_and_usaspending_data() -> None:
+def test_live_cycle_ingests_only_bounded_russian_eis_data() -> None:
     factory = _factory()
 
     def now() -> datetime:
@@ -86,51 +86,27 @@ def test_live_cycle_ingests_bounded_ted_eis_and_usaspending_data() -> None:
         now=now,
     )
 
-    results = service.run_cycle(limit=10, ted_lookback_days=14, usa_lookback_days=365)
+    results = service.run_cycle(limit=10, eis_lookback_days=7)
 
     assert [(result.source.value, result.status, result.record_count) for result in results] == [
-        ("ted", "succeeded", 2),
         ("eis", "succeeded", 2),
-        ("usaspending", "succeeded", 1),
     ]
     with factory() as session:
-        assert len(ProcurementRepository(session).list_current_records()) == 5
+        assert len(ProcurementRepository(session).list_current_records()) == 2
         runs = session.execute(
             select(IngestionRunRow.source, IngestionRunRow.request_parameters).order_by(
                 IngestionRunRow.source
             )
         ).all()
     parameters_by_source = {source: parameters for source, parameters in runs}
-    assert all(parameters["limit"] == 10 for parameters in parameters_by_source.values())
-    assert parameters_by_source["ted"]["cpv_prefixes"] == ["48", "72", "33", "38"]
-    assert parameters_by_source["ted"]["profile_versions"] == {
-        "it-data-integrator": 1,
-        "medlab-supplier": 1,
-    }
-    assert parameters_by_source["usaspending"]["keywords"] == [
-        "data",
-        "analytics",
-        "cloud",
-        "machine learning",
-        "software",
-        "кибербезопасность",
-        "информационные технологии",
-        "medical",
-        "laboratory",
-        "diagnostic",
-        "reagent",
-        "orthopaedic",
-        "медицин",
-        "лаборатор",
-        "реагент",
-    ]
-    assert parameters_by_source["usaspending"]["profile_versions"] == {
-        "it-data-integrator": 1,
-        "medlab-supplier": 1,
+    assert set(parameters_by_source) == {"eis"}
+    assert parameters_by_source["eis"]["limit"] == 10
+    assert parameters_by_source["eis"]["profile_versions"] == {
+        profile.slug: 1 for profile in load_demo_profiles()
     }
 
 
-def test_known_fetch_failure_is_persisted_and_other_source_continues() -> None:
+def test_known_eis_fetch_failure_is_persisted() -> None:
     factory = _factory()
 
     def now() -> datetime:
@@ -138,26 +114,24 @@ def test_known_fetch_failure_is_persisted_and_other_source_continues() -> None:
 
     service = LiveIngestionService(
         IngestionCoordinator(factory, MemoryRawStore(), now=now),
-        FailingTedClient(),
+        FailingEisClient(),
         profiles=load_demo_profiles,
         now=now,
     )
 
-    results = service.run_cycle(limit=5, ted_lookback_days=7, usa_lookback_days=30)
+    results = service.run_cycle(limit=5, eis_lookback_days=7)
 
     assert [(result.source.value, result.status) for result in results] == [
-        ("ted", "failed"),
-        ("eis", "succeeded"),
-        ("usaspending", "succeeded"),
+        ("eis", "failed"),
     ]
     with factory() as session:
-        failed = session.scalar(select(IngestionRunRow).where(IngestionRunRow.source == "ted"))
+        failed = session.scalar(select(IngestionRunRow).where(IngestionRunRow.source == "eis"))
     assert failed is not None
-    assert failed.error_code == "ted_http_503"
+    assert failed.error_code == "eis_http_503"
     assert failed.raw_sha256 is None
 
 
-def test_current_profile_versions_drive_each_new_live_query_without_restart() -> None:
+def test_current_profile_versions_are_recorded_on_each_eis_cycle_without_restart() -> None:
     factory = _factory()
     current_profiles = list(load_demo_profiles())
     client = CapturingSourceClient()
@@ -171,12 +145,7 @@ def test_current_profile_versions_drive_each_new_live_query_without_restart() ->
         profiles=lambda: tuple(current_profiles),
         now=now,
     )
-    service.run_cycle(
-        limit=5,
-        ted_lookback_days=7,
-        usa_lookback_days=30,
-        sources=(SourceCode.TED, SourceCode.USA_SPENDING),
-    )
+    service.run_cycle(limit=5, eis_lookback_days=7)
 
     current_profiles[:] = [
         current_profiles[0].model_copy(
@@ -186,31 +155,29 @@ def test_current_profile_versions_drive_each_new_live_query_without_restart() ->
                 "positive_keywords": ("quantum",),
             }
         ),
-        current_profiles[1].model_copy(
-            update={
-                "version": 2,
-                "classification_prefixes": {"CPV": ("88",)},
-                "positive_keywords": ("robotics", "quantum"),
-            }
-        ),
+        *current_profiles[1:],
     ]
-    service.run_cycle(
-        limit=5,
-        ted_lookback_days=7,
-        usa_lookback_days=30,
-        sources=(SourceCode.TED, SourceCode.USA_SPENDING),
-    )
+    service.run_cycle(limit=5, eis_lookback_days=7)
 
-    assert client.ted_queries[0].cpv_prefixes == ("48", "72", "33", "38")
-    assert client.ted_queries[1].cpv_prefixes == ("99", "88")
-    assert client.usa_queries[1].keywords == ("quantum", "robotics")
+    assert len(client.eis_queries) == 2
+    with factory() as session:
+        runs = tuple(
+            session.scalars(
+                select(IngestionRunRow).order_by(IngestionRunRow.started_at, IngestionRunRow.id)
+            )
+        )
+    recorded_versions = {
+        run.request_parameters["profile_versions"]["auto-service-moscow"] for run in runs
+    }
+    assert recorded_versions == {1, 2}
+    assert client.ted_queries == []
+    assert client.usa_queries == []
 
 
 @pytest.mark.parametrize(
     "profiles",
     [
         (),
-        load_demo_profiles()[:1],
         (load_demo_profiles()[0], load_demo_profiles()[0]),
     ],
 )
@@ -228,9 +195,56 @@ def test_invalid_active_profile_set_fails_before_any_source_fetch(profiles) -> N
         now=now,
     )
 
-    with pytest.raises(RuntimeError, match="exactly two distinct active company profiles"):
-        service.run_cycle(limit=5, ted_lookback_days=7, usa_lookback_days=30)
+    with pytest.raises(RuntimeError, match="distinct active company profiles"):
+        service.run_cycle(limit=5, eis_lookback_days=7)
 
     assert client.ted_queries == []
     assert client.usa_queries == []
+    assert client.eis_queries == []
+
+
+def test_foreign_sources_are_rejected_before_live_fetch() -> None:
+    factory = _factory()
+    client = CapturingSourceClient()
+
+    service = LiveIngestionService(
+        IngestionCoordinator(
+            factory,
+            MemoryRawStore(),
+            now=lambda: datetime(2026, 8, 8, 2, tzinfo=UTC),
+        ),
+        client,
+        profiles=load_demo_profiles,
+        now=lambda: datetime(2026, 8, 8, 2, tzinfo=UTC),
+    )
+
+    with pytest.raises(ValueError, match="MVP 2.0 live ingestion supports EIS only"):
+        service.run_cycle(
+            limit=5,
+            eis_lookback_days=7,
+            sources=(SourceCode.TED,),
+        )
+
+    assert client.ted_queries == []
+    assert client.usa_queries == []
+    assert client.eis_queries == []
+
+
+def test_eis_limit_above_source_contract_fails_instead_of_silent_truncation() -> None:
+    factory = _factory()
+    client = CapturingSourceClient()
+    service = LiveIngestionService(
+        IngestionCoordinator(
+            factory,
+            MemoryRawStore(),
+            now=lambda: datetime(2026, 8, 8, 2, tzinfo=UTC),
+        ),
+        client,
+        profiles=load_demo_profiles,
+        now=lambda: datetime(2026, 8, 8, 2, tzinfo=UTC),
+    )
+
+    with pytest.raises(ValueError, match="between 1 and 50"):
+        service.run_cycle(limit=51)
+
     assert client.eis_queries == []

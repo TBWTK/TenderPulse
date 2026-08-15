@@ -90,9 +90,16 @@ const renderEvidence = (container, payload) => {
 
 const profileSwitch = document.querySelector('#profile-switch');
 profileSwitch?.addEventListener('change', () => {
-  const url = new URL(window.location.href);
+  const url = new URL('/', window.location.origin);
   url.searchParams.set('profile', profileSwitch.value);
   window.location.assign(url);
+});
+
+const detailProfileSwitch = document.querySelector('#detail-profile-switch');
+detailProfileSwitch?.addEventListener('change', () => {
+  const source = detailProfileSwitch.dataset.source;
+  const record = detailProfileSwitch.dataset.record;
+  window.location.assign(`/tenders/${source}/${record}?profile=${encodeURIComponent(detailProfileSwitch.value)}`);
 });
 
 const ingestionForm = document.querySelector('#ingestion-form');
@@ -109,9 +116,7 @@ ingestionForm?.addEventListener('submit', async (event) => {
       body: JSON.stringify({
         sources,
         limit: Number(data.get('limit')),
-        ted_lookback_days: Number(data.get('ted_days')),
         eis_lookback_days: Number(data.get('eis_days')),
-        usa_lookback_days: Number(data.get('usa_days')),
       }),
     });
     const payload = await response.json();
@@ -158,6 +163,44 @@ document.querySelectorAll('.ai-button').forEach((button) => {
   });
 });
 
+document.querySelectorAll('.detail-ai-button').forEach((button) => {
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    button.textContent = 'Проверяю сохранённую версию…';
+    try {
+      const response = await fetch(`/api/records/${button.dataset.source}/${button.dataset.record}/evidence/extract`, {method: 'POST'});
+      const payload = await response.json();
+      if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка извлечения'));
+      renderEvidence(document.querySelector('[data-evidence-output]'), payload);
+      button.textContent = 'Evidence сохранён';
+    } catch (error) {
+      button.textContent = `Не выполнено: ${error.message}`;
+      button.disabled = false;
+    }
+  });
+});
+
+const profileFields = (data) => ({
+  description: String(data.get('description') || '').trim(),
+  services: splitValues(data.get('services'), /\r?\n/),
+  capabilities: splitValues(data.get('capabilities'), /\r?\n/),
+  positive_keywords: splitValues(data.get('keywords'), /[,\r\n]/),
+  negative_keywords: splitValues(data.get('negative_keywords'), /[,\r\n]/),
+  classification_prefixes: parseClassifications(data.get('classifications')),
+  countries: splitValues(data.get('countries'), /[,;\s]+/),
+  customer_types: splitValues(data.get('customer_types'), /\r?\n/),
+  base_region: String(data.get('base_region') || '').trim() || null,
+  service_regions: splitValues(data.get('service_regions'), /[,;\s]+/),
+  delivery_mode: String(data.get('delivery_mode')),
+  nationwide: data.has('nationwide'),
+  travel_allowed: data.has('travel_allowed'),
+  contractors_allowed: data.has('contractors_allowed'),
+  excluded_regions: splitValues(data.get('excluded_regions'), /[,;\s]+/),
+  participation_constraints: splitValues(data.get('participation_constraints'), /\r?\n/),
+  min_amount: String(data.get('min_amount')).trim() || null,
+  max_amount: String(data.get('max_amount')).trim() || null,
+});
+
 const profilePanel = document.querySelector('#profile');
 const profileForm = document.querySelector('#profile-form');
 profileForm?.addEventListener('submit', async (event) => {
@@ -168,14 +211,9 @@ profileForm?.addEventListener('submit', async (event) => {
   try {
     const update = {
       ...profile,
+      ...profileFields(data),
       version: profile.version + 1,
       name: String(data.get('name')).trim(),
-      capabilities: splitValues(data.get('capabilities'), /\r?\n/),
-      positive_keywords: splitValues(data.get('keywords'), /[,\r\n]/),
-      classification_prefixes: parseClassifications(data.get('classifications')),
-      countries: splitValues(data.get('countries'), /[,;\s]+/),
-      min_amount: String(data.get('min_amount')).trim() || null,
-      max_amount: String(data.get('max_amount')).trim() || null,
     };
     status.textContent = `Сохраняю v${update.version}…`;
     const response = await fetch(`/api/profiles/${update.slug}`, {
@@ -187,6 +225,31 @@ profileForm?.addEventListener('submit', async (event) => {
     window.setTimeout(() => window.location.reload(), 700);
   } catch (error) {
     status.textContent = `Не сохранено: ${error.message}`;
+  }
+});
+
+const createProfileForm = document.querySelector('#create-profile-form');
+createProfileForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const data = new FormData(createProfileForm);
+  const status = document.querySelector('#create-profile-status');
+  try {
+    const profile = {
+      slug: String(data.get('slug')).trim(),
+      version: 1,
+      name: String(data.get('name')).trim(),
+      ...profileFields(data),
+    };
+    status.textContent = 'Создаю версионируемый профиль…';
+    const response = await fetch('/api/profiles', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(profile),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка создания профиля'));
+    status.textContent = 'Профиль создан. Открываю рекомендации…';
+    window.setTimeout(() => window.location.assign(`/?profile=${encodeURIComponent(payload.slug)}#companies`), 500);
+  } catch (error) {
+    status.textContent = `Не создано: ${error.message}`;
   }
 });
 

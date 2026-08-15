@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 
+from tenderpulse.domain.geography import ServiceDeliveryMode
 from tenderpulse.domain.models import (
     ClassificationCode,
     LifecycleStatus,
@@ -21,18 +22,22 @@ RUN_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 def build_record(
     *,
+    source: SourceCode = SourceCode.TED,
     source_record_id: str = "record-1",
     title: str = "Cloud data platform implementation",
     description: str = "Data engineering, analytics and machine learning platform services",
     codes: tuple[ClassificationCode, ...] = (ClassificationCode(system="CPV", code="72200000"),),
     countries: tuple[str, ...] = ("DE",),
+    region_codes: tuple[str, ...] = (),
+    delivery_location: str | None = None,
+    delivery_mode: ServiceDeliveryMode = ServiceDeliveryMode.UNKNOWN,
     amount: Decimal | None = Decimal("500000"),
     currency: str | None = "EUR",
     deadline_at: datetime | None = datetime(2026, 9, 30, 12, 0, tzinfo=UTC),
     raw_sha256: str = "a" * 64,
 ) -> ProcurementRecord:
     return ProcurementRecord(
-        source=SourceCode.TED,
+        source=source,
         source_record_id=source_record_id,
         kind=RecordKind.NOTICE,
         lifecycle=LifecycleStatus.ACTIVE,
@@ -42,6 +47,9 @@ def build_record(
         supplier_names=(),
         classifications=codes,
         countries=countries,
+        region_codes=region_codes,
+        delivery_location=delivery_location,
+        delivery_mode=delivery_mode,
         published_at=datetime(2026, 8, 3, tzinfo=UTC),
         observed_at=datetime(2026, 8, 8, tzinfo=UTC),
         deadline_at=deadline_at,
@@ -65,7 +73,14 @@ def build_record(
 
 @pytest.fixture
 def it_notice() -> ProcurementRecord:
-    return build_record()
+    return build_record(
+        source=SourceCode.EIS,
+        countries=("RU",),
+        region_codes=("RU-PRI",),
+        delivery_location="Владивосток",
+        delivery_mode=ServiceDeliveryMode.REMOTE,
+        currency="RUB",
+    )
 
 
 @pytest.fixture
@@ -86,10 +101,66 @@ def medical_notice() -> ProcurementRecord:
 @pytest.fixture
 def unrelated_notice() -> ProcurementRecord:
     return build_record(
+        source=SourceCode.EIS,
         source_record_id="construction-1",
         title="Winter road construction and maintenance",
         description="Road works and snow removal services",
         codes=(ClassificationCode(system="CPV", code="45000000"),),
-        countries=("SE",),
+        countries=("RU",),
+        region_codes=("RU-MOW",),
+        delivery_location="Москва",
+        delivery_mode=ServiceDeliveryMode.ONSITE,
+        currency="RUB",
         raw_sha256="c" * 64,
+    )
+
+
+@pytest.fixture
+def auto_notice() -> ProcurementRecord:
+    return build_record(
+        source=SourceCode.EIS,
+        source_record_id="auto-moscow",
+        title="Техническое обслуживание и ремонт автомобилей",
+        description="Ремонт и мойка служебного автотранспорта заказчика",
+        codes=(ClassificationCode(system="CPV", code="50110000"),),
+        countries=("RU",),
+        region_codes=("RU-MOW",),
+        delivery_location="Москва",
+        delivery_mode=ServiceDeliveryMode.ONSITE,
+        currency="RUB",
+        raw_sha256="d" * 64,
+    )
+
+
+@pytest.fixture
+def landscaping_notice() -> ProcurementRecord:
+    return build_record(
+        source=SourceCode.EIS,
+        source_record_id="landscaping-moscow",
+        title="Озеленение и благоустройство городской территории",
+        description="Устройство газонов, клумб и посадка кустарников",
+        codes=(ClassificationCode(system="CPV", code="45112710"),),
+        countries=("RU",),
+        region_codes=("RU-MOW",),
+        delivery_location="Москва",
+        delivery_mode=ServiceDeliveryMode.ONSITE,
+        currency="RUB",
+        raw_sha256="e" * 64,
+    )
+
+
+@pytest.fixture
+def cleaning_notice() -> ProcurementRecord:
+    return build_record(
+        source=SourceCode.EIS,
+        source_record_id="cleaning-moscow",
+        title="Комплексная уборка помещений и дворов",
+        description="Ежедневный клининг и санитарное содержание территории",
+        codes=(ClassificationCode(system="CPV", code="90910000"),),
+        countries=("RU",),
+        region_codes=("RU-MOW",),
+        delivery_location="Москва",
+        delivery_mode=ServiceDeliveryMode.ONSITE,
+        currency="RUB",
+        raw_sha256="f" * 64,
     )

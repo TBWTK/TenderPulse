@@ -10,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from tenderpulse.domain.models import SourceCode
 from tenderpulse.ingestion import IngestionCoordinator
+from tenderpulse.persistence.ingestion_repository import IngestionRepository
 from tenderpulse.persistence.models import Base, IngestionRunRow, RawArtifactRow
 from tenderpulse.persistence.repository import ProcurementRepository
 from tenderpulse.raw_store import MemoryRawStore
@@ -81,3 +82,26 @@ def test_invalid_payload_preserves_failed_run_and_raw_evidence() -> None:
     assert run.error_code == "source_contract_error"
     assert artifact is not None
     assert raw_store.get(artifact.sha256) == b'{"notices":[{}]}'
+
+
+def test_current_product_run_projection_excludes_foreign_legacy_sources() -> None:
+    factory = _session_factory()
+    observed_at = datetime(2026, 8, 8, tzinfo=UTC)
+    with factory.begin() as session:
+        for source in (SourceCode.EIS, SourceCode.TED, SourceCode.USA_SPENDING):
+            session.add(
+                IngestionRunRow(
+                    source=source.value,
+                    status="succeeded",
+                    started_at=observed_at,
+                    finished_at=observed_at,
+                    observed_at=observed_at,
+                    request_parameters={"fixture": True},
+                    record_count=1,
+                )
+            )
+
+    with factory() as session:
+        runs = IngestionRepository(session).list_current_product_runs(limit=6)
+
+    assert [run.source for run in runs] == [SourceCode.EIS]

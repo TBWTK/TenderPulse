@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 from tenderpulse.domain.models import ProcurementRecord
 from tenderpulse.persistence.models import Base
 from tenderpulse.persistence.repository import ProcurementRepository
+from tenderpulse.profiles import load_demo_profiles
 
 
 def _session() -> Session:
@@ -69,4 +70,28 @@ def test_repository_source_natural_key_isolated(it_notice: ProcurementRecord) ->
     assert [record.source_record_id for record in repository.list_current_records()] == [
         "record-1",
         "record-2",
+    ]
+
+
+def test_repository_creates_arbitrary_profile_and_preserves_version_history() -> None:
+    session = _session()
+    repository = ProcurementRepository(session)
+    template = next(
+        profile for profile in load_demo_profiles() if profile.slug == "cleaning-moscow"
+    )
+    created = template.model_copy(
+        update={"slug": "user-facility-company", "name": "Пользовательский клининг"}
+    )
+
+    repository.create_profile(created)
+    repository.add_profile_version(
+        created.model_copy(update={"version": 2, "name": "Новый клининг"})
+    )
+    session.commit()
+
+    assert repository.get_profile(created.slug).name == "Новый клининг"
+    assert [item.version for item in repository.list_profile_history(created.slug)] == [1, 2]
+    assert [item.name for item in repository.list_profile_history(created.slug)] == [
+        "Пользовательский клининг",
+        "Новый клининг",
     ]

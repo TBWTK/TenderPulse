@@ -3,7 +3,7 @@ title: TenderPulse
 project: TenderPulse
 type: project
 status: active
-updated: 2026-08-10
+updated: 2026-08-15
 ---
 
 # TenderPulse
@@ -23,22 +23,27 @@ TenderPulse превращает ограниченные, регулярно о
 
 ## Границы
 
-### MVP
+### MVP 2.0 — active scope
 
-- TED Search API: актуальные и result notices по узким временным/CPV-фильтрам.
+- Пользовательский current scope содержит только закупки российских заказчиков; ЕИС является
+  подтверждённым live-authority, а российские ЭТП — официальными destinations/card sources до
+  появления документированного machine-readable contract.
+- Четыре demo-профиля покрывают автосервис, IT-разработку, благоустройство и клининг. Это seed,
+  а не лимит: пользователь может создавать и версионировать собственные компании.
+- География учитывает регион выполнения и реальную delivery model (`onsite`, `remote`, `hybrid`),
+  contractor coverage и unknown; совпадение страны `RU` само по себе не является преимуществом.
+- Русский guided UI объединяет управление компаниями, actionable/rejected тендеры, detail/evidence,
+  официальный переход, scoped analytics и alerts.
+
+### Сохранённая foundation MVP 1.0
+
 - ЕИС: актуальные notices 44-ФЗ из официального bounded RSS; ограниченные XML/ZIP-пакеты остаются
   поддерживаемым fallback для исторических извещений и результатов.
-- USAspending: исторические федеральные contract awards, получатели и суммы. Это источник
-  результатов, а не активных закупок США.
-- Не более 100 записей на источник за один запуск по умолчанию и не более 500 по явному запросу.
+- Live ЕИС загружает не более 25 записей по умолчанию и никогда не принимает более 50 за запуск;
+  окно публикации ограничено 31 днём, ответ — 2 MiB.
 - Неизменяемый raw-артефакт, SHA-256, параметры запроса, время получения, версии canonical-record
   и evidence каждого match.
-- Два синтетических демонстрационных профиля: IT/data-интегратор и поставщик медицинского/
-  лабораторного оборудования. Они не представляют реальные компании.
-- Веб-интерфейс редактирует все matching-поля ровно двух профилей; каждое сохранение создаёт новую
-  версию, немедленно пересчитывает рекомендации и не перезаписывается повторным demo seed.
-- Каждый новый manual/scheduled цикл перечитывает эти active versions из PostgreSQL: их CPV prefixes
-  ограничивают TED, keywords — USAspending, а использованные версии и фильтры сохраняются в run provenance.
+- Веб-интерфейс сохраняет каждое изменение профиля новой версией и не перезаписывает его bootstrap-ом.
 - Карточка рекомендации показывает последний AI attempt для текущей версии notice: coverage
   requirements/deadlines, claims, gaps и verbatim citations. Idempotent in-app alerts и opt-in HTTPS
   webhook ведут журнал попыток; внешняя отправка выключена по умолчанию.
@@ -62,9 +67,11 @@ TenderPulse превращает ограниченные, регулярно о
 
 | Источник | Роль | Официальный контракт | MVP-режим |
 | --- | --- | --- | --- |
-| TED | notices и результаты ЕС | [Search API v3](https://docs.ted.europa.eu/api/latest/search.html) | anonymous POST, date/CPV filters |
-| ЕИС | notices, протоколы и контракты РФ | [RSS расширенного поиска](https://zakupki.gov.ru/epz/order/extendedsearch/rss.html) | live 44-ФЗ RSS + bounded XML/ZIP import |
-| USAspending | contract awards США | [API endpoints](https://api.usaspending.gov/docs/endpoints) | anonymous award search |
+| ЕИС RSS | notices 44-ФЗ | [RSS расширенного поиска](https://zakupki.gov.ru/epz/order/extendedsearch/rss.html) | active: HTTPS, 31 дней, ≤50 records, ≤2 MiB |
+| ЕИС XML/ZIP | details/history/results | [ЕИС](https://zakupki.gov.ru/) | active bounded manual/import fallback; immutable raw |
+| Росэлторг | 44-ФЗ, 223-ФЗ, commercial cards | [Публичный поиск](https://www.roseltorg.ru/torgi) | destination/candidate; public procurement API не доказан |
+| Другие российские ЭТП | platform-specific cards | official pages из ЕИС | candidate; adapter только после API/RSS/export contract review |
+| TED / USAspending | legacy foreign history | сохранённые adapters MVP 1.0 | исключаются из current UI/analytics/alerts и новых live cycles |
 | GigaChat | structured extraction/explanation | [REST API](https://developers.sber.ru/docs/ru/gigachat/api/reference/rest/gigachat-api) | optional, cached evidence, no CI calls |
 
 ## Навигация
@@ -80,3 +87,4 @@ TenderPulse превращает ограниченные, регулярно о
 - [ADR-001: platform and data boundaries](decisions/ADR-001-platform-and-data-boundaries.md)
 - [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md)
 - [ADR-003: official ЕИС RSS and TLS boundary](decisions/ADR-003-eis-rss-and-tls-boundary.md)
+- [ADR-004: Russian source and geography boundary](decisions/ADR-004-russian-source-and-geography-boundary.md)

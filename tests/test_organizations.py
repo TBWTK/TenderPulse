@@ -64,7 +64,7 @@ def test_identity_is_reused_inside_source_but_not_guessed_across_sources(
     link_count = session.scalar(select(func.count()).select_from(ProcurementOrganizationLinkRow))
 
     assert [(row.source, row.normalized_name) for row in organizations] == [
-        ("ted", "public buyer"),
+        ("eis", "public buyer"),
         ("usaspending", "public buyer"),
     ]
     assert {row.alias_name for row in aliases} == {"Public Buyer", "PUBLIC—BUYER"}

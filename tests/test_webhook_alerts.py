@@ -31,7 +31,7 @@ def _session_with_alert(record: ProcurementRecord) -> Session:
     repository.apply_records((record,), at=datetime(2026, 8, 8, tzinfo=UTC))
     repository.seed_profiles(load_demo_profiles())
     AlertService(session, now=lambda: datetime(2026, 8, 8, tzinfo=UTC)).sync_profile(
-        "it-data-integrator"
+        "it-russia-integrator"
     )
     session.commit()
     return session

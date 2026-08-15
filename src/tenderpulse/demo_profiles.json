@@ -1,57 +1,110 @@
 [
   {
-    "slug": "it-data-integrator",
+    "slug": "auto-service-moscow",
     "version": 1,
-    "name": "Northstar Data Integration",
+    "name": "Московский автосервис",
+    "description": "Ремонт, обслуживание и мойка легковых и служебных автомобилей в Москве и Московской области.",
+    "services": [
+      "ремонт и техническое обслуживание автомобилей",
+      "мойка автомобилей",
+      "шиномонтаж",
+      "обслуживание корпоративного автопарка",
+      "поставка автомобильных запчастей и расходных материалов"
+    ],
     "capabilities": [
-      "data engineering and analytics platforms",
-      "cloud migration and managed IT services",
-      "machine learning and cybersecurity integration"
+      "диагностика и ремонт автомобилей",
+      "сезонное обслуживание автопарка",
+      "выездное обслуживание в пределах региона"
     ],
-    "positive_keywords": [
-      "data",
-      "analytics",
-      "cloud",
-      "machine learning",
-      "software",
-      "кибербезопасность",
-      "информационные технологии"
-    ],
-    "classification_prefixes": {
-      "CPV": ["48", "72"],
-      "OKPD2": ["58.29", "62", "63.11"],
-      "PSC": ["D3", "DA", "R4"]
-    },
-    "countries": ["DE", "FR", "IT", "SE", "US", "RU"],
+    "positive_keywords": ["автомобил", "автотранспорт", "ремонт", "техническое обслуживание", "мойка", "шиномонтаж", "запчаст"],
+    "negative_keywords": ["строительство автомобильных дорог", "перевозка пассажиров"],
+    "classification_prefixes": {"CPV": ["5011", "90917"], "OKPD2": ["45.20", "45.31", "29.32"]},
+    "countries": ["RU"],
+    "customer_types": ["государственные и муниципальные заказчики", "организации с корпоративным автопарком"],
+    "base_region": "RU-MOW",
+    "service_regions": ["RU-MOW", "RU-MOS"],
+    "delivery_mode": "onsite",
+    "nationwide": false,
+    "travel_allowed": false,
+    "contractors_allowed": false,
+    "excluded_regions": [],
+    "participation_constraints": ["место оказания услуг должно входить в сервисную географию"],
     "min_amount": "50000",
-    "max_amount": "5000000"
+    "max_amount": "10000000"
   },
   {
-    "slug": "medlab-supplier",
+    "slug": "it-russia-integrator",
     "version": 1,
-    "name": "MedLab Supply Cooperative",
-    "capabilities": [
-      "laboratory analyzers and diagnostic reagents",
-      "medical devices and consumables",
-      "installation, calibration and staff training"
+    "name": "Российская IT-интеграция",
+    "description": "Заказная разработка программного обеспечения, интеграция систем, аналитические платформы и техническая поддержка.",
+    "services": [
+      "заказная разработка программного обеспечения",
+      "backend и frontend разработка",
+      "интеграция информационных систем",
+      "аналитические платформы и решения в области данных и AI",
+      "сопровождение и техническая поддержка"
     ],
-    "positive_keywords": [
-      "medical",
-      "laboratory",
-      "diagnostic",
-      "reagent",
-      "orthopaedic",
-      "медицин",
-      "лаборатор",
-      "реагент"
-    ],
-    "classification_prefixes": {
-      "CPV": ["33", "38"],
-      "OKPD2": ["21", "26.60", "32.50"],
-      "PSC": ["65"]
-    },
-    "countries": ["DE", "FR", "IT", "SE", "US", "RU"],
-    "min_amount": "10000",
-    "max_amount": "10000000"
+    "capabilities": ["web и backend разработка", "интеграция и API", "data engineering и машинное обучение"],
+    "positive_keywords": ["разработка программного обеспечения", "информационная система", "интеграция", "программ", "сайт", "данн", "техническая поддержка"],
+    "negative_keywords": ["поставка компьютерного оборудования без работ"],
+    "classification_prefixes": {"CPV": ["48", "72"], "OKPD2": ["58.29", "62", "63.11"]},
+    "countries": ["RU"],
+    "customer_types": ["государственные и муниципальные заказчики", "государственные компании"],
+    "base_region": "RU-MOW",
+    "service_regions": [],
+    "delivery_mode": "remote",
+    "nationwide": true,
+    "travel_allowed": true,
+    "contractors_allowed": true,
+    "excluded_regions": [],
+    "participation_constraints": ["постоянное присутствие на объекте требует отдельной проверки"],
+    "min_amount": "100000",
+    "max_amount": "50000000"
+  },
+  {
+    "slug": "landscaping-moscow",
+    "version": 1,
+    "name": "Городское озеленение",
+    "description": "Озеленение, устройство газонов и клумб, посадка растений и благоустройство общественных территорий.",
+    "services": ["озеленение", "посадка деревьев и кустарников", "устройство газонов и клумб", "установка бордюров", "мощение и благоустройство"],
+    "capabilities": ["ландшафтные работы", "обслуживание парков", "благоустройство городских пространств"],
+    "positive_keywords": ["озелен", "газон", "клумб", "дерев", "кустарник", "благоустрой", "бордюр", "мощение"],
+    "negative_keywords": ["проектирование без выполнения работ"],
+    "classification_prefixes": {"CPV": ["451127", "7731", "45233222"], "OKPD2": ["81.30", "42.99", "43.99"]},
+    "countries": ["RU"],
+    "customer_types": ["муниципальные заказчики", "учреждения благоустройства"],
+    "base_region": "RU-MOW",
+    "service_regions": ["RU-MOW", "RU-MOS"],
+    "delivery_mode": "onsite",
+    "nationwide": false,
+    "travel_allowed": false,
+    "contractors_allowed": false,
+    "excluded_regions": [],
+    "participation_constraints": ["работы выполняются только в сервисных регионах"],
+    "min_amount": "100000",
+    "max_amount": "30000000"
+  },
+  {
+    "slug": "cleaning-moscow",
+    "version": 1,
+    "name": "Чистая территория",
+    "description": "Уборка помещений, дворов и общественных территорий, санитарное и сезонное обслуживание объектов.",
+    "services": ["уборка помещений", "уборка дворов", "санитарное обслуживание", "сезонная уборка", "уборка снега"],
+    "capabilities": ["ежедневный клининг", "содержание прилегающих территорий", "зимняя уборка"],
+    "positive_keywords": ["уборк", "клининг", "санитар", "содержан территор", "очистк", "снег"],
+    "negative_keywords": ["вывоз радиоактивных отходов"],
+    "classification_prefixes": {"CPV": ["9091", "9062"], "OKPD2": ["81.21", "81.22", "81.29"]},
+    "countries": ["RU"],
+    "customer_types": ["государственные учреждения", "муниципальные заказчики"],
+    "base_region": "RU-MOW",
+    "service_regions": ["RU-MOW", "RU-MOS"],
+    "delivery_mode": "onsite",
+    "nationwide": false,
+    "travel_allowed": false,
+    "contractors_allowed": false,
+    "excluded_regions": [],
+    "participation_constraints": ["объект должен находиться в сервисной географии"],
+    "min_amount": "50000",
+    "max_amount": "20000000"
   }
 ]

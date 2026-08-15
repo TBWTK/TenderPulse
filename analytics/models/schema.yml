@@ -85,6 +85,11 @@ models:
         tests: [not_null]
       - name: raw_sha256
         tests: [not_null]
+      - name: source
+        tests:
+          - accepted_values:
+              arguments:
+                values: [eis]
   - name: mart_source_freshness
     columns:
       - name: source

@@ -15,8 +15,6 @@ from tenderpulse.persistence.repository import ProcurementRepository
 from tenderpulse.profiles import load_demo_profiles
 from tenderpulse.raw_store import RawStore
 from tenderpulse.sources.eis import parse_eis_legacy_xml
-from tenderpulse.sources.ted import parse_ted_response
-from tenderpulse.sources.usaspending import parse_usaspending_response
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,18 +33,6 @@ def seed_demo(
     demo_root = files("tenderpulse.demo_data")
     inputs = (
         (
-            SourceCode.TED,
-            demo_root.joinpath("ted_active_notices.json").read_bytes(),
-            "application/json",
-            parse_ted_response,
-        ),
-        (
-            SourceCode.USA_SPENDING,
-            demo_root.joinpath("usaspending_ai_award.json").read_bytes(),
-            "application/json",
-            parse_usaspending_response,
-        ),
-        (
             SourceCode.EIS,
             demo_root.joinpath("eis_legacy_notification.xml").read_bytes(),
             "application/xml",
@@ -63,7 +49,7 @@ def seed_demo(
             raw=raw,
             content_type=content_type,
             parser=parser,
-            request_parameters={"mode": "demo_fixture", "limit": 2},
+            request_parameters={"mode": "demo_fixture", "limit": 7},
         )
         record_count += result.record_count
 

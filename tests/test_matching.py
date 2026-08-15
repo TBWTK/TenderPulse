@@ -12,36 +12,48 @@ from tenderpulse.domain.models import LifecycleStatus, ProcurementRecord, Record
 from tenderpulse.profiles import load_demo_profiles
 
 
-def test_exactly_two_distinct_demo_profiles_are_seeded() -> None:
+def _profile(slug: str):
+    return next(profile for profile in load_demo_profiles() if profile.slug == slug)
+
+
+def test_four_distinct_demo_profiles_are_seeded() -> None:
     profiles = load_demo_profiles()
 
-    assert [profile.slug for profile in profiles] == ["it-data-integrator", "medlab-supplier"]
-    assert profiles[0].classification_prefixes != profiles[1].classification_prefixes
-    assert profiles[0].positive_keywords != profiles[1].positive_keywords
+    assert {profile.slug for profile in profiles} == {
+        "auto-service-moscow",
+        "it-russia-integrator",
+        "landscaping-moscow",
+        "cleaning-moscow",
+    }
+    assert len({tuple(profile.positive_keywords) for profile in profiles}) == 4
 
 
-def test_profiles_rank_their_own_sector_above_unrelated(
+def test_profiles_rank_each_russian_sector_above_unrelated(
     it_notice: ProcurementRecord,
-    medical_notice: ProcurementRecord,
+    auto_notice: ProcurementRecord,
+    landscaping_notice: ProcurementRecord,
+    cleaning_notice: ProcurementRecord,
     unrelated_notice: ProcurementRecord,
 ) -> None:
     matcher = TenderMatcher(now=lambda: datetime(2026, 8, 8, tzinfo=UTC))
-    it_profile, med_profile = load_demo_profiles()
+    sectors = (
+        ("auto-service-moscow", auto_notice),
+        ("it-russia-integrator", it_notice),
+        ("landscaping-moscow", landscaping_notice),
+        ("cleaning-moscow", cleaning_notice),
+    )
 
-    it_ranked = matcher.rank(it_profile, [medical_notice, unrelated_notice, it_notice])
-    med_ranked = matcher.rank(med_profile, [it_notice, unrelated_notice, medical_notice])
-
-    assert it_ranked[0].record_source_id == it_notice.source_record_id
-    assert med_ranked[0].record_source_id == medical_notice.source_record_id
-    assert it_ranked[0].decision is MatchDecision.RECOMMENDED
-    assert med_ranked[0].decision is MatchDecision.RECOMMENDED
+    for slug, own_notice in sectors:
+        ranked = matcher.rank(_profile(slug), (unrelated_notice, own_notice))
+        assert ranked[0].record_source_id == own_notice.source_record_id
+        assert ranked[0].decision is MatchDecision.RECOMMENDED
 
 
 def test_every_positive_reason_is_traceable_to_source_evidence(
     it_notice: ProcurementRecord,
 ) -> None:
     matcher = TenderMatcher(now=lambda: datetime(2026, 8, 8, tzinfo=UTC))
-    it_profile = load_demo_profiles()[0]
+    it_profile = _profile("it-russia-integrator")
 
     recommendation = matcher.match(it_profile, it_notice)
 
@@ -55,13 +67,21 @@ def test_every_positive_reason_is_traceable_to_source_evidence(
     assert sum(reason.contribution for reason in recommendation.reasons) == recommendation.score
 
 
-def test_missing_optional_facts_are_visible_gaps(
-    medical_notice: ProcurementRecord,
-) -> None:
+def test_missing_optional_facts_are_visible_gaps(it_notice: ProcurementRecord) -> None:
     matcher = TenderMatcher(now=lambda: datetime(2026, 8, 8, tzinfo=UTC))
-    med_profile = load_demo_profiles()[1]
+    it_profile = _profile("it-russia-integrator")
+    missing = it_notice.model_copy(
+        update={
+            "deadline_at": None,
+            "lots": (
+                it_notice.lots[0].model_copy(
+                    update={"amount": None, "currency": None, "deadline_at": None}
+                ),
+            ),
+        }
+    )
 
-    recommendation = matcher.match(med_profile, medical_notice)
+    recommendation = matcher.match(it_profile, missing)
 
     assert GapCode.UNKNOWN_AMOUNT in recommendation.gaps
     assert GapCode.UNKNOWN_DEADLINE in recommendation.gaps
@@ -70,7 +90,7 @@ def test_missing_optional_facts_are_visible_gaps(
 
 def test_expired_notice_is_not_recommended(it_notice: ProcurementRecord) -> None:
     matcher = TenderMatcher(now=lambda: datetime(2026, 10, 1, tzinfo=UTC))
-    it_profile = load_demo_profiles()[0]
+    it_profile = _profile("it-russia-integrator")
 
     recommendation = matcher.match(it_profile, it_notice)
 

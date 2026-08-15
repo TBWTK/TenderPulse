@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tenderpulse"
-version = "0.1.0"
+version = "0.2.0"
 description = "Traceable procurement lakehouse and explainable tender matching"
 readme = "docs/README.md"
 requires-python = ">=3.12,<3.14"

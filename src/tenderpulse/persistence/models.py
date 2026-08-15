@@ -9,10 +9,12 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -131,7 +133,16 @@ class ProcurementOrganizationLinkRow(Base):
 
 class CompanyProfileRow(Base):
     __tablename__ = "company_profiles"
-    __table_args__ = (UniqueConstraint("slug", "version"),)
+    __table_args__ = (
+        UniqueConstraint("slug", "version"),
+        Index(
+            "uq_company_profiles_one_active",
+            "slug",
+            unique=True,
+            postgresql_where=text("active IS TRUE"),
+            sqlite_where=text("active = 1"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     slug: Mapped[str] = mapped_column(String(128), index=True)

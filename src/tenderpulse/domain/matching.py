@@ -8,6 +8,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
+from tenderpulse.domain.geography import GeographyStatus, assess_geography
 from tenderpulse.domain.models import (
     LifecycleStatus,
     ProcurementRecord,
@@ -15,6 +16,7 @@ from tenderpulse.domain.models import (
     SourceCode,
 )
 from tenderpulse.profiles import CompanyProfile
+from tenderpulse.source_policy import current_product_records
 
 
 class MatchDecision(StrEnum):
@@ -29,6 +31,12 @@ class GapCode(StrEnum):
     UNKNOWN_DEADLINE = "unknown_deadline"
     UNKNOWN_LOCATION = "unknown_location"
     DEADLINE_PASSED = "deadline_passed"
+
+
+class BlockerCode(StrEnum):
+    NEGATIVE_KEYWORD = "negative_keyword"
+    GEOGRAPHY_OUT_OF_SCOPE = "geography_out_of_scope"
+    GEOGRAPHY_EXCLUDED = "geography_excluded"
 
 
 class MatchReason(BaseModel):
@@ -51,6 +59,7 @@ class Recommendation(BaseModel):
     decision: MatchDecision
     reasons: tuple[MatchReason, ...]
     gaps: tuple[GapCode, ...]
+    blockers: tuple[BlockerCode, ...] = ()
 
 
 def current_opportunities(
@@ -59,7 +68,7 @@ def current_opportunities(
     """Return the canonical matching scope: current active or planned notices."""
     return tuple(
         record
-        for record in records
+        for record in current_product_records(records)
         if record.kind is RecordKind.NOTICE
         and record.lifecycle in {LifecycleStatus.ACTIVE, LifecycleStatus.PLANNED}
     )
@@ -80,6 +89,7 @@ class TenderMatcher:
     def match(self, profile: CompanyProfile, record: ProcurementRecord) -> Recommendation:
         reasons: list[MatchReason] = []
         gaps: list[GapCode] = []
+        blockers: list[BlockerCode] = []
 
         def add_reason(code: str, contribution: str, values: Iterable[str]) -> None:
             matched = tuple(dict.fromkeys(values))
@@ -108,11 +118,38 @@ class TenderMatcher:
             contribution = min(Decimal("0.30"), Decimal("0.10") * len(keyword_matches))
             add_reason("keywords", str(contribution), keyword_matches)
 
-        if record.countries:
-            country_matches = sorted(set(record.countries) & set(profile.countries))
-            add_reason("geography", "0.10", country_matches)
-        else:
+        negative_matches = [
+            keyword
+            for keyword in profile.negative_keywords
+            if self._contains(text, keyword.casefold())
+        ]
+        if negative_matches:
+            blockers.append(BlockerCode.NEGATIVE_KEYWORD)
+
+        geography = assess_geography(
+            profile_delivery_mode=profile.delivery_mode,
+            service_regions=profile.service_regions,
+            nationwide=profile.nationwide,
+            travel_allowed=profile.travel_allowed,
+            contractors_allowed=profile.contractors_allowed,
+            excluded_regions=profile.excluded_regions,
+            notice_delivery_mode=record.delivery_mode,
+            notice_regions=record.region_codes,
+        )
+        if geography.status is GeographyStatus.UNKNOWN:
             gaps.append(GapCode.UNKNOWN_LOCATION)
+        elif geography.status is GeographyStatus.SERVICE_REGION:
+            add_reason("geography_service_region", "0.10", geography.region_codes)
+        elif geography.status is GeographyStatus.NATIONWIDE_REMOTE:
+            add_reason("geography_nationwide_remote", "0.10", geography.region_codes)
+        elif geography.status is GeographyStatus.CONTRACTOR_COVERAGE:
+            add_reason("geography_contractor_coverage", "0.05", geography.region_codes)
+        elif geography.status is GeographyStatus.TRAVEL_COVERAGE:
+            add_reason("geography_travel_coverage", "0.05", geography.region_codes)
+        elif geography.status is GeographyStatus.EXCLUDED:
+            blockers.append(BlockerCode.GEOGRAPHY_EXCLUDED)
+        else:
+            blockers.append(BlockerCode.GEOGRAPHY_OUT_OF_SCOPE)
 
         amounts = [lot.amount for lot in record.lots if lot.amount is not None]
         if not amounts:
@@ -128,8 +165,19 @@ class TenderMatcher:
         score = sum((reason.contribution for reason in reasons), start=Decimal("0"))
         if GapCode.DEADLINE_PASSED in gaps:
             decision = MatchDecision.EXPIRED
+        elif blockers:
+            decision = MatchDecision.NOT_RELEVANT
         elif score >= Decimal("0.55"):
-            decision = MatchDecision.RECOMMENDED
+            decision = (
+                MatchDecision.REVIEW
+                if geography.status
+                in {
+                    GeographyStatus.CONTRACTOR_COVERAGE,
+                    GeographyStatus.TRAVEL_COVERAGE,
+                    GeographyStatus.UNKNOWN,
+                }
+                else MatchDecision.RECOMMENDED
+            )
         elif score >= Decimal("0.30"):
             decision = MatchDecision.REVIEW
         else:
@@ -143,6 +191,7 @@ class TenderMatcher:
             decision=decision,
             reasons=tuple(reasons),
             gaps=tuple(dict.fromkeys(gaps)),
+            blockers=tuple(dict.fromkeys(blockers)),
         )
 
     @staticmethod

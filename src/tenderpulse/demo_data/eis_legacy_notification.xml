@@ -4,15 +4,117 @@
   xmlns:oos="http://zakupki.gov.ru/oos/types/1">
   <exp:fcsNotificationEF>
     <oos:purchaseNumber>0123456789026000001</oos:purchaseNumber>
-    <oos:docPublishDate>2026-08-05T10:00:00+03:00</oos:docPublishDate>
-    <oos:purchaseObjectInfo>Поставка лабораторных реагентов</oos:purchaseObjectInfo>
-    <oos:customer>
-      <oos:fullName>ГБУЗ Демонстрационная больница</oos:fullName>
-    </oos:customer>
+    <oos:docPublishDate>2026-08-12T10:00:00+03:00</oos:docPublishDate>
+    <oos:purchaseObjectInfo>Техническое обслуживание и ремонт автомобилей</oos:purchaseObjectInfo>
+    <oos:requirements>Опыт обслуживания корпоративного автопарка не менее двух лет. Исполнение в Москве.</oos:requirements>
+    <oos:customer><oos:fullName>ГБУ Автомобильные дороги Москвы</oos:fullName></oos:customer>
+    <oos:regionCode>RU-MOW</oos:regionCode>
+    <oos:placeOfDelivery>г. Москва, автотранспортная база заказчика</oos:placeOfDelivery>
+    <oos:deliveryMode>onsite</oos:deliveryMode>
+    <oos:applicationEndDate>2026-09-10T12:00:00+03:00</oos:applicationEndDate>
     <oos:lot>
-      <oos:lotNumber>1</oos:lotNumber>
-      <oos:maxPrice>1500000.00</oos:maxPrice>
+      <oos:lotNumber>1</oos:lotNumber><oos:maxPrice>2500000.00</oos:maxPrice>
       <oos:currency><oos:code>RUB</oos:code></oos:currency>
+      <oos:classification><oos:system>CPV</oos:system><oos:code>50110000</oos:code></oos:classification>
+      <oos:classification><oos:system>OKPD2</oos:system><oos:code>45.20.11</oos:code></oos:classification>
     </oos:lot>
   </exp:fcsNotificationEF>
+  <exp:fcsNotificationEF>
+    <oos:purchaseNumber>0123456789026000002</oos:purchaseNumber>
+    <oos:docPublishDate>2026-08-12T11:00:00+03:00</oos:docPublishDate>
+    <oos:purchaseObjectInfo>Ремонт служебных автомобилей в Камчатском крае</oos:purchaseObjectInfo>
+    <oos:requirements>Исполнитель обязан иметь ремонтную базу в Петропавловске-Камчатском.</oos:requirements>
+    <oos:customer><oos:fullName>КГБУ Транспортное управление</oos:fullName></oos:customer>
+    <oos:regionCode>RU-KAM</oos:regionCode>
+    <oos:placeOfDelivery>г. Петропавловск-Камчатский</oos:placeOfDelivery>
+    <oos:deliveryMode>onsite</oos:deliveryMode>
+    <oos:applicationEndDate>2026-09-11T12:00:00+12:00</oos:applicationEndDate>
+    <oos:lot>
+      <oos:lotNumber>1</oos:lotNumber><oos:maxPrice>1800000.00</oos:maxPrice>
+      <oos:currency><oos:code>RUB</oos:code></oos:currency>
+      <oos:classification><oos:system>CPV</oos:system><oos:code>50110000</oos:code></oos:classification>
+      <oos:classification><oos:system>OKPD2</oos:system><oos:code>45.20.11</oos:code></oos:classification>
+    </oos:lot>
+  </exp:fcsNotificationEF>
+  <exp:fcsNotificationEF>
+    <oos:purchaseNumber>0123456789026000003</oos:purchaseNumber>
+    <oos:docPublishDate>2026-08-13T09:30:00+03:00</oos:docPublishDate>
+    <oos:purchaseObjectInfo>Разработка и внедрение информационной системы</oos:purchaseObjectInfo>
+    <oos:requirements>Требуется опыт разработки государственных информационных систем. Работы допускаются удалённо.</oos:requirements>
+    <oos:customer><oos:fullName>Министерство цифрового развития Приморского края</oos:fullName></oos:customer>
+    <oos:regionCode>RU-PRI</oos:regionCode>
+    <oos:placeOfDelivery>г. Владивосток, дистанционное выполнение работ</oos:placeOfDelivery>
+    <oos:deliveryMode>remote</oos:deliveryMode>
+    <oos:applicationEndDate>2026-09-15T18:00:00+10:00</oos:applicationEndDate>
+    <oos:lot>
+      <oos:lotNumber>1</oos:lotNumber><oos:maxPrice>12500000.00</oos:maxPrice>
+      <oos:currency><oos:code>RUB</oos:code></oos:currency>
+      <oos:classification><oos:system>CPV</oos:system><oos:code>72200000</oos:code></oos:classification>
+      <oos:classification><oos:system>OKPD2</oos:system><oos:code>62.01.11</oos:code></oos:classification>
+    </oos:lot>
+  </exp:fcsNotificationEF>
+  <exp:fcsNotificationEF>
+    <oos:purchaseNumber>0123456789026000004</oos:purchaseNumber>
+    <oos:docPublishDate>2026-08-13T10:00:00+03:00</oos:docPublishDate>
+    <oos:purchaseObjectInfo>Озеленение и благоустройство городской территории</oos:purchaseObjectInfo>
+    <oos:requirements>Посадка кустарников, устройство газонов, клумб и бордюров в Москве.</oos:requirements>
+    <oos:customer><oos:fullName>ГБУ Жилищник района Арбат</oos:fullName></oos:customer>
+    <oos:regionCode>RU-MOW</oos:regionCode>
+    <oos:placeOfDelivery>г. Москва, район Арбат</oos:placeOfDelivery>
+    <oos:deliveryMode>onsite</oos:deliveryMode>
+    <oos:applicationEndDate>2026-09-20T10:00:00+03:00</oos:applicationEndDate>
+    <oos:lot>
+      <oos:lotNumber>1</oos:lotNumber><oos:maxPrice>4700000.00</oos:maxPrice>
+      <oos:currency><oos:code>RUB</oos:code></oos:currency>
+      <oos:classification><oos:system>CPV</oos:system><oos:code>45112710</oos:code></oos:classification>
+      <oos:classification><oos:system>OKPD2</oos:system><oos:code>81.30.10</oos:code></oos:classification>
+    </oos:lot>
+  </exp:fcsNotificationEF>
+  <exp:fcsNotificationEF>
+    <oos:purchaseNumber>0123456789026000005</oos:purchaseNumber>
+    <oos:docPublishDate>2026-08-14T08:00:00+03:00</oos:docPublishDate>
+    <oos:purchaseObjectInfo>Комплексная уборка помещений и дворов</oos:purchaseObjectInfo>
+    <oos:requirements>Ежедневная уборка помещений и санитарное содержание прилегающей территории.</oos:requirements>
+    <oos:customer><oos:fullName>ГБОУ Школа № 1000</oos:fullName></oos:customer>
+    <oos:regionCode>RU-MOW</oos:regionCode>
+    <oos:placeOfDelivery>г. Москва, здания и дворы заказчика</oos:placeOfDelivery>
+    <oos:deliveryMode>onsite</oos:deliveryMode>
+    <oos:applicationEndDate>2026-09-05T09:00:00+03:00</oos:applicationEndDate>
+    <oos:lot>
+      <oos:lotNumber>1</oos:lotNumber><oos:maxPrice>3200000.00</oos:maxPrice>
+      <oos:currency><oos:code>RUB</oos:code></oos:currency>
+      <oos:classification><oos:system>CPV</oos:system><oos:code>90910000</oos:code></oos:classification>
+      <oos:classification><oos:system>OKPD2</oos:system><oos:code>81.21.10</oos:code></oos:classification>
+    </oos:lot>
+  </exp:fcsNotificationEF>
+  <exp:fcsNotificationEF>
+    <oos:purchaseNumber>0123456789026000006</oos:purchaseNumber>
+    <oos:docPublishDate>2026-08-14T12:00:00+03:00</oos:docPublishDate>
+    <oos:purchaseObjectInfo>Поставка офисной мебели</oos:purchaseObjectInfo>
+    <oos:requirements>Поставка столов и шкафов в административное здание.</oos:requirements>
+    <oos:customer><oos:fullName>ФКУ Административное управление</oos:fullName></oos:customer>
+    <oos:regionCode>RU-MOW</oos:regionCode>
+    <oos:placeOfDelivery>г. Москва</oos:placeOfDelivery>
+    <oos:deliveryMode>onsite</oos:deliveryMode>
+    <oos:applicationEndDate>2026-09-08T10:00:00+03:00</oos:applicationEndDate>
+    <oos:lot>
+      <oos:lotNumber>1</oos:lotNumber><oos:maxPrice>900000.00</oos:maxPrice>
+      <oos:currency><oos:code>RUB</oos:code></oos:currency>
+      <oos:classification><oos:system>CPV</oos:system><oos:code>39130000</oos:code></oos:classification>
+      <oos:classification><oos:system>OKPD2</oos:system><oos:code>31.01.12</oos:code></oos:classification>
+    </oos:lot>
+  </exp:fcsNotificationEF>
+  <exp:contract>
+    <oos:registryNumber>1770123456726000001</oos:registryNumber>
+    <oos:contractDate>2026-08-01T12:00:00+03:00</oos:contractDate>
+    <oos:purchaseObjectInfo>Техническое обслуживание автопарка: опубликованный результат</oos:purchaseObjectInfo>
+    <oos:customer><oos:fullName>ГБУ Автомобильные дороги Москвы</oos:fullName></oos:customer>
+    <oos:supplier><oos:fullName>ООО Надёжный автосервис</oos:fullName></oos:supplier>
+    <oos:regionCode>RU-MOW</oos:regionCode>
+    <oos:placeOfDelivery>г. Москва</oos:placeOfDelivery>
+    <oos:contractPrice>2100000.00</oos:contractPrice>
+    <oos:currency><oos:code>RUB</oos:code></oos:currency>
+    <oos:classification><oos:system>CPV</oos:system><oos:code>50110000</oos:code></oos:classification>
+    <oos:classification><oos:system>OKPD2</oos:system><oos:code>45.20.11</oos:code></oos:classification>
+  </exp:contract>
 </exp:export>

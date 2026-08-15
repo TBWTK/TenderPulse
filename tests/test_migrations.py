@@ -32,5 +32,8 @@ def test_initial_migration_creates_lineage_schema(tmp_path: Path) -> None:
     } <= tables
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "0006_ai_evidence_coverage"
+            "0007_profile_active_invariant"
         )
+    assert "uq_company_profiles_one_active" in {
+        item["name"] for item in inspect(engine).get_indexes("company_profiles")
+    }

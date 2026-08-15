@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ record.title }} · TenderPulse</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+  <script defer src="{{ url_for('static', path='/app.js') }}"></script>
+</head>
+<body>
+  <main class="detail-shell">
+    <header class="detail-topbar">
+      <a class="back-link" href="/?profile={{ selected.slug if selected else '' }}">← Вернуться к тендерам</a>
+      {% if profiles %}
+      <label class="profile-switch"><span>Оценка для компании</span><select id="detail-profile-switch" data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}">{% for item in profiles %}<option value="{{ item.slug }}" {{ 'selected' if selected and item.slug == selected.slug else '' }}>{{ item.name }} · v{{ item.version }}</option>{% endfor %}</select></label>
+      {% endif %}
+    </header>
+
+    <section class="detail-hero">
+      <div>
+        <span class="eyebrow mint">Карточка закупки · {{ record.source.value|upper }}</span>
+        <h1>{{ record.title }}</h1>
+        <p>{{ record.buyer_name or 'Заказчик не указан' }}</p>
+      </div>
+      {% if recommendation %}<div class="detail-decision {{ recommendation.decision.value }}"><strong>{{ (recommendation.score * 100)|int }}</strong><span>{{ decision_labels.get(recommendation.decision.value, recommendation.decision.value) }}</span></div>{% endif %}
+    </section>
+
+    <div class="detail-actions">
+      <a class="button primary" href="{{ record.evidence.source_url }}" target="_blank" rel="noreferrer">Открыть на официальном сайте ↗</a>
+      <span>Официальная запись откроется в новой вкладке. TenderPulse не подаёт заявку автоматически.</span>
+    </div>
+
+    <section class="detail-grid">
+      <article class="panel">
+        <div class="panel-head"><div><span class="eyebrow">Основные сведения</span><h2>Условия закупки</h2></div><span class="badge">{{ lifecycle_labels.get(record.lifecycle.value, record.lifecycle.value) }}</span></div>
+        <dl class="fact-list">
+          <div><dt>Номер</dt><dd>{{ record.source_record_id }}</dd></div>
+          <div><dt>Регион</dt><dd>{% if record.region_codes %}{% for code in record.region_codes %}{{ region_labels.get(code, code) }} ({{ code }}){% if not loop.last %}, {% endif %}{% endfor %}{% else %}unknown{% endif %}</dd></div>
+          <div><dt>Место исполнения</dt><dd>{{ record.delivery_location or 'unknown' }}</dd></div>
+          <div><dt>Формат</dt><dd>{{ delivery_mode_labels.get(record.delivery_mode.value, record.delivery_mode.value) }}</dd></div>
+          <div><dt>Сумма</dt><dd>{% set known_lots = record.lots|selectattr('amount', 'ne', none)|list %}{% if known_lots %}{{ known_lots[0].amount|amount }} {{ known_lots[0].currency }}{% else %}не указана{% endif %}</dd></div>
+          <div><dt>Срок подачи</dt><dd>{{ record.deadline_at.strftime('%d.%m.%Y %H:%M') if record.deadline_at else 'не указан' }}</dd></div>
+          <div><dt>Опубликовано</dt><dd>{{ record.published_at.strftime('%d.%m.%Y %H:%M') if record.published_at else 'не указано' }}</dd></div>
+        </dl>
+        <h3>Классификаторы</h3>
+        <div class="chip-set">{% for item in record.classifications %}<span>{{ item.system }} {{ item.code }}</span>{% else %}<span>unknown</span>{% endfor %}</div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><div><span class="eyebrow">Объяснение</span><h2>Географическая оценка</h2></div></div>
+        {% if recommendation %}
+        <div class="evidence-row">{% for reason in recommendation.reasons %}<span><b>+{{ (reason.contribution * 100)|int }}</b> {{ reason_labels.get(reason.code, reason.code) }} · {{ reason.matched_values|join(', ') }}</span>{% endfor %}</div>
+        <div class="diagnostic-list">
+          {% for blocker in recommendation.blockers %}<p class="blocker"><b>Блокирует участие</b>{{ diagnostic_labels.get(blocker.value, blocker.value) }}</p>{% endfor %}
+          {% for gap in recommendation.gaps %}<p class="gap"><b>Нужно проверить</b>{{ diagnostic_labels.get(gap.value, gap.value) }}</p>{% endfor %}
+          {% if not recommendation.blockers and not recommendation.gaps %}<p class="ok-copy">Критичных блокирующих причин по географии и неизвестных данных не обнаружено.</p>{% endif %}
+        </div>
+        {% else %}<p class="muted-copy">Выберите компанию, чтобы получить оценку.</p>{% endif %}
+      </article>
+
+      <article class="panel detail-wide">
+        <div class="panel-head"><div><span class="eyebrow">Свидетельства по сохранённой версии</span><h2>Требования и сроки</h2></div><span class="badge">{% if evidence_attempt %}{{ evidence_attempt.status.value }}{% else %}не проверено{% endif %}</span></div>
+        <p>{{ record.description }}</p>
+        <section class="ai-evidence {{ evidence_attempt.status.value if evidence_attempt else 'empty' }}" data-evidence-output aria-live="polite">
+          {% if evidence_attempt and evidence_attempt.claims %}
+          <div class="coverage-row"><span>requirements: {{ evidence_attempt.claims.requirements_status.value }}</span><span>deadlines: {{ evidence_attempt.claims.deadlines_status.value }}</span></div>
+          <div class="claim-list">{% for claim in evidence_attempt.claims.requirements %}<p><b>{{ claim.text }}</b><small>{{ claim.citation.field }} · {{ claim.citation.quote }}</small></p>{% endfor %}{% for claim in evidence_attempt.claims.deadlines %}<p><b>{{ claim.label }} · {{ claim.value }}</b><small>{{ claim.citation.field }} · {{ claim.citation.quote }}</small></p>{% endfor %}</div>
+          {% else %}<p class="ai-gaps">Требования, опыт, лицензии, персонал и обеспечение не определены до проверки доступных полей. Отсутствие данных не считается отсутствием требования.</p>{% endif %}
+        </section>
+        {% if ai_enabled and (not evidence_attempt or evidence_attempt.status.value != 'validated') %}<button class="button ghost detail-ai-button" data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}">Проверить требования в сохранённой версии</button>{% endif %}
+      </article>
+
+      <article class="panel detail-wide">
+        <div class="panel-head"><div><span class="eyebrow">SCD2 · immutable raw</span><h2>История изменений</h2></div><span class="badge">{{ lineage|length }} версий</span></div>
+        <div class="timeline-list">{% for version in lineage %}<article><b>v{{ version.version }} · {{ 'текущая' if version.valid_to is none else 'закрыта' }}</b><span>raw SHA</span><code>{{ version.record.evidence.raw_sha256 }}</code><span>ingestion run</span><code>{{ version.record.evidence.ingestion_run_id }}</code><span>источник</span><a href="{{ version.record.evidence.source_url }}" target="_blank" rel="noreferrer">официальная запись ↗</a></article>{% endfor %}</div>
+      </article>
+
+      <article class="panel detail-wide">
+        <div class="panel-head"><div><span class="eyebrow">Опубликованные факты</span><h2>Результаты, победители и суммы</h2></div></div>
+        <div class="outcome-list">{% for outcome in related_outcomes %}<a class="outcome-row" href="{{ outcome.source_url }}" target="_blank" rel="noreferrer"><span><b>{{ outcome.supplier_names|join(', ') if outcome.supplier_names else 'победитель unknown' }}</b><small>{{ outcome.buyer_name or 'заказчик unknown' }}</small></span><strong>{{ outcome.amount ~ ' ' ~ outcome.currency if outcome.amount else 'сумма unknown' }}</strong></a>{% else %}<p class="muted-copy">Связанный опубликованный результат не найден; факт остаётся unknown.</p>{% endfor %}</div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

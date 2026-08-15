@@ -2,15 +2,15 @@
 title: Запуск и эксплуатация
 type: runbook
 status: active
-updated: 2026-08-10
+updated: 2026-08-15
 ---
 
 # Запуск и эксплуатация
 
 ## Быстрый старт
 
-Требования: Docker Compose и заполненный локальный `.env`. Реальные секреты не копируются в
-`.env.example` и не коммитятся.
+Требования: Docker Compose и локальный `.env`. Реальные секреты не переносятся в `.env.example` и
+не коммитятся.
 
 ```bash
 cp .env.example .env
@@ -18,104 +18,73 @@ docker compose up --build -d
 docker compose ps -a
 ```
 
-Web/API доступен только на `http://127.0.0.1:8010`; PostgreSQL — `127.0.0.1:5433`, MinIO console —
-`127.0.0.1:9001`. Порты переопределяются переменными `TENDERPULSE_*_PORT`.
+Web/API: `http://127.0.0.1:8010`; PostgreSQL: `127.0.0.1:5433`; MinIO console:
+`127.0.0.1:9001`. Порты задаются `TENDERPULSE_*_PORT`.
 
-Init container применяет все Alembic migrations, загружает три небольших demo fixtures, два
-синтетических профиля и создаёт in-app alerts. Повторный init идемпотентен для canonical versions и
-alerts, но сохраняет новый ingestion run как свидетельство повтора. После migrations он также
-идемпотентно восстанавливает organization links для всех ранее сохранённых SCD2-версий. Seed создаёт
-только отсутствующий профиль: сохранённая пользователем версия никогда не откатывается к demo v1.
+Init применяет Alembic, идемпотентно загружает один российский ЕИС demo-export из 6 notices и 1
+award, создаёт четыре отсутствующих demo-профиля и alerts. Повторный init сохраняет новый ingestion
+run, но не создаёт canonical version без изменения. Пользовательская active version и созданные
+пользователем slug-и не сбрасываются.
 
-## Управление данными
+## Пользовательский workflow
 
-- Dashboard: `GET /`.
-- Ограниченная live-загрузка: `POST /api/ingestion/run`; источники `ted`, `eis`, `usaspending`, общий
-  limit `1..500`, URL нельзя передать снаружи. ЕИС независимо ограничивает ответ первыми 50 records.
-- Manual ЕИС: `POST /api/ingestion/eis-upload`, `.xml`/`.zip`, максимум 10 MiB. ZIP ограничен 50
-  members, 20 MiB uncompressed и 500 records; DTD/ENTITY и unsafe paths запрещены.
-- Runs/freshness: `GET /api/ingestion/runs`, `GET /api/analytics/source-freshness`.
-- Результаты контрактов: `GET /api/analytics/award-outcomes`; winner/amount имеют явный coverage status.
-- Product analytics: `GET /api/analytics/product/{profile_slug}`. `decisions`, `coverage`, `sources`,
-  `categories`, `geographies` и `buyers` относятся только к current active/planned notices; `history`
-  читает все SCD2 versions, `outcomes` — current award lots.
-- Lineage: `GET /api/records/{source}/{source_record_id}/lineage`.
-- Профили: dashboard редактирует name, capabilities, keywords, CPV/OKPD2/PSC, countries и budget bounds;
-  `PUT /api/profiles/{slug}` обязан передавать следующую version. В MVP остаётся ровно два slug-а.
+- `/` — русская очередь, filters/sort, аналитика, компании и bounded ingestion.
+- `/tenders/{source}/{source_record_id}?profile={slug}` — внутренняя карточка с requirements,
+  geography, lineage, результатами и отдельным официальным переходом.
+- `GET/POST /api/profiles`, `PUT /api/profiles/{slug}`, `GET /api/profiles/{slug}/history` — создание,
+  следующая immutable version и история. Любое число distinct active slug допустимо.
+- `GET /api/recommendations/{slug}` — current ЕИС/RU active/planned notices.
+- `GET /api/analytics/product/{slug}` — полный current scope, даже если UI-очередь отфильтрована.
+- `GET /api/analytics/award-outcomes` — только текущие российские award facts.
+- `GET /api/records/{source}/{id}/lineage` — все сохранённые версии, включая legacy history.
 
-Следующий manual или scheduled cycle перечитывает current versions без рестарта. Union CPV prefixes
-обоих профилей ограничивает TED, union keywords — USAspending; ЕИС RSS использует свой фиксированный
-bounded query. `GET /api/ingestion/runs` возвращает фактические filters и `profile_versions`. Если active
-profiles не ровно два или slug-и дублируются, цикл завершается ошибкой до обращения к источнику.
+Основная очередь содержит `recommended` и `review`; `not_relevant`/`expired` находятся в audit и не
+получают AI/alert actions. Alert создаётся только для `recommended` и сохраняет profile/record version,
+score/reasons, region, deadline, official URL и raw SHA.
 
-Dashboard по умолчанию показывает только `recommended`/`review`. Отклонённые matcher-ом records
-раскрываются отдельно под «Рассмотрено и отклонено» и не имеют кнопок AI extraction. Кнопка
-«Проверить требования в доступных данных» проверяет только поля уже сохранённой current record version;
-после validated attempt карточка показывает coverage/claims/gaps вместо повторного действия. Timeline
-«История» содержит raw SHA, ingestion run и официальный source URL каждой версии.
-
-Для регулярного TED/ЕИС/USA цикла:
+## Bounded ЕИС ingestion
 
 ```dotenv
 LIVE_INGESTION_ENABLED=true
 INGESTION_INTERVAL_SECONDS=3600
-SOURCE_RECORD_LIMIT=100
-TED_LOOKBACK_DAYS=14
+SOURCE_RECORD_LIMIT=25
 EIS_LOOKBACK_DAYS=7
-USA_LOOKBACK_DAYS=365
-GIGACHAT_CA_BUNDLE_FILE=/app/certs/russian_trusted_root_ca_pem.crt
 EIS_ROOT_CA_FILE=/app/certs/russian_trusted_root_ca_pem.crt
 EIS_SUB_CA_FILE=/app/certs/russian_trusted_sub_ca_pem.crt
 ```
 
-Worker выполняет первый цикл сразу после старта, затем ждёт interval. При `false` внешних source
-вызовов нет. Live ЕИС использует только `https://zakupki.gov.ru/epz/order/extendedsearch/rss.html`,
-44-ФЗ, первую страницу, интервал `1..31` день и максимум 50 records; `Referer`/URL извне не принимаются.
-RSS не содержит полного набора CPV/deadline/result details, поэтому эти поля остаются `unknown`, пока
-они не подтверждены отдельным evidence. При ротации upstream certificate обновите issuing CA только
-после проверки issuer/expiry/fingerprint и повторите certificate tests; `verify=false` запрещён.
+`POST /api/ingestion/run` принимает только `sources=["eis"]`, limit `1..50` и окно `1..31` день.
+URL фиксирован: `https://zakupki.gov.ru/epz/order/extendedsearch/rss.html`; response ≤2 MiB. Параметры
+и версии всех профилей сохраняются в run. Пустой валидный RSS — `0 records`; foreign source, limit 51,
+битая schema или transport error видны как отказ, а не как правдоподобный пустой результат.
 
-## Alerts
-
-In-app outbox работает всегда и не вызывает внешние системы. Для opt-in доставки задайте:
-
-```dotenv
-ALERT_WEBHOOK_URL=https://internal.example/tenderpulse
-ALERT_WEBHOOK_TIMEOUT_SECONDS=10
-ALERT_WEBHOOK_MAX_ATTEMPTS=5
-```
-
-Разрешён только HTTPS URL без embedded credentials и fragment. При заданном URL worker запускается
-даже если live ingestion выключен, отправляет pending alerts со стабильным `Idempotency-Key` и повторяет
-только transport/429/5xx failures. БД хранит destination SHA-256, HTTP status и error class; URL,
-response body и возможный token из query string в audit/log не записываются. Получатель обязан уважать
-`Idempotency-Key`, потому что сбой между HTTP 2xx и DB commit может привести к повторной попытке.
+`POST /api/ingestion/eis-upload` принимает `.xml`/`.zip` ≤10 MiB; ZIP ≤50 members и ≤20 MiB
+uncompressed. DTD/ENTITY, unsafe path и unsupported schema отклоняются. Parser сохраняет official
+zakupki.gov.ru URL, region/delivery mode, deadline, CPV/ОКПД2 и award winner/amount, когда они есть.
 
 ## GigaChat
 
-Нужны `GIGACHAT_API_KEY`, `GIGACHAT_SCOPE` и доступный внутри контейнера CA bundle. Authorization key
-и access token существуют только в memory HTTP-клиента. `GIGACHAT_CLIENT_ID` допускается в `.env` для
-операционного учёта, но REST OAuth использует готовый Authorization key.
+Задайте `GIGACHAT_API_KEY`, `GIGACHAT_SCOPE` и CA bundle. Токены живут только в HTTP-клиенте и не
+попадают в raw/log. Кнопка requirements вызывает `POST /api/records/{source}/{id}/evidence/extract`.
+Attempt привязан к current record version и содержит prompt/model/input/output hashes, validation
+status и verbatim citations. `unknown` означает недостаток evidence, не отсутствие требования.
 
-AI extraction вызывается явно через dashboard или `POST
-/api/records/{source}/{source_record_id}/evidence/extract`. Результат не меняет canonical facts:
-validated/rejected/failed attempt хранится отдельно с model/prompt/input/output hashes и citations.
-После ответа и после reload карточка показывает последний attempt текущей record version, включая
-coverage statuses, gaps и verbatim citations. `unknown` означает недостаток evidence, а не отсутствие
-требования или срока.
+## Alerts и webhook
 
-## Проверка и остановка
+In-app outbox работает локально. Для opt-in HTTPS webhook задайте `ALERT_WEBHOOK_URL`, timeout и
+bounded max attempts. Receiver обязан уважать `Idempotency-Key`; БД хранит destination hash/status/error,
+но не URL и response body. Retry разрешён только для transport/429/5xx.
+
+## Проверка, перезапуск и остановка
 
 ```bash
 make verify
 make dbt-test
+docker compose restart api worker
+docker compose ps -a
 docker compose down
 ```
 
-`make dbt-test` по умолчанию использует Compose-порт `127.0.0.1:5433`; переменные `DBT_*` нужны только
-для явно переопределённого подключения.
-
-`docker compose down` сохраняет named volumes. Удаление volumes не входит в обычную остановку и
-является destructive operation. До public deployment обязательны auth/RBAC, CSRF, tenant isolation,
-durable command queue и backup/restore test. Для публичного webhook дополнительно нужны egress allowlist,
-destination rotation procedure и receiver authentication policy.
+После restart проверьте созданный slug через `/api/profiles` и его history. `docker compose down`
+сохраняет named volumes. Удаление volumes — отдельная destructive operation и не входит в штатную
+остановку. До public deployment нужны auth/RBAC, CSRF, tenant isolation, backup/restore и durable queue.

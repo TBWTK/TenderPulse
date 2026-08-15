@@ -28,7 +28,7 @@ def test_demo_seed_is_a_repeatable_end_to_end_vertical_slice() -> None:
     first = seed_demo(factory, raw_store, now=now)
     with factory.begin() as session:
         repository = ProcurementRepository(session)
-        current = repository.get_profile("it-data-integrator")
+        current = repository.get_profile("it-russia-integrator")
         assert current is not None
         repository.add_profile_version(
             current.model_copy(update={"version": 2, "name": "User configured profile"})
@@ -45,15 +45,16 @@ def test_demo_seed_is_a_repeatable_end_to_end_vertical_slice() -> None:
             len(repository.lineage(record.source, record.source_record_id)) for record in records
         ]
 
-    assert first.record_count == replay.record_count == 4
-    assert len(records) == 4
-    assert len(profiles) == 2
-    assert next(profile for profile in profiles if profile.slug == "it-data-integrator").name == (
+    assert first.record_count == replay.record_count == 7
+    assert len(records) == 7
+    assert {record.source.value for record in records} == {"eis"}
+    assert len(profiles) == 4
+    assert next(profile for profile in profiles if profile.slug == "it-russia-integrator").name == (
         "User configured profile"
     )
     assert (
-        next(profile for profile in profiles if profile.slug == "it-data-integrator").version == 2
+        next(profile for profile in profiles if profile.slug == "it-russia-integrator").version == 2
     )
-    assert run_count == 6
-    assert artifact_count == 3
-    assert lineage_counts == [1, 1, 1, 1]
+    assert run_count == 2
+    assert artifact_count == 1
+    assert lineage_counts == [1, 1, 1, 1, 1, 1, 1]

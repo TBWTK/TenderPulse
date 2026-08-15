@@ -2,7 +2,7 @@
 title: Этапы проекта
 type: roadmap
 status: complete
-updated: 2026-08-10
+updated: 2026-08-15
 ---
 
 # Этапы проекта
@@ -18,5 +18,12 @@ updated: 2026-08-10
 | Identity | Source-scoped buyers/suppliers and aliases | Backfill all SCD2 versions, dbt relationships, no guessed cross-source merge | done |
 | Quality & handoff | Документация совпадает с работающим Docker MVP | Full regression, dbt, live smoke, audit, Git checkpoint и проверенный push | done |
 | Product acceptance | Рекомендации, AI-state, navigation, analytics и history образуют честный usable MVP | Two-profile E2E eval, semantic UI tests, browser inspection, full regression | done |
+| MVP 2.0 intent | Российский source boundary и полный acceptance contract | Source matrix, baseline audit, 15 E2E scenarios и non-goals зафиксированы до кода | done |
+| MVP 2.0 profiles | 4 demo + произвольные versioned user companies | Create/edit/history/reseed tests; source scope не зависит от числа профилей | done |
+| MVP 2.0 geography | Explainable region/service-mode policy | Москва/Камчатка, contractor, remote Владивосток и unknown-location evals | done |
+| MVP 2.0 Russian data | Только bounded российские active notices/outcomes | ЕИС current/details/results fixtures, foreign exclusion, official links and lineage | done |
+| MVP 2.0 product UI | Понятный русский company/tender workflow | Guided profile, filters/sort/detail, four-profile + create-company deterministic E2E | done |
+| MVP 2.0 analytics | География, deadlines, dynamics, blockers и quality | Typed API/UI scopes, deterministic projection tests и dbt coherence | done |
+| MVP 2.0 handoff | Воспроизводимый Docker MVP и Git checkpoint | Full regression/dbt/health/browser/audit, restart persistence и verified push | done |
 
 Допустимые статусы: `planned`, `active`, `blocked`, `done`.

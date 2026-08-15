@@ -81,9 +81,7 @@ def main() -> None:
         results = (
             service.run_cycle(
                 limit=settings.source_record_limit,
-                ted_lookback_days=settings.ted_lookback_days,
                 eis_lookback_days=settings.eis_lookback_days,
-                usa_lookback_days=settings.usa_lookback_days,
             )
             if service is not None
             else ()

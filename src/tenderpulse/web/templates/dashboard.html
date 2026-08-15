@@ -12,16 +12,17 @@
     <div class="meta-line">
       <span class="source-tag">{{ record.source.value|upper }}</span>
       <span>{{ record.source_record_id }}</span>
-      <span>{{ record.countries|join(' · ') if record.countries else 'география unknown' }}</span>
+      <span>{% if record.region_codes %}{% for code in record.region_codes %}{{ region_labels.get(code, code) }} ({{ code }}){% if not loop.last %} · {% endif %}{% endfor %}{% else %}регион unknown{% endif %}</span>
       <span>{{ record.deadline_at.strftime('%d.%m.%Y %H:%M') if record.deadline_at else 'срок unknown' }}</span>
     </div>
-    <h3><a href="{{ record.evidence.source_url }}" target="_blank" rel="noreferrer">{{ record.title }}</a></h3>
+    <h3><a href="/tenders/{{ record.source.value }}/{{ record.source_record_id }}?profile={{ selected.slug if selected else '' }}">{{ record.title }}</a></h3>
     <p class="buyer">{{ record.buyer_name or 'Заказчик не указан' }}</p>
     <div class="evidence-row">
       {% for reason in recommendation.reasons %}
-      <span><b>+{{ (reason.contribution * 100)|int }}</b> {{ reason.code }} · {{ reason.matched_values|join(', ') }}</span>
+      <span><b>+{{ (reason.contribution * 100)|int }}</b> {{ reason_labels.get(reason.code, reason.code) }} · {{ reason.matched_values|join(', ') }}</span>
       {% endfor %}
-      {% for gap in recommendation.gaps %}<span class="gap">{{ gap.value }}</span>{% endfor %}
+      {% for gap in recommendation.gaps %}<span class="gap">{{ diagnostic_labels.get(gap.value, gap.value) }}</span>{% endfor %}
+      {% for blocker in recommendation.blockers %}<span class="blocker">{{ diagnostic_labels.get(blocker.value, blocker.value) }}</span>{% endfor %}
     </div>
     <section class="ai-evidence {{ evidence_attempt.status.value if evidence_attempt else 'empty' }}" data-evidence-output aria-live="polite">
       {% if evidence_attempt %}
@@ -51,7 +52,9 @@
     </details>
   </div>
   <div class="card-actions">
-    <span class="decision">{{ recommendation.decision.value }}</span>
+    <span class="decision">{{ decision_labels.get(recommendation.decision.value, recommendation.decision.value) }}</span>
+    <a class="button primary" href="/tenders/{{ record.source.value }}/{{ record.source_record_id }}?profile={{ selected.slug if selected else '' }}">Открыть карточку</a>
+    <a class="official-link" href="{{ record.evidence.source_url }}" target="_blank" rel="noreferrer">Официальный сайт ↗</a>
     {% if actionable and ai_enabled and not evidence_attempt %}
     <button class="button ghost ai-button" data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}">Проверить требования в доступных данных</button>
     {% elif actionable and evidence_attempt and evidence_attempt.status.value == 'validated' %}
@@ -81,10 +84,10 @@
       </a>
 
       <nav class="nav" aria-label="Разделы">
-        <a class="active" href="#opportunities" aria-current="location"><span>01</span> Возможности</a>
+        <a class="active" href="#opportunities" aria-current="location"><span>01</span> Тендеры</a>
         <a href="#analytics"><span>02</span> Аналитика</a>
-        <a href="#loading"><span>03</span> Загрузка данных</a>
-        <a href="#profile"><span>04</span> Профиль</a>
+        <a href="#companies"><span>03</span> Компании</a>
+        <a href="#loading"><span>04</span> Загрузка данных</a>
       </nav>
 
       <section class="rail-section" aria-labelledby="freshness-title">
@@ -93,7 +96,7 @@
           {% for item in freshness %}
           <div class="source-row">
             <span class="pulse {{ 'ok' if item.last_status == 'succeeded' else 'muted' }}"></span>
-            <div><strong>{{ item.source.value|upper }}</strong><small>{{ item.last_status }}</small></div>
+            <div><strong>{{ item.source.value|upper }}</strong><small>{{ run_status_labels.get(item.last_status, item.last_status) }}</small></div>
             <time>
               {% if item.age_seconds is not none %}
                 {{ (item.age_seconds / 3600)|round(1) }} ч
@@ -114,7 +117,7 @@
       <header class="topbar">
         <div>
           <div class="eyebrow">Рабочее пространство / {{ workspace_date }}</div>
-          <h1>Лента возможностей</h1>
+          <h1>Российские тендеры</h1>
         </div>
         <label class="profile-switch">
           <span>Профиль компании</span>
@@ -142,9 +145,9 @@
 
       <section class="metrics" aria-label="Ключевые показатели">
         <article><span class="metric-index">A</span><strong>{{ actionable_cards|length }}</strong><p>для подачи / проверки</p></article>
-        <article><span class="metric-index">B</span><strong>{{ opportunity_count }}</strong><p>рассмотрено active/planned</p></article>
+        <article><span class="metric-index">B</span><strong>{{ opportunity_count }}</strong><p>активных и планируемых</p></article>
         <article><span class="metric-index">C</span><strong>{{ profiles|length }}</strong><p>версируемых профиля</p></article>
-        <article><span class="metric-index">D</span><strong>500</strong><p>жёсткий лимит / запуск</p></article>
+        <article><span class="metric-index">D</span><strong>50</strong><p>жёсткий лимит ЕИС / запуск</p></article>
       </section>
 
       <div class="section-head">
@@ -152,11 +155,23 @@
         <div class="legend"><span class="dot recommended"></span> рекомендовано <span class="dot review"></span> проверить</div>
       </div>
 
+      <form class="tender-filters" method="get" action="/" aria-label="Фильтры тендеров">
+        <input type="hidden" name="profile" value="{{ selected.slug if selected else '' }}">
+        <label>Поиск<input type="search" name="search" value="{{ filters.search }}" placeholder="Предмет, заказчик или номер"></label>
+        <label>Статус<select name="decision">
+          {% for value, label in [('all', 'Все решения'), ('actionable', 'Для подачи или проверки'), ('recommended', 'Рекомендовано'), ('review', 'Нужно проверить'), ('rejected', 'Отклонено'), ('expired', 'Срок истёк')] %}<option value="{{ value }}" {{ 'selected' if filters.decision == value else '' }}>{{ label }}</option>{% endfor %}
+        </select></label>
+        <label>Регион<select name="region"><option value="all">Все регионы</option>{% for value in available_regions %}<option value="{{ value }}" {{ 'selected' if filters.region == value else '' }}>{{ region_labels.get(value, value) }} ({{ value }})</option>{% endfor %}</select></label>
+        <label>Сортировка<select name="sort">{% for value, label in [('relevance', 'По релевантности'), ('deadline', 'По ближайшему сроку'), ('region', 'По региону'), ('amount', 'По сумме'), ('source', 'По источнику')] %}<option value="{{ value }}" {{ 'selected' if filters.sort == value else '' }}>{{ label }}</option>{% endfor %}</select></label>
+        <button class="button primary" type="submit">Применить</button>
+        <a class="button ghost" href="/?profile={{ selected.slug if selected else '' }}">Сбросить</a>
+      </form>
+
       <section class="alert-strip" aria-label="Последние alerts">
-        <div><span class="eyebrow">In-app alerts</span><strong>{{ alerts|selectattr('read_at', 'none')|list|length }} непрочитано</strong></div>
+        <div><span class="eyebrow">Уведомления в приложении</span><strong>{{ alerts|selectattr('read_at', 'none')|list|length }} непрочитано</strong></div>
         {% for alert in alerts[:3] %}
         <button class="alert-item {{ 'read' if alert.read_at else '' }}" data-alert="{{ alert.id }}">
-          <span>{{ alert.record_source.value|upper }} · {{ (alert.score * 100)|int }}%</span>
+          <span>{{ alert.record_source.value|upper }} · {{ (alert.score * 100)|int }}% · {{ alert.region_codes|join(', ') if alert.region_codes else 'регион unknown' }} · {{ alert.deadline_at.strftime('%d.%m.%Y') if alert.deadline_at else 'срок unknown' }}</span>
           <b>{{ alert.title }}</b>
         </button>
         {% else %}
@@ -185,19 +200,19 @@
 
       {% if analytics %}
       <section class="analytics-section" id="analytics">
-        <div class="section-head"><div><span class="eyebrow">Аналитика профиля</span><h2>Проверяемый срез данных</h2></div><span class="badge">Текущий срез active/planned</span></div>
+        <div class="section-head"><div><span class="eyebrow">Аналитика профиля</span><h2>Проверяемый срез данных</h2></div><span class="badge">Активные и планируемые закупки</span></div>
         <div class="analytics-grid">
           <article class="panel analytics-panel wide">
-            <div class="panel-head"><div><span class="eyebrow">Decision funnel</span><h3>Результат matching</h3></div><span class="badge">{{ analytics.decisions.total }} рассмотрено</span></div>
+            <div class="panel-head"><div><span class="eyebrow">Воронка решений</span><h3>Результат сопоставления</h3></div><span class="badge">{{ analytics.decisions.total }} рассмотрено</span></div>
             <div class="stat-grid four">
-              <div><strong>{{ analytics.decisions.recommended }}</strong><span>recommended</span></div>
-              <div><strong>{{ analytics.decisions.review }}</strong><span>review</span></div>
-              <div><strong>{{ analytics.decisions.not_relevant }}</strong><span>not relevant</span></div>
-              <div><strong>{{ analytics.decisions.expired }}</strong><span>expired</span></div>
+              <div><strong>{{ analytics.decisions.recommended }}</strong><span>рекомендовано</span></div>
+              <div><strong>{{ analytics.decisions.review }}</strong><span>нужно проверить</span></div>
+              <div><strong>{{ analytics.decisions.not_relevant }}</strong><span>не подходит</span></div>
+              <div><strong>{{ analytics.decisions.expired }}</strong><span>срок истёк</span></div>
             </div>
           </article>
           <article class="panel analytics-panel wide">
-            <div class="panel-head"><div><span class="eyebrow">Data coverage</span><h3>Полнота текущих notices</h3></div><span class="badge">из {{ analytics.coverage.total }}</span></div>
+            <div class="panel-head"><div><span class="eyebrow">Полнота данных</span><h3>Заполнение текущих закупок</h3></div><span class="badge">из {{ analytics.coverage.total }}</span></div>
             <div class="coverage-grid">
               <div><b>{{ analytics.coverage.buyer_known }}/{{ analytics.coverage.total }}</b><span>заказчик</span></div>
               <div><b>{{ analytics.coverage.classification_known }}/{{ analytics.coverage.total }}</b><span>классификаторы</span></div>
@@ -207,7 +222,7 @@
             </div>
           </article>
           <article class="panel analytics-panel">
-            <div class="panel-head"><div><span class="eyebrow">Current notices</span><h3>Заказчики</h3></div><span class="badge">current scope</span></div>
+            <div class="panel-head"><div><span class="eyebrow">Текущие закупки</span><h3>Заказчики</h3></div><span class="badge">текущий срез</span></div>
             <div class="buyer-chart">
               {% set max_count = analytics.buyers[0].count if analytics.buyers else 1 %}
               {% for item in analytics.buyers[:5] %}
@@ -216,25 +231,25 @@
             </div>
           </article>
           <article class="panel analytics-panel">
-            <div class="panel-head"><div><span class="eyebrow">Distributions</span><h3>Источники · категории · география</h3></div><span class="badge">current scope</span></div>
+            <div class="panel-head"><div><span class="eyebrow">Распределения</span><h3>Источники · категории · география</h3></div><span class="badge">текущий срез</span></div>
             <div class="distribution-block"><b>Источники</b><div class="chip-set">{% for item in analytics.sources %}<span>{{ item.label }} · {{ item.count }}</span>{% endfor %}</div></div>
             <div class="distribution-block"><b>Категории</b><div class="chip-set">{% for item in analytics.categories[:8] %}<span>{{ item.label }} · {{ item.count }}</span>{% else %}<span>unknown</span>{% endfor %}</div></div>
-            <div class="distribution-block"><b>География</b><div class="chip-set">{% for item in analytics.geographies[:8] %}<span>{{ item.label }} · {{ item.count }}</span>{% else %}<span>unknown</span>{% endfor %}</div></div>
+            <div class="distribution-block"><b>География</b><div class="chip-set">{% for item in analytics.geographies[:8] %}<span>{{ region_labels.get(item.label, item.label) }} ({{ item.label }}) · {{ item.count }}</span>{% else %}<span>unknown</span>{% endfor %}</div></div>
           </article>
           <article class="panel analytics-panel">
-            <div class="panel-head"><div><span class="eyebrow">SCD2 history</span><h3>Изменения записей</h3></div><span class="badge">all saved versions</span></div>
+            <div class="panel-head"><div><span class="eyebrow">История SCD2</span><h3>Изменения записей</h3></div><span class="badge">все сохранённые версии</span></div>
             <div class="stat-grid three">
-              <div><strong>{{ analytics.history.current_records }}</strong><span>current records</span></div>
-              <div><strong>{{ analytics.history.total_versions }}</strong><span>saved versions</span></div>
-              <div><strong>{{ analytics.history.changed_records }}</strong><span>records changed</span></div>
+              <div><strong>{{ analytics.history.current_records }}</strong><span>текущих записей</span></div>
+              <div><strong>{{ analytics.history.total_versions }}</strong><span>сохранённых версий</span></div>
+              <div><strong>{{ analytics.history.changed_records }}</strong><span>изменённых записей</span></div>
             </div>
           </article>
           <article class="panel analytics-panel">
-            <div class="panel-head"><div><span class="eyebrow">Outcomes</span><h3>Победители и суммы</h3></div><span class="badge">current awards</span></div>
+            <div class="panel-head"><div><span class="eyebrow">Результаты закупок</span><h3>Победители и суммы</h3></div><span class="badge">текущие результаты</span></div>
             <div class="stat-grid three">
-              <div><strong>{{ analytics.outcomes.awards }}</strong><span>awards</span></div>
-              <div><strong>{{ analytics.outcomes.winner_known }}</strong><span>winner known</span></div>
-              <div><strong>{{ analytics.outcomes.amount_known }}</strong><span>amount known</span></div>
+              <div><strong>{{ analytics.outcomes.awards }}</strong><span>результатов</span></div>
+              <div><strong>{{ analytics.outcomes.winner_known }}</strong><span>победитель известен</span></div>
+              <div><strong>{{ analytics.outcomes.amount_known }}</strong><span>сумма известна</span></div>
             </div>
             <div class="outcome-list">
               {% for outcome in award_outcomes %}
@@ -242,56 +257,83 @@
                 <span><b>{{ outcome.supplier_names|join(', ') if outcome.supplier_names else 'победитель unknown' }}</b><small>{{ outcome.buyer_name or 'заказчик unknown' }}</small></span>
                 <strong>{% if outcome.amount_status.value == 'found' %}{{ outcome.amount }} {{ outcome.currency }}{% else %}{{ outcome.amount_status.value }}{% endif %}</strong>
               </a>
-              {% else %}<p class="muted-copy">Результаты появятся после bounded USAspending загрузки.</p>{% endfor %}
+              {% else %}<p class="muted-copy">Опубликованные результаты ЕИС пока не найдены.</p>{% endfor %}
             </div>
+          </article>
+          <article class="panel analytics-panel">
+            <div class="panel-head"><div><span class="eyebrow">Аудит причин</span><h3>Блокирующие причины и пробелы</h3></div><span class="badge">текущее сопоставление</span></div>
+            <div class="stat-grid three"><div><strong>{{ analytics.diagnostics.geography_rejected }}</strong><span>отклонено по географии</span></div><div><strong>{{ analytics.diagnostics.blockers|sum(attribute='count') }}</strong><span>блокирующих причин</span></div><div><strong>{{ analytics.diagnostics.gaps|sum(attribute='count') }}</strong><span>пробелов в данных</span></div></div>
+            <div class="distribution-block"><b>Частые блокирующие причины</b><div class="chip-set">{% for item in analytics.diagnostics.blockers %}<span>{{ diagnostic_labels.get(item.label, item.label) }} · {{ item.count }}</span>{% else %}<span>нет</span>{% endfor %}</div></div>
+            <div class="distribution-block"><b>Частые пробелы</b><div class="chip-set">{% for item in analytics.diagnostics.gaps %}<span>{{ diagnostic_labels.get(item.label, item.label) }} · {{ item.count }}</span>{% else %}<span>нет</span>{% endfor %}</div></div>
+          </article>
+          <article class="panel analytics-panel">
+            <div class="panel-head"><div><span class="eyebrow">Качество профиля</span><h3>Готовность данных компании</h3></div><span class="badge">{{ analytics.profile_quality.score }}%</span></div>
+            <div class="stat-grid three"><div><strong>{{ analytics.budget.known_count }}</strong><span>бюджетов известно</span></div><div><strong>{{ analytics.budget.average|amount }}</strong><span>средний бюджет</span></div><div><strong>{{ analytics.budget.median|amount }}</strong><span>медиана</span></div></div>
+            <div class="distribution-block"><b>Незаполненные поля</b><div class="chip-set">{% for field in analytics.profile_quality.missing_fields %}<span>{{ field }}</span>{% else %}<span>профиль заполнен</span>{% endfor %}</div></div>
+          </article>
+          <article class="panel analytics-panel wide">
+            <div class="panel-head"><div><span class="eyebrow">Календарь сроков</span><h3>Ближайшие сроки</h3></div><span class="badge">будущие сроки подачи</span></div>
+            <div class="deadline-list">{% for item in analytics.nearest_deadlines %}<a href="/tenders/{{ item.record_source.value }}/{{ item.record_source_id }}?profile={{ selected.slug }}"><time>{{ item.deadline_at.strftime('%d.%m.%Y %H:%M') }}</time><b>{{ item.title }}</b><span>{{ item.region_codes|join(', ') if item.region_codes else 'регион unknown' }} · {{ decision_labels.get(item.decision.value, item.decision.value) }}</span></a>{% else %}<p class="muted-copy">Подтверждённых будущих сроков нет.</p>{% endfor %}</div>
           </article>
         </div>
         <p class="panel-note">Это наблюдаемые current/history данные и deterministic matching, не вероятность победы.</p>
       </section>
       {% else %}<section id="analytics"></section>{% endif %}
 
-        <article class="panel loading-panel" id="loading">
-          <div class="panel-head"><div><span class="eyebrow">Контроль данных</span><h2>Bounded-загрузка</h2></div><span class="badge warm">ручной запуск</span></div>
-          <form id="ingestion-form">
-            <fieldset><legend>Источники</legend><label><input type="checkbox" name="sources" value="ted" checked> TED</label><label><input type="checkbox" name="sources" value="eis" checked> ЕИС RSS</label><label><input type="checkbox" name="sources" value="usaspending"> USA outcomes</label></fieldset>
-            <div class="form-grid"><label>Лимит<input type="number" name="limit" min="1" max="500" value="25"></label><label>TED, дней<input type="number" name="ted_days" min="1" max="90" value="14"></label><label>ЕИС, дней<input type="number" name="eis_days" min="1" max="31" value="7"></label><label>USA, дней<input type="number" name="usa_days" min="1" max="731" value="365"></label></div>
-            <button class="button primary" type="submit">Загрузить проверяемый срез</button>
-            <output id="ingestion-status" aria-live="polite">TED CPV и USA keywords берутся из текущих версий обоих профилей. URL источников фиксированы; полная выгрузка недоступна.</output>
-          </form>
-          <form id="eis-upload-form" class="upload-form">
-            <label>ЕИС manual fallback · XML/ZIP до 10 MiB<input type="file" name="file" accept=".xml,.zip" required></label>
-            <button class="button ghost" type="submit">Загрузить пакет ЕИС</button>
-            <output id="eis-upload-status" aria-live="polite">DTD, ENTITY, path traversal и ZIP bombs отклоняются.</output>
-          </form>
-          <div class="run-list">
-            {% for run in runs %}<div><span class="pulse {{ 'ok' if run.status == 'succeeded' else 'muted' }}"></span><b>{{ run.source.value|upper }}</b><span>{{ run.status }} · {{ run.record_count }} записей</span><time>{{ run.started_at.strftime('%d.%m %H:%M') }}</time></div>{% endfor %}
-          </div>
-        </article>
-
-      {% if selected %}
-      <section class="panel profile-panel" id="profile" data-profile='{{ selected.model_dump(mode="json")|tojson }}'>
-        <div class="panel-head"><div><span class="eyebrow">Версионируемый профиль</span><h2>{{ selected.name }}</h2></div><span class="badge">v{{ selected.version }}</span></div>
-        <div class="profile-layout">
-          <div><h3>Компетенции</h3><ul>{% for capability in selected.capabilities %}<li>{{ capability }}</li>{% endfor %}</ul></div>
-          <div><h3>Классификаторы</h3><div class="chip-set">{% for system, prefixes in selected.classification_prefixes.items() %}{% for prefix in prefixes %}<span>{{ system }} {{ prefix }}</span>{% endfor %}{% endfor %}</div></div>
-          <form id="profile-form">
-            <label>Название<input name="name" value="{{ selected.name }}" required></label>
-            <label>Компетенции · по одной на строку<textarea name="capabilities" rows="4" required>{% for value in selected.capabilities %}{{ value }}{% if not loop.last %}
+      <section class="companies-section" id="companies">
+        <div class="section-head"><div><span class="eyebrow">Компании</span><h2>Профили поиска</h2></div><span class="badge">{{ profiles|length }} активных</span></div>
+        <div class="company-tabs">{% for item in profiles %}<a class="{{ 'active' if selected and item.slug == selected.slug else '' }}" href="/?profile={{ item.slug }}#companies"><b>{{ item.name }}</b><span>v{{ item.version }} · {{ item.delivery_mode.value }}</span></a>{% endfor %}</div>
+        {% if selected %}
+        <section class="panel profile-panel" id="profile" data-profile='{{ selected.model_dump(mode="json")|tojson }}'>
+          <div class="panel-head"><div><span class="eyebrow">Версионируемый профиль</span><h2>{{ selected.name }}</h2></div><span class="badge">v{{ selected.version }}</span></div>
+          <details class="profile-guide"><summary>Как заполнить профиль</summary><p>Опишите конкретные услуги и компетенции, добавьте фразы из предмета закупки, стоп-слова для чужих направлений и коды ОКПД2/CPV. Для физических работ укажите сервисные регионы ISO 3166-2 (`RU-MOW`, `RU-MOS`); nationwide включайте только при реальной возможности работать по России.</p></details>
+          <form id="profile-form" class="profile-form-grid">
+            <label>Название<input name="name" value="{{ selected.name }}" required><small>Показывается в переключателе компаний.</small></label>
+            <label class="wide">Описание деятельности<textarea name="description" rows="3">{{ selected.description }}</textarea><small>Что именно делает компания и для каких заказчиков.</small></label>
+            <label>Товары и услуги · по одной на строку<textarea name="services" rows="5">{{ selected.services|join('\n') }}</textarea></label>
+            <label>Компетенции · по одной на строку<textarea name="capabilities" rows="5" required>{{ selected.capabilities|join('\n') }}</textarea></label>
+            <label>Ключевые слова<textarea name="keywords" rows="4" required>{{ selected.positive_keywords|join(', ') }}</textarea><small>Например: ремонт автомобилей, шиномонтаж.</small></label>
+            <label>Стоп-слова<textarea name="negative_keywords" rows="4">{{ selected.negative_keywords|join(', ') }}</textarea><small>Фразы, которые должны блокировать чужое направление.</small></label>
+            <label>Классификаторы · SYSTEM: префикс, префикс<textarea name="classifications" rows="4" required>{% for system, prefixes in selected.classification_prefixes.items() %}{{ system }}: {{ prefixes|join(', ') }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea></label>
-            <label>Ключевые слова · строка или запятая<textarea name="keywords" rows="4" required>{{ selected.positive_keywords|join(', ') }}</textarea></label>
-            <label>Классификаторы · `SYSTEM: prefix, prefix`<textarea name="classifications" rows="4" required>{% for system, prefixes in selected.classification_prefixes.items() %}{{ system }}: {{ prefixes|join(', ') }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea></label>
-            <label>География · ISO alpha-2 через запятую<input name="countries" value="{{ selected.countries|join(', ') }}" required></label>
-            <div class="profile-budget-grid">
-              <label>Бюджет от<input type="number" name="min_amount" min="0" step="any" value="{{ selected.min_amount if selected.min_amount is not none else '' }}"></label>
-              <label>Бюджет до<input type="number" name="max_amount" min="0" step="any" value="{{ selected.max_amount if selected.max_amount is not none else '' }}"></label>
-            </div>
-            <button class="button ghost" type="submit">Сохранить как v{{ selected.version + 1 }}</button>
-            <output id="profile-status" aria-live="polite">Все поля сохранятся новой версией; предыдущая останется в истории.</output>
+            <label>Типы заказчиков<textarea name="customer_types" rows="4">{{ selected.customer_types|join('\n') }}</textarea></label>
+            <label>Страна<input name="countries" value="{{ selected.countries|join(', ') }}" required readonly></label>
+            <label>Базовый регион<input name="base_region" value="{{ selected.base_region or '' }}" placeholder="RU-MOW"></label>
+            <label>Регионы оказания услуг<input name="service_regions" value="{{ selected.service_regions|join(', ') }}" placeholder="RU-MOW, RU-MOS"></label>
+            <label>Формат оказания<select name="delivery_mode"><option value="onsite" {{ 'selected' if selected.delivery_mode.value == 'onsite' else '' }}>Физически на объекте</option><option value="remote" {{ 'selected' if selected.delivery_mode.value == 'remote' else '' }}>Удалённо</option><option value="hybrid" {{ 'selected' if selected.delivery_mode.value == 'hybrid' else '' }}>Гибридно</option><option value="unknown" {{ 'selected' if selected.delivery_mode.value == 'unknown' else '' }}>Не определено</option></select></label>
+            <label>Исключённые регионы<input name="excluded_regions" value="{{ selected.excluded_regions|join(', ') }}" placeholder="RU-KAM"></label>
+            <fieldset class="policy-checks"><legend>Политика выполнения</legend><label><input type="checkbox" name="nationwide" {{ 'checked' if selected.nationwide else '' }}> Работа по всей России</label><label><input type="checkbox" name="travel_allowed" {{ 'checked' if selected.travel_allowed else '' }}> Командировки допустимы</label><label><input type="checkbox" name="contractors_allowed" {{ 'checked' if selected.contractors_allowed else '' }}> Подрядчики допустимы</label></fieldset>
+            <label class="wide">Обязательные условия участия<textarea name="participation_constraints" rows="3">{{ selected.participation_constraints|join('\n') }}</textarea></label>
+            <div class="profile-budget-grid wide"><label>Бюджет от<input type="number" name="min_amount" min="0" step="any" value="{{ selected.min_amount if selected.min_amount is not none else '' }}"></label><label>Бюджет до<input type="number" name="max_amount" min="0" step="any" value="{{ selected.max_amount if selected.max_amount is not none else '' }}"></label></div>
+            <button class="button primary wide" type="submit">Сохранить как v{{ selected.version + 1 }} и пересчитать</button>
+            <output class="wide" id="profile-status" aria-live="polite">Сохранение создаёт новую версию; предыдущая остаётся в истории.</output>
           </form>
-        </div>
+          <details class="profile-history"><summary>История профиля · {{ profile_history|length }} {{ 'версия' if profile_history|length == 1 else 'версии' }}</summary><div>{% for item in profile_history %}<span><b>v{{ item.version }}</b>{{ item.name }} · {{ item.delivery_mode.value }} · {{ item.service_regions|join(', ') if item.service_regions else 'без списка регионов' }}</span>{% endfor %}</div></details>
+        </section>
+        {% endif %}
+        <section class="panel create-company-panel">
+          <div class="panel-head"><div><span class="eyebrow">Новая компания</span><h2>Создать профиль с нуля</h2></div><span class="badge warm">тот же pipeline</span></div>
+          <form id="create-profile-form" class="profile-form-grid">
+            <label>Slug<input name="slug" pattern="[a-z0-9-]+" placeholder="my-company" required></label><label>Название<input name="name" placeholder="ООО Моя компания" required></label>
+            <label class="wide">Описание деятельности<textarea name="description" rows="3" required></textarea></label>
+            <label>Товары и услуги<textarea name="services" rows="4" required></textarea></label><label>Компетенции<textarea name="capabilities" rows="4" required></textarea></label>
+            <label>Ключевые слова<textarea name="keywords" rows="3" required></textarea></label><label>Стоп-слова<textarea name="negative_keywords" rows="3"></textarea></label>
+            <label>Классификаторы<textarea name="classifications" rows="3" placeholder="OKPD2: 62.01\nCPV: 722" required></textarea></label><label>Типы заказчиков<textarea name="customer_types" rows="3"></textarea></label>
+            <input type="hidden" name="countries" value="RU"><label>Базовый регион<input name="base_region" placeholder="RU-MOW"></label><label>Регионы услуг<input name="service_regions" placeholder="RU-MOW, RU-MOS"></label>
+            <label>Формат<select name="delivery_mode"><option value="onsite">Физически</option><option value="remote">Удалённо</option><option value="hybrid">Гибридно</option><option value="unknown">Не определено</option></select></label><label>Исключённые регионы<input name="excluded_regions"></label>
+            <fieldset class="policy-checks"><legend>Политика</legend><label><input type="checkbox" name="nationwide"> Вся Россия</label><label><input type="checkbox" name="travel_allowed"> Командировки</label><label><input type="checkbox" name="contractors_allowed"> Подрядчики</label></fieldset>
+            <label class="wide">Условия участия<textarea name="participation_constraints" rows="3"></textarea></label><div class="profile-budget-grid wide"><label>Бюджет от<input type="number" name="min_amount" min="0"></label><label>Бюджет до<input type="number" name="max_amount" min="0"></label></div>
+            <button class="button primary wide" type="submit">Создать компанию</button><output class="wide" id="create-profile-status" aria-live="polite">После создания профиль появится в списке и получит рекомендации по общей логике.</output>
+          </form>
+        </section>
       </section>
-      {% endif %}
+
+      <article class="panel loading-panel" id="loading">
+        <div class="panel-head"><div><span class="eyebrow">Контроль данных</span><h2>Ограниченная загрузка ЕИС</h2></div><span class="badge warm">ручной запуск</span></div>
+        <form id="ingestion-form"><input type="hidden" name="sources" value="eis"><div class="form-grid"><label>Лимит записей<input type="number" name="limit" min="1" max="50" value="25"></label><label>Окно публикации, дней<input type="number" name="eis_days" min="1" max="31" value="7"></label></div><button class="button primary" type="submit">Загрузить актуальный срез</button><output id="ingestion-status" aria-live="polite">Только официальный ЕИС RSS: даты и жёсткий лимит сохраняются в ingestion run вместе с версиями профилей.</output></form>
+        <form id="eis-upload-form" class="upload-form"><label>Официальный пакет ЕИС · XML/ZIP до 10 MiB<input type="file" name="file" accept=".xml,.zip" required></label><button class="button ghost" type="submit">Загрузить пакет ЕИС</button><output id="eis-upload-status" aria-live="polite">DTD, ENTITY, path traversal и ZIP bombs отклоняются.</output></form>
+        <div class="run-list">{% for run in runs %}<div><span class="pulse {{ 'ok' if run.status == 'succeeded' else 'muted' }}"></span><b>{{ run.source.value|upper }}</b><span>{{ run_status_labels.get(run.status, run.status) }} · {{ run.record_count }} записей</span><time>{{ run.started_at.strftime('%d.%m %H:%M') }}</time></div>{% endfor %}</div>
+      </article>
 
       <footer><span>TenderPulse · local MVP</span><span>Unknown ≠ zero · evidence before confidence</span></footer>
     </main>

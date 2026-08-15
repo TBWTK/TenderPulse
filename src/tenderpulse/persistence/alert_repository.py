@@ -19,7 +19,7 @@ from tenderpulse.persistence.models import (
 )
 from tenderpulse.profiles import CompanyProfile
 
-POLICY_VERSION = "deterministic-match-v1"
+POLICY_VERSION = "deterministic-match-v2-geography"
 CHANNEL = "in_app"
 
 
@@ -76,6 +76,12 @@ class AlertRepository:
                 "decision": recommendation.decision.value,
                 "reasons": [reason.model_dump(mode="json") for reason in recommendation.reasons],
                 "gaps": [gap.value for gap in recommendation.gaps],
+                "blockers": [blocker.value for blocker in recommendation.blockers],
+                "region_codes": list(record.region_codes),
+                "deadline_at": (
+                    record.deadline_at.isoformat() if record.deadline_at is not None else None
+                ),
+                "source_url": record.evidence.source_url,
                 "raw_sha256": record.evidence.raw_sha256,
             },
             created_at=at,
@@ -150,6 +156,7 @@ class AlertRepository:
         record: ProcurementRecordRow,
     ) -> AlertView:
         payload = row.payload
+        canonical_record = ProcurementRecord.model_validate(version.payload)
         return AlertView(
             id=row.id,
             profile_slug=profile.slug,
@@ -162,6 +169,10 @@ class AlertRepository:
             decision=payload["decision"],
             reasons=payload["reasons"],
             gaps=payload["gaps"],
+            blockers=payload.get("blockers", ()),
+            region_codes=payload.get("region_codes", canonical_record.region_codes),
+            deadline_at=payload.get("deadline_at", canonical_record.deadline_at),
+            source_url=payload.get("source_url", canonical_record.evidence.source_url),
             raw_sha256=payload["raw_sha256"],
             channel=row.channel,
             policy_version=row.policy_version,

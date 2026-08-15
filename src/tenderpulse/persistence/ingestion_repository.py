@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from tenderpulse.domain.models import SourceCode
 from tenderpulse.ingestion_models import IngestionRunView, SourceFreshnessView
 from tenderpulse.persistence.models import IngestionRunRow
+from tenderpulse.source_policy import CURRENT_PRODUCT_SOURCES
 
 
 class IngestionRepository:
@@ -18,6 +19,16 @@ class IngestionRepository:
         statement = select(IngestionRunRow).order_by(IngestionRunRow.started_at.desc()).limit(limit)
         return tuple(self._to_view(row) for row in self._session.scalars(statement))
 
+    def list_current_product_runs(self, *, limit: int = 50) -> tuple[IngestionRunView, ...]:
+        current_sources = tuple(source.value for source in CURRENT_PRODUCT_SOURCES)
+        statement = (
+            select(IngestionRunRow)
+            .where(IngestionRunRow.source.in_(current_sources))
+            .order_by(IngestionRunRow.started_at.desc())
+            .limit(limit)
+        )
+        return tuple(self._to_view(row) for row in self._session.scalars(statement))
+
     def source_freshness(self, *, now: datetime) -> tuple[SourceFreshnessView, ...]:
         rows = tuple(
             self._session.scalars(
@@ -25,7 +36,7 @@ class IngestionRepository:
             )
         )
         result: list[SourceFreshnessView] = []
-        for source in SourceCode:
+        for source in CURRENT_PRODUCT_SOURCES:
             source_rows = tuple(row for row in rows if row.source == source.value)
             latest = source_rows[0] if source_rows else None
             latest_success = next(

@@ -9,6 +9,9 @@ select
     v.payload ->> 'buyer_name' as buyer_name,
     v.payload -> 'supplier_names' as supplier_names,
     v.payload -> 'lots' as lots,
+    v.payload -> 'region_codes' as region_codes,
+    v.payload ->> 'delivery_location' as delivery_location,
+    v.payload ->> 'delivery_mode' as delivery_mode,
     nullif(v.payload ->> 'published_at', '')::timestamptz as published_at,
     (v.payload ->> 'observed_at')::timestamptz as observed_at,
     nullif(v.payload ->> 'deadline_at', '')::timestamptz as deadline_at,
@@ -18,3 +21,5 @@ select
 from {{ source('app', 'procurement_records') }} as r
 join {{ source('app', 'procurement_versions') }} as v on v.record_id = r.id
 where v.valid_to is null
+  and r.source = 'eis'
+  and (v.payload -> 'countries')::jsonb ? 'RU'

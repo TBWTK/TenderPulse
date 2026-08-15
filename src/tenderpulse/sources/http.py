@@ -39,7 +39,7 @@ class OfficialSourceClient:
         self._http = http_client or httpx.Client(
             timeout=httpx.Timeout(30.0, connect=10.0),
             follow_redirects=False,
-            headers={"User-Agent": "TenderPulse/0.1 (+bounded public-procurement research)"},
+            headers={"User-Agent": "TenderPulse/0.2 (+bounded Russian-procurement research)"},
         )
         if eis_http_client is not None:
             self._eis_http = eis_http_client
@@ -53,7 +53,7 @@ class OfficialSourceClient:
                 follow_redirects=False,
                 headers={
                     "User-Agent": (
-                        "Mozilla/5.0 (compatible; TenderPulse/0.1; bounded official RSS reader)"
+                        "Mozilla/5.0 (compatible; TenderPulse/0.2; bounded official RSS reader)"
                     )
                 },
             )

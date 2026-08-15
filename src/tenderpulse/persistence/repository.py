@@ -21,6 +21,7 @@ from tenderpulse.persistence.models import (
     ProcurementVersionRow,
 )
 from tenderpulse.profiles import CompanyProfile
+from tenderpulse.source_policy import current_product_records
 
 
 class ProcurementRepository:
@@ -49,7 +50,11 @@ class ProcurementRepository:
         )
 
     def list_award_outcomes(self) -> tuple[AwardOutcomeView, ...]:
-        records = (record for record in self.list_current_records() if record.kind.value == "award")
+        records = (
+            record
+            for record in current_product_records(self.list_current_records())
+            if record.kind.value == "award"
+        )
         return tuple(
             sorted(
                 (build_award_outcome(record) for record in records),
@@ -136,6 +141,34 @@ class ProcurementRepository:
         return tuple(
             CompanyProfile.model_validate(row.payload) for row in self._session.scalars(statement)
         )
+
+    def list_profile_history(self, slug: str) -> tuple[CompanyProfile, ...]:
+        statement = (
+            select(CompanyProfileRow)
+            .where(CompanyProfileRow.slug == slug)
+            .order_by(CompanyProfileRow.version)
+        )
+        return tuple(
+            CompanyProfile.model_validate(row.payload) for row in self._session.scalars(statement)
+        )
+
+    def create_profile(self, profile: CompanyProfile) -> None:
+        if profile.version != 1:
+            raise ValueError("new company profile must start at version 1")
+        existing = self._session.scalar(
+            select(CompanyProfileRow.id).where(CompanyProfileRow.slug == profile.slug).limit(1)
+        )
+        if existing is not None:
+            raise ValueError(f"company profile already exists: {profile.slug}")
+        self._session.add(
+            CompanyProfileRow(
+                slug=profile.slug,
+                version=profile.version,
+                payload=profile.model_dump(mode="json"),
+                active=True,
+            )
+        )
+        self._session.flush()
 
     def get_profile(self, slug: str) -> CompanyProfile | None:
         statement = (

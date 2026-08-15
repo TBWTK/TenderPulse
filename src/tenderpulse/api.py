@@ -1,5 +1,6 @@
 from collections.abc import Callable, Generator
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Protocol
 from uuid import UUID
@@ -29,6 +30,7 @@ from tenderpulse.persistence.ingestion_repository import IngestionRepository
 from tenderpulse.persistence.repository import ProcurementRepository
 from tenderpulse.product_analytics import ProductAnalytics, build_product_analytics
 from tenderpulse.profiles import CompanyProfile
+from tenderpulse.source_policy import current_product_records
 from tenderpulse.sources.common import SourceContractError
 
 MAX_EIS_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -47,6 +49,64 @@ RU_MONTHS = (
     "ноября",
     "декабря",
 )
+DECISION_LABELS = {
+    "recommended": "Рекомендовано",
+    "review": "Нужно проверить",
+    "not_relevant": "Не подходит",
+    "expired": "Срок истёк",
+}
+REASON_LABELS = {
+    "classification": "совпали классификаторы",
+    "keywords": "совпали ключевые слова",
+    "budget": "бюджет входит в диапазон",
+    "geography_service_region": "регион входит в зону работы",
+    "geography_nationwide_remote": "допустимо удалённое выполнение по России",
+    "geography_contractor_coverage": "регион покрывается через подрядчика",
+    "geography_travel_coverage": "регион покрывается командировкой",
+}
+DIAGNOSTIC_LABELS = {
+    "unknown_amount": "сумма не найдена",
+    "unknown_deadline": "срок подачи не найден",
+    "unknown_location": "место исполнения не найдено",
+    "deadline_passed": "срок подачи истёк",
+    "negative_keyword": "обнаружено стоп-слово",
+    "geography_out_of_scope": "регион вне зоны работы",
+    "geography_excluded": "регион явно исключён",
+}
+REGION_LABELS = {
+    "RU-MOW": "Москва",
+    "RU-MOS": "Московская область",
+    "RU-KAM": "Камчатский край",
+    "RU-PRI": "Приморский край",
+}
+RUN_STATUS_LABELS = {
+    "succeeded": "успешно",
+    "running": "выполняется",
+    "failed": "ошибка",
+    "unknown": "нет данных",
+}
+LIFECYCLE_LABELS = {
+    "planned": "Планируется",
+    "active": "Активна",
+    "awarded": "Завершена выбором победителя",
+    "cancelled": "Отменена",
+    "unknown": "Статус не определён",
+}
+DELIVERY_MODE_LABELS = {
+    "onsite": "Физически на объекте",
+    "remote": "Удалённо",
+    "hybrid": "Гибридно",
+    "unknown": "Формат не определён",
+}
+
+
+def _format_amount(value: Decimal | None) -> str:
+    if value is None:
+        return "—"
+    rendered = f"{value:,.2f}"
+    if rendered.endswith(".00"):
+        rendered = rendered[:-3]
+    return rendered.replace(",", " ").replace(".", ",")
 
 
 class IngestionRunner(Protocol):
@@ -54,9 +114,7 @@ class IngestionRunner(Protocol):
         self,
         *,
         limit: int,
-        ted_lookback_days: int,
         eis_lookback_days: int,
-        usa_lookback_days: int,
         sources: tuple[SourceCode, ...],
     ) -> tuple[LiveSourceResult, ...]: ...
 
@@ -64,28 +122,18 @@ class IngestionRunner(Protocol):
 
 
 class ManualIngestionCommand(BaseModel):
-    sources: tuple[SourceCode, ...] = (
-        SourceCode.TED,
-        SourceCode.EIS,
-        SourceCode.USA_SPENDING,
-    )
-    limit: int = Field(default=100, ge=1, le=500)
-    ted_lookback_days: int = Field(default=14, ge=1, le=90)
+    sources: tuple[SourceCode, ...] = (SourceCode.EIS,)
+    limit: int = Field(default=25, ge=1, le=50)
     eis_lookback_days: int = Field(default=7, ge=1, le=31)
-    usa_lookback_days: int = Field(default=365, ge=1, le=731)
 
     @field_validator("sources")
     @classmethod
     def validate_live_sources(cls, sources: tuple[SourceCode, ...]) -> tuple[SourceCode, ...]:
         if not sources:
             raise ValueError("at least one source is required")
-        unsupported = set(sources) - {
-            SourceCode.TED,
-            SourceCode.EIS,
-            SourceCode.USA_SPENDING,
-        }
+        unsupported = set(sources) - {SourceCode.EIS}
         if unsupported:
-            raise ValueError("live ingestion supports TED, EIS and USAspending only")
+            raise ValueError("MVP 2.0 live ingestion supports EIS only")
         return tuple(dict.fromkeys(sources))
 
 
@@ -97,9 +145,10 @@ def create_app(
     ai_requested_model: str = "GigaChat-2",
     ingestion_runner: IngestionRunner | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="TenderPulse", version="0.1.0")
+    app = FastAPI(title="TenderPulse", version="0.2.0")
     web_root = Path(__file__).with_name("web")
     templates = Jinja2Templates(directory=web_root / "templates")
+    templates.env.filters["amount"] = _format_amount
     app.mount("/static", StaticFiles(directory=web_root / "static"), name="static")
 
     def get_session() -> Generator[Session, None, None]:
@@ -116,6 +165,29 @@ def create_app(
     @app.get("/api/profiles", response_model=list[CompanyProfile])
     def profiles(session: SessionDep) -> tuple[CompanyProfile, ...]:
         return ProcurementRepository(session).list_profiles()
+
+    @app.post("/api/profiles", response_model=CompanyProfile, status_code=201)
+    def create_profile(profile: CompanyProfile, session: SessionDep) -> CompanyProfile:
+        repository = ProcurementRepository(session)
+        try:
+            repository.create_profile(profile)
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        session.commit()
+        return profile
+
+    @app.get(
+        "/api/profiles/{profile_slug}/history",
+        response_model=list[CompanyProfile],
+    )
+    def profile_history(
+        profile_slug: str,
+        session: SessionDep,
+    ) -> tuple[CompanyProfile, ...]:
+        history = ProcurementRepository(session).list_profile_history(profile_slug)
+        if not history:
+            raise HTTPException(status_code=404, detail="company profile not found")
+        return history
 
     @app.put("/api/profiles/{profile_slug}", response_model=CompanyProfile)
     def update_profile(
@@ -137,7 +209,7 @@ def create_app(
 
     @app.get("/api/records", response_model=list[ProcurementRecord])
     def records(session: SessionDep) -> tuple[ProcurementRecord, ...]:
-        return ProcurementRepository(session).list_current_records()
+        return current_product_records(ProcurementRepository(session).list_current_records())
 
     @app.get("/api/recommendations/{profile_slug}", response_model=list[Recommendation])
     def recommendations(
@@ -213,7 +285,7 @@ def create_app(
     ) -> tuple[IngestionRunView, ...]:
         if not 1 <= limit <= 500:
             raise HTTPException(status_code=422, detail="limit must be between 1 and 500")
-        return IngestionRepository(session).list_runs(limit=limit)
+        return IngestionRepository(session).list_current_product_runs(limit=limit)
 
     @app.post("/api/ingestion/run", response_model=list[LiveSourceResult])
     def run_ingestion(command: ManualIngestionCommand) -> tuple[LiveSourceResult, ...]:
@@ -222,9 +294,7 @@ def create_app(
         return ingestion_runner.run_cycle(
             sources=command.sources,
             limit=command.limit,
-            ted_lookback_days=command.ted_lookback_days,
             eis_lookback_days=command.eis_lookback_days,
-            usa_lookback_days=command.usa_lookback_days,
         )
 
     @app.post("/api/ingestion/eis-upload", response_model=LiveSourceResult)
@@ -270,15 +340,23 @@ def create_app(
         profile = repository.get_profile(profile_slug)
         if profile is None:
             raise HTTPException(status_code=404, detail="company profile not found")
-        records = repository.list_current_records()
+        records = current_product_records(repository.list_current_records())
         opportunities = current_opportunities(records)
         ranked = TenderMatcher(now=now).rank(profile, opportunities)
+        product_keys = {(record.source, record.source_record_id) for record in records}
+        lineages = {
+            key: versions
+            for key, versions in repository.list_all_lineages().items()
+            if key in product_keys
+        }
         return build_product_analytics(
             current_records=records,
             opportunities=opportunities,
             recommendations=ranked,
-            lineages=repository.list_all_lineages(),
+            lineages=lineages,
             award_outcomes=repository.list_award_outcomes(),
+            profile=profile,
+            as_of=now(),
         )
 
     @app.post("/api/alerts/sync/{profile_slug}", response_model=list[AlertView])
@@ -304,25 +382,128 @@ def create_app(
         session.commit()
         return alert
 
+    @app.get(
+        "/tenders/{source}/{source_record_id}",
+        response_class=HTMLResponse,
+        include_in_schema=False,
+    )
+    def tender_detail(
+        request: Request,
+        source: SourceCode,
+        source_record_id: str,
+        session: SessionDep,
+        profile: str | None = None,
+    ) -> HTMLResponse:
+        repository = ProcurementRepository(session)
+        records = current_product_records(repository.list_current_records())
+        record = next(
+            (
+                item
+                for item in records
+                if item.source is source and item.source_record_id == source_record_id
+            ),
+            None,
+        )
+        if record is None:
+            raise HTTPException(status_code=404, detail="procurement record not found")
+        profiles = repository.list_profiles()
+        selected = repository.get_profile(profile) if profile is not None else None
+        if selected is None and profiles:
+            selected = profiles[0]
+        recommendation = TenderMatcher(now=now).match(selected, record) if selected else None
+        attempts = AIExtractionRepository(session).list_attempts(source, source_record_id)
+        record_codes = {(item.system, item.code) for item in record.classifications}
+        related_outcomes = tuple(
+            outcome
+            for outcome in repository.list_award_outcomes()
+            if outcome.buyer_name == record.buyer_name
+            or bool(
+                record_codes
+                & {
+                    (item.system, item.code)
+                    for candidate in records
+                    if candidate.source is outcome.record_source
+                    and candidate.source_record_id == outcome.record_source_id
+                    for item in candidate.classifications
+                }
+            )
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="tender_detail.html",
+            context={
+                "record": record,
+                "profiles": profiles,
+                "selected": selected,
+                "recommendation": recommendation,
+                "evidence_attempt": attempts[-1] if attempts else None,
+                "lineage": repository.lineage(source, source_record_id),
+                "related_outcomes": related_outcomes,
+                "ai_enabled": evidence_generator is not None,
+                "decision_labels": DECISION_LABELS,
+                "reason_labels": REASON_LABELS,
+                "diagnostic_labels": DIAGNOSTIC_LABELS,
+                "region_labels": REGION_LABELS,
+                "lifecycle_labels": LIFECYCLE_LABELS,
+                "delivery_mode_labels": DELIVERY_MODE_LABELS,
+            },
+        )
+
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def dashboard(
         request: Request,
         session: SessionDep,
         profile: str | None = None,
+        search: str = "",
+        decision: str = "all",
+        region: str = "all",
+        sort: str = "relevance",
     ) -> HTMLResponse:
+        allowed_decisions = {
+            "all",
+            "actionable",
+            "recommended",
+            "review",
+            "rejected",
+            "not_relevant",
+            "expired",
+        }
+        allowed_sorts = {"relevance", "deadline", "region", "amount", "source"}
+        if decision not in allowed_decisions:
+            raise HTTPException(status_code=422, detail="unsupported decision filter")
+        if sort not in allowed_sorts:
+            raise HTTPException(status_code=422, detail="unsupported opportunity sort")
         repository = ProcurementRepository(session)
         profiles = repository.list_profiles()
         selected = repository.get_profile(profile) if profile is not None else None
         if selected is None and profiles:
             selected = profiles[0]
-        records = repository.list_current_records()
+        records = current_product_records(repository.list_current_records())
         opportunities = current_opportunities(records)
-        ranked = TenderMatcher(now=now).rank(selected, opportunities) if selected else []
+        all_ranked = TenderMatcher(now=now).rank(selected, opportunities) if selected else []
+        filtered_opportunities = _filter_opportunities(
+            opportunities,
+            search=search,
+            region=region,
+        )
+        filtered_keys = {record.natural_key for record in filtered_opportunities}
+        ranked = [
+            item
+            for item in all_ranked
+            if f"{item.record_source.value}:{item.record_source_id}" in filtered_keys
+            and _decision_matches(item.decision.value, decision)
+        ]
         record_by_key = {
             (record.source, record.source_record_id): record for record in opportunities
         }
+        ranked = _sort_recommendations(ranked, record_by_key, sort=sort)
         extraction_repository = AIExtractionRepository(session)
-        lineages = repository.list_all_lineages()
+        product_keys = {(record.source, record.source_record_id) for record in records}
+        lineages = {
+            key: versions
+            for key, versions in repository.list_all_lineages().items()
+            if key in product_keys
+        }
         actionable_cards: list[dict[str, object]] = []
         rejected_cards: list[dict[str, object]] = []
         for recommendation in ranked:
@@ -348,9 +529,11 @@ def create_app(
             build_product_analytics(
                 current_records=records,
                 opportunities=opportunities,
-                recommendations=ranked,
+                recommendations=all_ranked,
                 lineages=lineages,
                 award_outcomes=award_outcomes,
+                profile=selected,
+                as_of=now(),
             )
             if selected
             else None
@@ -358,16 +541,31 @@ def create_app(
         context = {
             "profiles": profiles,
             "selected": selected,
+            "profile_history": (repository.list_profile_history(selected.slug) if selected else ()),
             "workspace_date": _format_workspace_date(now()),
             "actionable_cards": actionable_cards,
             "rejected_cards": rejected_cards,
             "record_count": len(records),
             "opportunity_count": len(opportunities),
             "recommended_count": sum(
-                recommendation.decision.value == "recommended" for recommendation in ranked
+                recommendation.decision.value == "recommended" for recommendation in all_ranked
             ),
+            "available_regions": sorted(
+                {code for record in opportunities for code in record.region_codes}
+            ),
+            "filters": {
+                "search": search,
+                "decision": decision,
+                "region": region,
+                "sort": sort,
+            },
+            "decision_labels": DECISION_LABELS,
+            "reason_labels": REASON_LABELS,
+            "diagnostic_labels": DIAGNOSTIC_LABELS,
+            "region_labels": REGION_LABELS,
+            "run_status_labels": RUN_STATUS_LABELS,
             "freshness": IngestionRepository(session).source_freshness(now=now()),
-            "runs": IngestionRepository(session).list_runs(limit=6),
+            "runs": IngestionRepository(session).list_current_product_runs(limit=6),
             "analytics": analytics,
             "award_outcomes": award_outcomes[:5],
             "ai_enabled": evidence_generator is not None,
@@ -383,3 +581,89 @@ def create_app(
 def _format_workspace_date(value: datetime) -> str:
     local_value = value.astimezone(WORKSPACE_TIMEZONE)
     return f"{local_value.day} {RU_MONTHS[local_value.month - 1]} {local_value.year}"
+
+
+def _filter_opportunities(
+    records: tuple[ProcurementRecord, ...],
+    *,
+    search: str,
+    region: str,
+) -> tuple[ProcurementRecord, ...]:
+    query = " ".join(search.split()).casefold()
+    return tuple(
+        record
+        for record in records
+        if (
+            not query
+            or query
+            in " ".join(
+                (
+                    record.source_record_id,
+                    record.title,
+                    record.description,
+                    record.buyer_name or "",
+                )
+            ).casefold()
+        )
+        and (region == "all" or region in record.region_codes)
+    )
+
+
+def _decision_matches(value: str, selected: str) -> bool:
+    if selected == "all":
+        return True
+    if selected == "actionable":
+        return value in {"recommended", "review"}
+    if selected == "rejected":
+        return value in {"not_relevant", "expired"}
+    return value == selected
+
+
+def _sort_recommendations(
+    recommendations: list[Recommendation],
+    records: dict[tuple[SourceCode, str], ProcurementRecord],
+    *,
+    sort: str,
+) -> list[Recommendation]:
+    if sort == "relevance":
+        return recommendations
+
+    def record_for(item: Recommendation) -> ProcurementRecord:
+        return records[(item.record_source, item.record_source_id)]
+
+    if sort == "deadline":
+
+        def deadline_key(item: Recommendation) -> tuple[bool, float, str]:
+            deadline = record_for(item).deadline_at
+            return (
+                deadline is None,
+                deadline.timestamp() if deadline is not None else float("inf"),
+                item.record_source_id,
+            )
+
+        return sorted(
+            recommendations,
+            key=deadline_key,
+        )
+    if sort == "region":
+        return sorted(
+            recommendations,
+            key=lambda item: (record_for(item).region_codes or ("ZZZ",), item.record_source_id),
+        )
+    if sort == "amount":
+        return sorted(
+            recommendations,
+            key=lambda item: (
+                (_record_amount(record_for(item)) is None),
+                -(_record_amount(record_for(item)) or Decimal("0")),
+                item.record_source_id,
+            ),
+        )
+    return sorted(
+        recommendations,
+        key=lambda item: (item.record_source.value, item.record_source_id),
+    )
+
+
+def _record_amount(record: ProcurementRecord) -> Decimal | None:
+    return next((lot.amount for lot in record.lots if lot.amount is not None), None)

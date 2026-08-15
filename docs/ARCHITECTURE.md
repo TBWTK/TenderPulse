@@ -2,28 +2,27 @@
 title: Архитектура
 type: architecture
 status: active
-updated: 2026-08-10
+updated: 2026-08-15
 ---
 
 # Архитектура
 
 ## Контекст
 
-TenderPulse запускается одним Docker Compose project. Web/API принимает профиль и управляемые
-ingestion-запросы. Перед каждым циклом API/worker перечитывает две active profile versions из PostgreSQL;
-их CPV/keywords задают bounded scope TED/USA. Worker обращается только к allowlisted source adapters, сохраняет исходный ответ
-в S3-compatible object storage и одной транзакцией регистрирует hash/run. Нормализатор пишет
-canonical сущности и SCD2-версии в PostgreSQL; dbt строит проверяемые marts. Matcher использует
-структурированные признаки и при наличии конфигурации GigaChat добавляет строго валидированное
-извлечение требований/объяснение. Ни LLM, ни web UI не владеют canonical facts.
+TenderPulse запускается одним Docker Compose project. Web/API управляет versioned-профилями и
+bounded ЕИС-загрузкой. Каждый цикл перечитывает все active profile versions из PostgreSQL и сохраняет
+их номера в ingestion run, но число demo-профилей не является runtime-limit. Worker обращается только
+к официальному ЕИС RSS, сохраняет bytes в S3-compatible raw store и регистрирует SHA/run; XML/ZIP
+остаётся bounded manual fallback. Нормализатор пишет canonical JSON и SCD2-версии в PostgreSQL, dbt
+строит только российскую current projection. Matcher объединяет классификаторы, текст, бюджет и typed
+географию; optional GigaChat извлекает требования только из сохранённой record version. Ни LLM, ни UI
+не владеют canonical facts.
 
 ```mermaid
 flowchart LR
   Company["Компания / тендерный специалист"] --> Web["Web UI"] --> API["FastAPI"]
   Operator["Оператор / scheduler"] --> Worker["Ingestion worker"]
-  Worker --> TED["TED Search API"]
   Worker --> EIS["ЕИС RSS 44-ФЗ / XML/ZIP"]
-  Worker --> USA["USAspending awards"]
   Worker --> Raw[("S3 raw evidence")]
   Worker --> DB[("PostgreSQL + pgvector")]
   DB --> DBT["dbt marts"] --> API
@@ -43,15 +42,18 @@ flowchart LR
 - Unknown сохраняется явно. Парсер не угадывает валюту, deadline, winner или crosswalk классификатора.
 - Organization identity source-scoped: точное нормализованное имя переиспользуется внутри source, но
   межисточниковый merge требует отдельного устойчивого identifier/evidence.
-- Запуск по умолчанию ≤100 records/source, hard limit ≤500; live ЕИС дополнительно ограничен 50 records
-  и 31 днём. Полная выгрузка требует нового решения.
+- Live-запуск по умолчанию ≤25 records и всегда ≤50; ЕИС-окно ≤31 дня, body ≤2 MiB. Значение выше
+  source contract отклоняется, а не молча обрезается. Полная выгрузка требует нового решения.
 - LLM не создаёт facts: его claims имеют prompt/model/input hash, citations и validation status.
 - Company profile изменяется только добавлением следующей immutable version; bootstrap добавляет
   отсутствующие demo-профили, но никогда не реактивирует seed поверх пользовательской версии.
 - Runtime source scope читает те же current DB profiles, что matcher/alerts; `load_demo_profiles` допустим
   только для bootstrap/fixtures. Неожиданное число или дубликаты active profiles останавливают fetch.
-- `current_opportunities` — единственный владелец matching scope: только current notices со статусом
-  `active` или `planned`. Recommendation API, dashboard и alerts не определяют этот scope повторно.
+- `source_policy.current_product_records` владеет российской current projection: `source=eis` и `RU`.
+  `current_opportunities` дополняет её `kind=notice`, `lifecycle=active|planned`; API, UI, analytics,
+  dbt и alerts не скрывают foreign records собственными эвристиками.
+- `domain.geography` — один typed owner ISO `RU-*`, delivery mode и reach assessment. Matcher может
+  вернуть geography reason, risk (`review`) или blocker (`not_relevant`); unknown не становится match.
 - Dashboard читает последний extraction attempt только для текущей record version. Payload migration
   добавляет явный coverage status старым attempts, не превращая отсутствие evidence в `not_present`.
 - `ProductAnalytics` — единая typed projection для API и dashboard. Decision/coverage/distribution
@@ -100,7 +102,8 @@ flowchart LR
 
 - Регулярный ingestion выполняет worker. Явный bounded manual trigger в локальном MVP ждёт завершения
   одного запроса; его run status/raw hash остаются в БД. Перед публичным deployment нужен durable queue.
-- Foundation рассчитан на 2 профиля и сотни, не миллионы, records. Порог пересмотра указан в ADR-001.
+- Foundation рассчитан на десятки active профилей и сотни, не миллионы, records. Порог пересмотра
+  указан в ADR-001.
 - HTTP source timeout — 30 секунд на запрос; повтор возможен только для idempotent read с bounded backoff.
 - `0 records` допустим только вместе с подтверждённым успешным source response и параметрами запроса.
 - ЕИС adapter принимает только RSS 2.0 с фиксированного HTTPS host, одной страницы 44-ФЗ и размера до
@@ -115,3 +118,4 @@ flowchart LR
 - [ADR-001: platform and data boundaries](decisions/ADR-001-platform-and-data-boundaries.md).
 - [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md).
 - [ADR-003: official ЕИС RSS and TLS boundary](decisions/ADR-003-eis-rss-and-tls-boundary.md).
+- [ADR-004: Russian source and geography boundary](decisions/ADR-004-russian-source-and-geography-boundary.md).

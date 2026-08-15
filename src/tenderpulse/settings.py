@@ -30,10 +30,8 @@ class Settings(BaseSettings):
 
     live_ingestion_enabled: bool = False
     ingestion_interval_seconds: int = Field(default=3600, ge=60)
-    source_record_limit: int = Field(default=100, ge=1, le=500)
-    ted_lookback_days: int = Field(default=14, ge=1, le=90)
+    source_record_limit: int = Field(default=25, ge=1, le=50)
     eis_lookback_days: int = Field(default=7, ge=1, le=31)
-    usa_lookback_days: int = Field(default=365, ge=1, le=731)
 
     alert_webhook_url: SecretStr | None = None
     alert_webhook_timeout_seconds: float = Field(default=10.0, ge=1.0, le=30.0)

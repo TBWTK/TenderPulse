@@ -23,12 +23,12 @@ def test_profile_provider_reads_the_current_database_version_on_every_call() -> 
         repository.seed_profiles(load_demo_profiles())
     profiles = create_profile_provider(factory)
 
-    assert profiles()[0].version == 1
+    assert next(item for item in profiles() if item.slug == "it-russia-integrator").version == 1
 
     with factory.begin() as session:
         repository = ProcurementRepository(session)
-        current = repository.get_profile("it-data-integrator")
+        current = repository.get_profile("it-russia-integrator")
         assert current is not None
         repository.add_profile_version(current.model_copy(update={"version": 2}))
 
-    assert profiles()[0].version == 2
+    assert next(item for item in profiles() if item.slug == "it-russia-integrator").version == 2

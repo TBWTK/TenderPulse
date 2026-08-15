@@ -11,6 +11,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from tenderpulse.domain.geography import ServiceDeliveryMode, normalize_russian_region
+
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -123,6 +125,9 @@ class ProcurementRecord(BaseModel):
     supplier_names: tuple[str, ...] = ()
     classifications: tuple[ClassificationCode, ...] = ()
     countries: tuple[str, ...] = ()
+    region_codes: tuple[str, ...] = ()
+    delivery_location: str | None = None
+    delivery_mode: ServiceDeliveryMode = ServiceDeliveryMode.UNKNOWN
     published_at: datetime | None = None
     observed_at: datetime
     deadline_at: datetime | None = None
@@ -141,6 +146,19 @@ class ProcurementRecord(BaseModel):
         if any(len(code) != 2 for code in normalized):
             raise ValueError("countries must contain ISO 3166-1 alpha-2 codes")
         return normalized
+
+    @field_validator("region_codes")
+    @classmethod
+    def normalize_region_codes(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(dict.fromkeys(normalize_russian_region(code) for code in value))
+
+    @field_validator("delivery_location")
+    @classmethod
+    def normalize_delivery_location(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = " ".join(value.split())
+        return normalized or None
 
     @property
     def natural_key(self) -> str:
