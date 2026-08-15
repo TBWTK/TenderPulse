@@ -28,7 +28,7 @@ def test_demo_seed_is_a_repeatable_end_to_end_vertical_slice() -> None:
     first = seed_demo(factory, raw_store, now=now)
     with factory.begin() as session:
         repository = ProcurementRepository(session)
-        current = repository.get_profile("it-russia-integrator")
+        current = repository.get_profile("office-supply-moscow")
         assert current is not None
         repository.add_profile_version(
             current.model_copy(update={"version": 2, "name": "User configured profile"})
@@ -48,12 +48,12 @@ def test_demo_seed_is_a_repeatable_end_to_end_vertical_slice() -> None:
     assert first.record_count == replay.record_count == 7
     assert len(records) == 7
     assert {record.source.value for record in records} == {"eis"}
-    assert len(profiles) == 4
-    assert next(profile for profile in profiles if profile.slug == "it-russia-integrator").name == (
+    assert len(profiles) == 2
+    assert next(profile for profile in profiles if profile.slug == "office-supply-moscow").name == (
         "User configured profile"
     )
     assert (
-        next(profile for profile in profiles if profile.slug == "it-russia-integrator").version == 2
+        next(profile for profile in profiles if profile.slug == "office-supply-moscow").version == 2
     )
     assert run_count == 2
     assert artifact_count == 1

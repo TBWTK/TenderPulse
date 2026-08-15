@@ -2,43 +2,84 @@
 {% block title %}Аналитика · TenderPulse{% endblock %}
 {% block content %}
 <header class="page-heading split-heading">
-  <div><span class="eyebrow">Аналитика профиля</span><h1>Почему система принимает такие решения</h1><p>Текущий срез, качество данных и история разделены по точным областям. Это наблюдаемые факты и deterministic matching, не вероятность победы.</p></div>
+  <div>
+    <span class="eyebrow">Аналитика компании</span>
+    <h1>Что происходит с вашими тендерами</h1>
+    <p>Сначала — решения и ближайшие действия. Качество данных, история и опубликованные результаты доступны ниже.</p>
+  </div>
   <span class="scope-badge">Активные и планируемые закупки</span>
 </header>
 
 {% if analytics %}
-<section class="analytics-grid" aria-label="Аналитика закупок">
-  <article class="panel analytics-panel wide">
-    <div class="panel-head"><div><span class="eyebrow">Воронка решений</span><h2>Результат сопоставления</h2></div><span class="count-badge">{{ analytics.decisions.total }} рассмотрено</span></div>
-    <div class="stat-grid four"><div><strong>{{ analytics.decisions.recommended }}</strong><span>рекомендовано</span></div><div><strong>{{ analytics.decisions.review }}</strong><span>проверить</span></div><div><strong>{{ analytics.decisions.not_relevant }}</strong><span>не подходит</span></div><div><strong>{{ analytics.decisions.expired }}</strong><span>срок истёк</span></div></div>
+{% set profile_query = '' if account else '?profile=' ~ selected.slug %}
+<section class="analytics-primary" aria-label="Главная аналитика закупок">
+  <article class="panel analytics-panel analytics-funnel">
+    <div class="panel-head">
+      <div><span class="eyebrow">Воронка решений</span><h2>Результат сопоставления</h2></div>
+      <span class="count-badge">{{ analytics.decisions.total }} рассмотрено</span>
+    </div>
+    <div class="stat-grid four">
+      <div><strong>{{ analytics.decisions.recommended }}</strong><span>можно рассматривать</span></div>
+      <div><strong>{{ analytics.decisions.review }}</strong><span>нужно проверить</span></div>
+      <div><strong>{{ analytics.decisions.not_relevant }}</strong><span>не подходит</span></div>
+      <div><strong>{{ analytics.decisions.expired }}</strong><span>срок истёк</span></div>
+    </div>
   </article>
-  <article class="panel analytics-panel wide">
-    <div class="panel-head"><div><span class="eyebrow">Полнота данных</span><h2>Что известно о закупках</h2></div><span class="count-badge">из {{ analytics.coverage.total }}</span></div>
-    <div class="coverage-grid"><div><b>{{ analytics.coverage.buyer_known }}/{{ analytics.coverage.total }}</b><span>заказчик</span></div><div><b>{{ analytics.coverage.classification_known }}/{{ analytics.coverage.total }}</b><span>классификаторы</span></div><div><b>{{ analytics.coverage.geography_known }}/{{ analytics.coverage.total }}</b><span>география</span></div><div><b>{{ analytics.coverage.amount_known }}/{{ analytics.coverage.total }}</b><span>сумма</span></div><div><b>{{ analytics.coverage.deadline_known }}/{{ analytics.coverage.total }}</b><span>срок</span></div></div>
-  </article>
+
   <article class="panel analytics-panel">
-    <div class="panel-head"><div><span class="eyebrow">География и данные</span><h2>Причины отказа</h2></div><span class="count-badge">{{ analytics.diagnostics.geography_rejected }} по географии</span></div>
-    <div class="distribution-block"><b>Блокирует участие</b><div class="chip-set">{% for item in analytics.diagnostics.blockers %}<span class="negative">{{ diagnostic_labels.get(item.label, item.label) }} · {{ item.count }}</span>{% else %}<span>нет</span>{% endfor %}</div></div>
-    <div class="distribution-block"><b>Требует проверки</b><div class="chip-set">{% for item in analytics.diagnostics.gaps %}<span class="warning">{{ diagnostic_labels.get(item.label, item.label) }} · {{ item.count }}</span>{% else %}<span>нет</span>{% endfor %}</div></div>
+    <div class="panel-head">
+      <div><span class="eyebrow">Объяснение</span><h2>Что мешает участию</h2></div>
+      <span class="count-badge">{{ analytics.diagnostics.geography_rejected }} по географии</span>
+    </div>
+    <div class="distribution-block">
+      <b>Блокирует участие</b>
+      <div class="chip-set">{% for item in analytics.diagnostics.blockers %}<span class="negative">{{ diagnostic_labels.get(item.label, item.label) }} · {{ item.count }}</span>{% else %}<span class="positive">блокеров нет</span>{% endfor %}</div>
+    </div>
+    <div class="distribution-block">
+      <b>Требует ручной проверки</b>
+      <div class="chip-set">{% for item in analytics.diagnostics.gaps %}<span class="warning">{{ diagnostic_labels.get(item.label, item.label) }} · {{ item.count }}</span>{% else %}<span class="positive">пробелов нет</span>{% endfor %}</div>
+    </div>
   </article>
+
   <article class="panel analytics-panel">
-    <div class="panel-head"><div><span class="eyebrow">Профиль компании</span><h2>Готовность к поиску</h2></div><span class="score-badge">{{ analytics.profile_quality.score }}%</span></div>
-    <div class="stat-grid three"><div><strong>{{ analytics.budget.known_count }}</strong><span>бюджетов известно</span></div><div><strong>{{ analytics.budget.average|amount }}</strong><span>средний бюджет</span></div><div><strong>{{ analytics.budget.median|amount }}</strong><span>медиана</span></div></div>
-    <div class="distribution-block"><b>Незаполненные поля</b><div class="chip-set">{% for field in analytics.profile_quality.missing_fields %}<span>{{ field }}</span>{% else %}<span class="positive">профиль заполнен</span>{% endfor %}</div></div>
-  </article>
-  <article class="panel analytics-panel">
-    <div class="panel-head"><div><span class="eyebrow">История SCD2</span><h2>Изменения записей</h2></div><span class="count-badge">все версии</span></div>
-    <div class="stat-grid three"><div><strong>{{ analytics.history.current_records }}</strong><span>текущих</span></div><div><strong>{{ analytics.history.total_versions }}</strong><span>версий</span></div><div><strong>{{ analytics.history.changed_records }}</strong><span>изменённых</span></div></div>
-    <div class="chip-set">{% for item in analytics.sources %}<span>{{ item.label }} · {{ item.count }}</span>{% endfor %}{% for item in analytics.geographies[:4] %}<span>{{ region_labels.get(item.label, item.label) }} · {{ item.count }}</span>{% endfor %}</div>
-  </article>
-  <article class="panel analytics-panel">
-    <div class="panel-head"><div><span class="eyebrow">Опубликованные результаты</span><h2>Победители и суммы</h2></div><span class="count-badge">{{ analytics.outcomes.awards }}</span></div>
-    <div class="outcome-list">{% for outcome in award_outcomes %}<a class="outcome-row" href="{{ outcome.source_url }}" target="_blank" rel="noreferrer" title="raw SHA {{ outcome.raw_sha256 }}"><span><b>{{ outcome.supplier_names|join(', ') if outcome.supplier_names else 'победитель unknown' }}</b><small>{{ outcome.buyer_name or 'заказчик unknown' }}</small></span><strong>{% if outcome.amount_status.value == 'found' %}{{ outcome.amount }} {{ outcome.currency }}{% else %}{{ outcome.amount_status.value }}{% endif %}</strong></a>{% else %}<p class="muted-copy">Опубликованные результаты ЕИС пока не найдены.</p>{% endfor %}</div>
-  </article>
-  <article class="panel analytics-panel wide">
-    <div class="panel-head"><div><span class="eyebrow">Календарь</span><h2>Ближайшие сроки</h2></div><span class="count-badge">подтверждённые даты</span></div>
-    <div class="deadline-list">{% for item in analytics.nearest_deadlines %}<a href="/tenders/{{ item.record_source.value }}/{{ item.record_source_id }}?profile={{ selected.slug }}"><time>{{ item.deadline_at.strftime('%d.%m.%Y %H:%M') }}</time><b>{{ item.title }}</b><span>{{ item.region_codes|join(', ') if item.region_codes else 'регион unknown' }} · {{ decision_labels.get(item.decision.value, item.decision.value) }}</span></a>{% else %}<p class="muted-copy">Подтверждённых будущих сроков нет.</p>{% endfor %}</div>
+    <div class="panel-head">
+      <div><span class="eyebrow">Календарь</span><h2>Ближайшие сроки</h2></div>
+      <span class="count-badge">подтверждённые даты</span>
+    </div>
+    <div class="deadline-list">{% for item in analytics.nearest_deadlines %}<a href="/tenders/{{ item.record_source.value }}/{{ item.record_source_id }}{{ profile_query }}"><time>{{ item.deadline_at.strftime('%d.%m.%Y %H:%M') }}</time><b>{{ item.title }}</b><span>{{ item.region_codes|join(', ') if item.region_codes else 'регион unknown' }} · {{ decision_labels.get(item.decision.value, item.decision.value) }}</span></a>{% else %}<p class="muted-copy">Подтверждённых будущих сроков нет.</p>{% endfor %}</div>
   </article>
 </section>
-{% else %}<div class="empty-state"><strong>Нет выбранного профиля.</strong><p>Создайте компанию, чтобы рассчитать аналитику.</p></div>{% endif %}
+
+<details class="analytics-secondary">
+  <summary>
+    <span><b>Дополнительная аналитика</b><small>качество данных, профиль, история и результаты</small></span>
+    <span aria-hidden="true">+</span>
+  </summary>
+  <div class="analytics-secondary-grid">
+    <article class="panel analytics-panel wide">
+      <div class="panel-head"><div><span class="eyebrow">Полнота данных</span><h2>Что известно о закупках</h2></div><span class="count-badge">из {{ analytics.coverage.total }}</span></div>
+      <div class="coverage-grid"><div><b>{{ analytics.coverage.buyer_known }}/{{ analytics.coverage.total }}</b><span>заказчик</span></div><div><b>{{ analytics.coverage.classification_known }}/{{ analytics.coverage.total }}</b><span>классификаторы</span></div><div><b>{{ analytics.coverage.geography_known }}/{{ analytics.coverage.total }}</b><span>география</span></div><div><b>{{ analytics.coverage.amount_known }}/{{ analytics.coverage.total }}</b><span>сумма</span></div><div><b>{{ analytics.coverage.deadline_known }}/{{ analytics.coverage.total }}</b><span>срок</span></div></div>
+    </article>
+
+    <article class="panel analytics-panel">
+      <div class="panel-head"><div><span class="eyebrow">Профиль компании</span><h2>Готовность к поиску</h2></div><span class="score-badge">{{ analytics.profile_quality.score }}%</span></div>
+      <div class="stat-grid three"><div><strong>{{ analytics.budget.known_count }}</strong><span>бюджетов известно</span></div><div><strong>{{ analytics.budget.average|amount }}</strong><span>средний бюджет</span></div><div><strong>{{ analytics.budget.median|amount }}</strong><span>медиана</span></div></div>
+      <div class="distribution-block"><b>Незаполненные поля</b><div class="chip-set">{% for field in analytics.profile_quality.missing_fields %}<span>{{ field }}</span>{% else %}<span class="positive">профиль заполнен</span>{% endfor %}</div></div>
+    </article>
+
+    <article class="panel analytics-panel">
+      <div class="panel-head"><div><span class="eyebrow">Прослеживаемость</span><h2>История обновлений</h2></div><span class="count-badge">все версии</span></div>
+      <div class="stat-grid three"><div><strong>{{ analytics.history.current_records }}</strong><span>текущих записей</span></div><div><strong>{{ analytics.history.total_versions }}</strong><span>сохранённых версий</span></div><div><strong>{{ analytics.history.changed_records }}</strong><span>изменённых закупок</span></div></div>
+      <div class="chip-set">{% for item in analytics.sources %}<span>{{ item.label }} · {{ item.count }}</span>{% endfor %}{% for item in analytics.geographies[:4] %}<span>{{ region_labels.get(item.label, item.label) }} · {{ item.count }}</span>{% endfor %}</div>
+    </article>
+
+    <article class="panel analytics-panel wide">
+      <div class="panel-head"><div><span class="eyebrow">Опубликованные результаты</span><h2>Победители и суммы</h2></div><span class="count-badge">{{ analytics.outcomes.awards }}</span></div>
+      <div class="outcome-list">{% for outcome in award_outcomes %}<a class="outcome-row" href="{{ outcome.source_url }}" target="_blank" rel="noreferrer" title="raw SHA {{ outcome.raw_sha256 }}"><span><b>{{ outcome.supplier_names|join(', ') if outcome.supplier_names else 'победитель unknown' }}</b><small>{{ outcome.buyer_name or 'заказчик unknown' }}</small></span><strong>{% if outcome.amount_status.value == 'found' %}{{ outcome.amount }} {{ outcome.currency }}{% else %}{{ outcome.amount_status.value }}{% endif %}</strong></a>{% else %}<p class="muted-copy">Опубликованные результаты ЕИС пока не найдены.</p>{% endfor %}</div>
+    </article>
+  </div>
+</details>
+{% else %}
+<div class="empty-state"><strong>Профиль компании недоступен.</strong><p>Проверьте привязку профиля к аккаунту.</p></div>
+{% endif %}
 {% endblock %}

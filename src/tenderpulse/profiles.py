@@ -197,9 +197,20 @@ def _normalize_optional_text_values(
 
 @lru_cache(maxsize=1)
 def load_demo_profiles() -> tuple[CompanyProfile, ...]:
+    path = Path(__file__).with_name("mvp21_profiles.json")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    profiles = tuple(CompanyProfile.model_validate(item) for item in payload)
+    expected_slugs = ("cleaning-moscow", "office-supply-moscow")
+    if tuple(profile.slug for profile in profiles) != expected_slugs:
+        raise RuntimeError("MVP 2.1 profile authority must contain cleaning and office supply")
+    return profiles
+
+
+@lru_cache(maxsize=1)
+def load_mvp2_legacy_test_profiles() -> tuple[CompanyProfile, ...]:
     path = Path(__file__).with_name("demo_profiles.json")
     payload = json.loads(path.read_text(encoding="utf-8"))
     profiles = tuple(CompanyProfile.model_validate(item) for item in payload)
     if len(profiles) != 4 or len({profile.slug for profile in profiles}) != 4:
-        raise RuntimeError("demo profile authority must contain four distinct profiles")
+        raise RuntimeError("legacy MVP 2.0 test profiles must contain four distinct profiles")
     return profiles

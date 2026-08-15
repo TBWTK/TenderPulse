@@ -164,3 +164,23 @@ def cleaning_notice() -> ProcurementRecord:
         currency="RUB",
         raw_sha256="f" * 64,
     )
+
+
+@pytest.fixture
+def office_notice() -> ProcurementRecord:
+    return build_record(
+        source=SourceCode.EIS,
+        source_record_id="office-supply-moscow",
+        title="Поставка офисной мебели, канцелярии и МФУ",
+        description="Столы, шкафы, бумага, принтеры и картриджи для административного здания",
+        codes=(
+            ClassificationCode(system="CPV", code="39130000"),
+            ClassificationCode(system="OKPD2", code="31.01.12"),
+        ),
+        countries=("RU",),
+        region_codes=("RU-MOW",),
+        delivery_location="Москва",
+        delivery_mode=ServiceDeliveryMode.ONSITE,
+        currency="RUB",
+        raw_sha256="1" * 64,
+    )

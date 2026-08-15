@@ -2,12 +2,18 @@
 title: Данные
 type: data
 status: active
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Данные
 
 ## Сущности и владельцы
+
+- `Account` владеет local identity, role/status и binding к одному company profile slug.
+- `AccessCredential` хранит keyed hash access code; raw code существует только в local secret config
+  и в момент выдачи пользователю.
+- `WebSession` хранит opaque session hash, account, expiry/revocation и audit timestamps.
+- Account binding определяет visibility, но не меняет source ownership: procurement facts остаются shared.
 
 | Сущность | Назначение | Владелец | Идентификатор |
 | --- | --- | --- | --- |
@@ -55,7 +61,8 @@ updated: 2026-08-15
     прежнюю активную версию и сохраняет новую. Demo seed создаёт только отсутствующий slug и не меняет
     уже существующую активную пользовательскую версию; одновременно активна ровно одна версия slug-а.
     Каждый следующий live cycle перечитывает все distinct active versions; `profile_versions`, даты и
-    limit сохраняются в request parameters ЕИС run-а. Четыре demo-профиля — seed, не runtime-limit.
+    limit сохраняются в request parameters ЕИС run-а. Runtime provider выбирает только distinct active
+    account bindings; два demo-профиля — local seed, не будущий product-limit.
 13. Начиная с Alembic `0006`, каждый сохранённый AI payload имеет явные `requirements_status` и
     `deadlines_status`. Для legacy payload непустая категория становится `found`, пустая — `unknown`;
     миграция не утверждает `not_present` без доказательства модели.
@@ -109,7 +116,9 @@ flowchart LR
 
 ## MVP 2.0: матрица российских источников
 
-Матрица проверена 15.08.2026. `candidate` означает, что публичные карточки существуют, но устойчивый
+Матрица повторно проверена 16.08.2026. Official search page содержит RSS transition, а bounded live GET
+с TenderPulse User-Agent и закреплённой российской CA-цепочкой вернул `200 application/rss+xml`.
+`candidate` означает, что публичные карточки существуют, но устойчивый
 машиночитаемый контракт не доказан; это запрещает adapter, а не создаёт разрешение на HTML scraping.
 
 | Источник | Доступ | Доступные facts | Ограничения / gaps | Решение MVP 2.0 |

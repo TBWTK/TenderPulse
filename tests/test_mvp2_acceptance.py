@@ -12,6 +12,7 @@ from tenderpulse.bootstrap import seed_demo
 from tenderpulse.domain.matching import BlockerCode, MatchDecision, TenderMatcher
 from tenderpulse.persistence.models import Base
 from tenderpulse.persistence.repository import ProcurementRepository
+from tenderpulse.profiles import load_mvp2_legacy_test_profiles
 from tenderpulse.raw_store import MemoryRawStore
 
 NOW = datetime(2026, 8, 15, 12, tzinfo=UTC)
@@ -27,6 +28,8 @@ def _workspace():
     factory = sessionmaker(engine, expire_on_commit=False)
     raw_store = MemoryRawStore()
     seed_demo(factory, raw_store, now=lambda: NOW)
+    with factory.begin() as session:
+        ProcurementRepository(session).seed_profiles(load_mvp2_legacy_test_profiles())
     return factory, raw_store
 
 
@@ -120,7 +123,7 @@ def test_profile_change_and_fifth_company_survive_reseed_and_use_same_pipeline()
     restarted = TestClient(create_app(factory, now=lambda: NOW))
     profiles = restarted.get("/api/profiles").json()
 
-    assert len(profiles) == 5
+    assert len(profiles) == 6
     assert next(item for item in profiles if item["slug"] == "auto-service-moscow")["version"] == 2
     assert restarted.get("/api/profiles/office-furniture/history").status_code == 200
     assert restarted.get("/api/recommendations/office-furniture").status_code == 200

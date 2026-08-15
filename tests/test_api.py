@@ -15,7 +15,7 @@ from tenderpulse.domain.models import LifecycleStatus, ProcurementRecord, Record
 from tenderpulse.live_ingestion import LiveSourceResult
 from tenderpulse.persistence.models import Base
 from tenderpulse.persistence.repository import ProcurementRepository
-from tenderpulse.profiles import load_demo_profiles
+from tenderpulse.profiles import load_mvp2_legacy_test_profiles as load_demo_profiles
 
 
 class StubGenerator:
@@ -697,7 +697,6 @@ def test_product_analytics_explains_geography_rejects_deadlines_budget_and_profi
     assert payload["diagnostics"]["geography_rejected"] == 1
     assert payload["diagnostics"]["blockers"] == [{"label": "geography_out_of_scope", "count": 1}]
     assert [item["record_source_id"] for item in payload["nearest_deadlines"]] == [
-        "auto-kamchatka",
         "auto-moscow",
     ]
     assert payload["budget"] == {

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import boto3  # type: ignore[import-untyped]
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from tenderpulse.ai.gigachat import GigaChatClient
+from tenderpulse.auth import AuthService, LocalAccountSeed
+from tenderpulse.persistence.models import AccountRow
 from tenderpulse.persistence.repository import ProcurementRepository
 from tenderpulse.profiles import CompanyProfile
 from tenderpulse.raw_store import MemoryRawStore, RawStore, S3RawStore
@@ -32,6 +34,74 @@ def create_profile_provider(
             return ProcurementRepository(session).list_profiles()
 
     return current_profiles
+
+
+def create_account_profile_provider(
+    session_factory: sessionmaker[Session],
+) -> Callable[[], tuple[CompanyProfile, ...]]:
+    def account_profiles() -> tuple[CompanyProfile, ...]:
+        with session_factory() as session:
+            profile_slugs = tuple(
+                dict.fromkeys(
+                    session.scalars(
+                        select(AccountRow.profile_slug)
+                        .where(AccountRow.active.is_(True))
+                        .order_by(AccountRow.slug)
+                    )
+                )
+            )
+            if not profile_slugs:
+                raise RuntimeError("no active account-bound company profiles are configured")
+            repository = ProcurementRepository(session)
+            profiles: list[CompanyProfile] = []
+            for slug in profile_slugs:
+                profile = repository.get_profile(slug)
+                if profile is None:
+                    raise RuntimeError(f"active account profile is unavailable: {slug}")
+                profiles.append(profile)
+            return tuple(profiles)
+
+    return account_profiles
+
+
+def create_auth_service(
+    settings: Settings,
+    session_factory: sessionmaker[Session],
+) -> AuthService | None:
+    if not settings.auth_enabled:
+        return None
+    if settings.auth_token_pepper is None:
+        raise RuntimeError("AUTH_TOKEN_PEPPER is required when AUTH_ENABLED=true")
+    return AuthService(
+        session_factory,
+        pepper=settings.auth_token_pepper,
+        now=utc_now,
+        session_ttl=timedelta(seconds=settings.auth_session_ttl_seconds),
+        secure_cookie=settings.auth_cookie_secure,
+    )
+
+
+def create_local_account_seeds(settings: Settings) -> tuple[LocalAccountSeed, ...]:
+    if not settings.auth_enabled:
+        return ()
+    if settings.cleaning_access_code is None or settings.office_access_code is None:
+        raise RuntimeError(
+            "CLEANING_ACCESS_CODE and OFFICE_ACCESS_CODE are required when AUTH_ENABLED=true"
+        )
+    return (
+        LocalAccountSeed(
+            slug="cleaning-demo",
+            display_name="Чистая территория",
+            profile_slug="cleaning-moscow",
+            access_code=settings.cleaning_access_code,
+        ),
+        LocalAccountSeed(
+            slug="office-demo",
+            display_name="Офисное снабжение",
+            profile_slug="office-supply-moscow",
+            access_code=settings.office_access_code,
+        ),
+    )
 
 
 def create_raw_store(settings: Settings) -> RawStore:

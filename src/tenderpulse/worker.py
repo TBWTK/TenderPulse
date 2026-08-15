@@ -14,6 +14,7 @@ from tenderpulse.alerts import AlertService
 from tenderpulse.ingestion import IngestionCoordinator
 from tenderpulse.live_ingestion import LiveIngestionService
 from tenderpulse.runtime import (
+    create_account_profile_provider,
     create_database,
     create_official_source_client,
     create_profile_provider,
@@ -37,10 +38,16 @@ def run_scheduled_loop(
     interval_seconds: int,
     stopped: StopSignal,
     run_cycle: Callable[[], object],
+    on_cycle_error: Callable[[Exception], None] | None = None,
 ) -> None:
     while not stopped.is_set():
         if enabled:
-            run_cycle()
+            try:
+                run_cycle()
+            except Exception as error:
+                if on_cycle_error is None:
+                    raise
+                on_cycle_error(error)
         stopped.wait(interval_seconds)
 
 
@@ -71,7 +78,11 @@ def main() -> None:
                 now=utc_now,
             ),
             create_official_source_client(settings),
-            profiles=create_profile_provider(factory),
+            profiles=(
+                create_account_profile_provider(factory)
+                if settings.auth_enabled
+                else create_profile_provider(factory)
+            ),
             now=utc_now,
         )
 
@@ -117,11 +128,15 @@ def main() -> None:
                 sum(delivery.status == "failed" for delivery in webhook_deliveries),
             )
 
+    def log_cycle_error(error: Exception) -> None:
+        logger.exception("worker_cycle_failed error_type=%s", type(error).__name__)
+
     run_scheduled_loop(
         enabled=settings.live_ingestion_enabled or settings.alert_webhook_url is not None,
         interval_seconds=settings.ingestion_interval_seconds,
         stopped=stopped,
         run_cycle=run_cycle,
+        on_cycle_error=log_cycle_error,
     )
     logger.info("worker_stopped")
 

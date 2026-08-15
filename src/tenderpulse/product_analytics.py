@@ -164,6 +164,11 @@ def build_product_analytics(
         f"{item.record_source.value}:{item.record_source_id}": item.decision
         for item in recommendations
     }
+    actionable_keys = {
+        f"{item.record_source.value}:{item.record_source_id}"
+        for item in recommendations
+        if item.decision in {MatchDecision.RECOMMENDED, MatchDecision.REVIEW}
+    }
     nearest_deadlines = tuple(
         DeadlineItem(
             record_source=record.source,
@@ -177,7 +182,9 @@ def build_product_analytics(
             (
                 item
                 for item in records_by_key.values()
-                if item.deadline_at is not None and item.deadline_at > as_of
+                if item.natural_key in actionable_keys
+                and item.deadline_at is not None
+                and item.deadline_at > as_of
             ),
             key=lambda item: (item.deadline_at, item.source_record_id),
         )[:8]

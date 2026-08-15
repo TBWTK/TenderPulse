@@ -4,6 +4,8 @@ from tenderpulse.api import create_app
 from tenderpulse.ingestion import IngestionCoordinator
 from tenderpulse.live_ingestion import LiveIngestionService
 from tenderpulse.runtime import (
+    create_account_profile_provider,
+    create_auth_service,
     create_database,
     create_gigachat_client,
     create_official_source_client,
@@ -18,7 +20,11 @@ engine, session_factory = create_database(settings)
 ingestion_runner = LiveIngestionService(
     IngestionCoordinator(session_factory, create_raw_store(settings), now=utc_now),
     create_official_source_client(settings),
-    profiles=create_profile_provider(session_factory),
+    profiles=(
+        create_account_profile_provider(session_factory)
+        if settings.auth_enabled
+        else create_profile_provider(session_factory)
+    ),
     now=utc_now,
 )
 app = create_app(
@@ -27,4 +33,5 @@ app = create_app(
     evidence_generator=create_gigachat_client(settings),
     ai_requested_model=settings.gigachat_model,
     ingestion_runner=ingestion_runner,
+    auth_service=create_auth_service(settings, session_factory),
 )

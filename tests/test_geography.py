@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from tenderpulse.domain.geography import ServiceDeliveryMode
 from tenderpulse.domain.matching import BlockerCode, GapCode, MatchDecision, TenderMatcher
 from tenderpulse.domain.models import ClassificationCode, ProcurementRecord, SourceCode
-from tenderpulse.profiles import load_demo_profiles
+from tenderpulse.profiles import load_mvp2_legacy_test_profiles as load_demo_profiles
 
 
 def _profile(slug: str):

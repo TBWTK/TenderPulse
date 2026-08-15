@@ -7,7 +7,7 @@
     <h1>Добрый день. Вот что требует внимания.</h1>
     <p>Короткая сводка для {{ selected.name if selected else 'выбранной компании' }} — без форм, длинных списков и технического шума.</p>
   </div>
-  <a class="button primary" href="/tenders?profile={{ selected.slug if selected else '' }}">Открыть рекомендации</a>
+  <a class="button primary" href="/tenders{% if not account %}?profile={{ selected.slug if selected else '' }}{% endif %}">Открыть рекомендации</a>
 </header>
 
 <section class="metric-grid" aria-label="Состояние рабочего пространства">
@@ -21,17 +21,17 @@
   <article class="task-card task-primary">
     <span class="task-index">01</span>
     <div><span class="eyebrow">Главная задача</span><h2>Разобрать подходящие тендеры</h2><p>Сначала — рекомендованные и требующие проверки. Отклонённые вынесены в отдельный журнал и не смешиваются с рабочей очередью.</p></div>
-    <a class="text-link" href="/tenders?profile={{ selected.slug if selected else '' }}">Перейти к очереди <span aria-hidden="true">→</span></a>
+    <a class="text-link" href="/tenders{% if not account %}?profile={{ selected.slug if selected else '' }}{% endif %}">Перейти к очереди <span aria-hidden="true">→</span></a>
   </article>
   <article class="task-card">
     <span class="task-index">02</span>
     <div><span class="eyebrow">Контроль</span><h2>Проверить профиль компании</h2><p>Услуги, классификаторы и реальная география работы напрямую влияют на рекомендации.</p></div>
-    <a class="text-link" href="/companies/{{ selected.slug if selected else '' }}">Открыть профиль <span aria-hidden="true">→</span></a>
+    {% if account %}<a class="text-link" href="/company">Открыть профиль <span aria-hidden="true">→</span></a>{% else %}<a class="text-link" href="/companies/{{ selected.slug if selected else '' }}">Открыть профиль <span aria-hidden="true">→</span></a>{% endif %}
   </article>
   <article class="task-card">
     <span class="task-index">03</span>
     <div><span class="eyebrow">Наблюдаемость</span><h2>Оценить данные и динамику</h2><p>В аналитике видны воронка, полнота, причины отказа, сроки и история версий.</p></div>
-    <a class="text-link" href="/analytics?profile={{ selected.slug if selected else '' }}">Смотреть аналитику <span aria-hidden="true">→</span></a>
+    <a class="text-link" href="/analytics{% if not account %}?profile={{ selected.slug if selected else '' }}{% endif %}">Смотреть аналитику <span aria-hidden="true">→</span></a>
   </article>
 </section>
 
@@ -41,6 +41,6 @@
   <div class="source-status"><span class="status-dot {{ 'ok' if item.last_status == 'succeeded' else 'muted' }}"></span><b>{{ item.source.value|upper }}</b><span>{{ run_status_labels.get(item.last_status, item.last_status) }}</span><small>{% if item.age_seconds is not none %}обновлено {{ (item.age_seconds / 3600)|round(1) }} ч назад{% else %}время обновления unknown{% endif %}</small></div>
   {% else %}<p>Запуски ещё не зафиксированы.</p>{% endfor %}
   {% if analytics and analytics.nearest_deadlines %}<div class="next-deadline"><span>Ближайший подтверждённый срок</span><b>{{ analytics.nearest_deadlines[0].deadline_at.strftime('%d.%m.%Y · %H:%M') }}</b></div>{% endif %}
-  <a class="button secondary" href="/data?profile={{ selected.slug if selected else '' }}">Управление данными</a>
+  {% if not account %}<a class="button secondary" href="/data?profile={{ selected.slug if selected else '' }}">Управление данными</a>{% endif %}
 </section>
 {% endblock %}

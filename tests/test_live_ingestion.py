@@ -14,7 +14,7 @@ from tenderpulse.ingestion import IngestionCoordinator
 from tenderpulse.live_ingestion import LiveIngestionService
 from tenderpulse.persistence.models import Base, IngestionRunRow
 from tenderpulse.persistence.repository import ProcurementRepository
-from tenderpulse.profiles import load_demo_profiles
+from tenderpulse.profiles import load_mvp2_legacy_test_profiles as load_demo_profiles
 from tenderpulse.raw_store import MemoryRawStore
 from tenderpulse.sources.http import FetchResult, SourceFetchError
 

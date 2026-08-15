@@ -1,14 +1,16 @@
-from collections.abc import Callable, Generator
+import hmac
+from collections.abc import Awaitable, Callable, Generator
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Protocol
+from urllib.parse import quote
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator
@@ -19,6 +21,13 @@ from tenderpulse.ai.models import ExtractionOutcome
 from tenderpulse.ai.service import AIExtractionService, EvidenceGenerator
 from tenderpulse.alert_models import AlertView
 from tenderpulse.alerts import AlertService
+from tenderpulse.auth import (
+    CSRF_COOKIE,
+    CSRF_HEADER,
+    SESSION_COOKIE,
+    AuthenticatedAccount,
+    AuthService,
+)
 from tenderpulse.domain.history import RecordVersion
 from tenderpulse.domain.matching import Recommendation, TenderMatcher, current_opportunities
 from tenderpulse.domain.models import ProcurementRecord, SourceCode
@@ -106,6 +115,12 @@ NAV_ITEMS = (
     ("companies", "/companies", "Компании"),
     ("data", "/data", "Данные"),
 )
+COMPANY_NAV_ITEMS = (
+    ("overview", "/", "Обзор"),
+    ("tenders", "/tenders", "Тендеры"),
+    ("analytics", "/analytics", "Аналитика"),
+    ("company", "/company", "Профиль компании"),
+)
 
 
 @dataclass(frozen=True)
@@ -119,6 +134,7 @@ class WebWorkspace:
     lineages: dict[tuple[SourceCode, str], tuple[RecordVersion, ...]]
     award_outcomes: tuple[AwardOutcomeView, ...]
     analytics: ProductAnalytics | None
+    account: AuthenticatedAccount | None = None
 
 
 def _format_amount(value: Decimal | None) -> str:
@@ -128,6 +144,33 @@ def _format_amount(value: Decimal | None) -> str:
     if rendered.endswith(".00"):
         rendered = rendered[:-3]
     return rendered.replace(",", " ").replace(".", ",")
+
+
+def _request_account(request: Request) -> AuthenticatedAccount | None:
+    account = getattr(request.state, "account", None)
+    return account if isinstance(account, AuthenticatedAccount) else None
+
+
+def _authorized_profile_slug(request: Request, requested: str | None) -> str | None:
+    account = _request_account(request)
+    if account is None:
+        return requested
+    if requested is not None and requested != account.profile_slug:
+        raise HTTPException(status_code=404, detail="company profile not found")
+    return account.profile_slug
+
+
+def _require_operator(request: Request) -> None:
+    account = _request_account(request)
+    if account is not None and account.role != "operator":
+        raise HTTPException(status_code=403, detail="operator access required")
+
+
+def _safe_next_path(value: str) -> str:
+    candidate = value.strip()
+    if not candidate.startswith("/") or candidate.startswith("//") or "\\" in candidate:
+        return "/"
+    return candidate
 
 
 class IngestionRunner(Protocol):
@@ -165,6 +208,7 @@ def create_app(
     evidence_generator: EvidenceGenerator | None = None,
     ai_requested_model: str = "GigaChat-2",
     ingestion_runner: IngestionRunner | None = None,
+    auth_service: AuthService | None = None,
 ) -> FastAPI:
     app = FastAPI(title="TenderPulse", version="0.2.0")
     web_root = Path(__file__).with_name("web")
@@ -178,17 +222,124 @@ def create_app(
 
     SessionDep = Annotated[Session, Depends(get_session)]
 
+    @app.middleware("http")
+    async def authenticate_request(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        request.state.account = None
+        if auth_service is None:
+            return await call_next(request)
+        session_token = request.cookies.get(SESSION_COOKIE)
+        request.state.account = auth_service.resolve(session_token)
+        path = request.url.path
+        public = path == "/login" or path == "/api/health" or path.startswith("/static/")
+        if public:
+            return await call_next(request)
+        if request.state.account is None:
+            if path.startswith("/api/"):
+                return JSONResponse({"detail": "authentication required"}, status_code=401)
+            destination = path
+            if request.url.query:
+                destination = f"{destination}?{request.url.query}"
+            return RedirectResponse(
+                url=f"/login?next={quote(destination, safe='')}",
+                status_code=303,
+            )
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            header_token = request.headers.get(CSRF_HEADER)
+            cookie_token = request.cookies.get(CSRF_COOKIE)
+            if (
+                header_token is None
+                or cookie_token is None
+                or not hmac.compare_digest(header_token, cookie_token)
+                or not auth_service.verify_csrf(session_token, header_token)
+            ):
+                return JSONResponse({"detail": "CSRF validation failed"}, status_code=403)
+        return await call_next(request)
+
+    if auth_service is not None:
+
+        @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
+        def login_page(request: Request, next: str = "/") -> Response:
+            if _request_account(request) is not None:
+                return RedirectResponse(url="/", status_code=303)
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={"next_path": _safe_next_path(next), "login_error": None},
+            )
+
+        @app.post("/login", response_class=HTMLResponse, include_in_schema=False)
+        def login(
+            request: Request,
+            access_code: Annotated[str, Form()],
+            next: Annotated[str, Form()] = "/",
+        ) -> Response:
+            result = auth_service.login(access_code)
+            if result is None:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="login.html",
+                    context={
+                        "next_path": _safe_next_path(next),
+                        "login_error": "Неверный код доступа",
+                    },
+                    status_code=401,
+                )
+            response = RedirectResponse(url=_safe_next_path(next), status_code=303)
+            response.set_cookie(
+                SESSION_COOKIE,
+                result.session_token,
+                max_age=result.max_age_seconds,
+                httponly=True,
+                secure=auth_service.secure_cookie,
+                samesite="lax",
+                path="/",
+            )
+            response.set_cookie(
+                CSRF_COOKIE,
+                result.csrf_token,
+                max_age=result.max_age_seconds,
+                httponly=False,
+                secure=auth_service.secure_cookie,
+                samesite="lax",
+                path="/",
+            )
+            return response
+
+        @app.post("/logout", include_in_schema=False)
+        def logout(request: Request) -> Response:
+            auth_service.revoke(request.cookies.get(SESSION_COOKIE))
+            response = RedirectResponse(url="/login", status_code=303)
+            response.delete_cookie(SESSION_COOKIE, path="/")
+            response.delete_cookie(CSRF_COOKIE, path="/")
+            return response
+
     @app.get("/api/health")
     def health(session: SessionDep) -> dict[str, str]:
         session.execute(select(1))
         return {"status": "ok"}
 
     @app.get("/api/profiles", response_model=list[CompanyProfile])
-    def profiles(session: SessionDep) -> tuple[CompanyProfile, ...]:
-        return ProcurementRepository(session).list_profiles()
+    def profiles(request: Request, session: SessionDep) -> tuple[CompanyProfile, ...]:
+        repository = ProcurementRepository(session)
+        account = _request_account(request)
+        if account is None:
+            return repository.list_profiles()
+        profile = repository.get_profile(account.profile_slug)
+        if profile is None:
+            raise HTTPException(status_code=503, detail="account profile is unavailable")
+        return (profile,)
 
     @app.post("/api/profiles", response_model=CompanyProfile, status_code=201)
-    def create_profile(profile: CompanyProfile, session: SessionDep) -> CompanyProfile:
+    def create_profile(
+        request: Request,
+        profile: CompanyProfile,
+        session: SessionDep,
+    ) -> CompanyProfile:
+        if _request_account(request) is not None:
+            raise HTTPException(status_code=403, detail="account cannot create another company")
         repository = ProcurementRepository(session)
         try:
             repository.create_profile(profile)
@@ -202,9 +353,11 @@ def create_app(
         response_model=list[CompanyProfile],
     )
     def profile_history(
+        request: Request,
         profile_slug: str,
         session: SessionDep,
     ) -> tuple[CompanyProfile, ...]:
+        profile_slug = _authorized_profile_slug(request, profile_slug) or profile_slug
         history = ProcurementRepository(session).list_profile_history(profile_slug)
         if not history:
             raise HTTPException(status_code=404, detail="company profile not found")
@@ -212,10 +365,12 @@ def create_app(
 
     @app.put("/api/profiles/{profile_slug}", response_model=CompanyProfile)
     def update_profile(
+        request: Request,
         profile_slug: str,
         profile: CompanyProfile,
         session: SessionDep,
     ) -> CompanyProfile:
+        profile_slug = _authorized_profile_slug(request, profile_slug) or profile_slug
         if profile.slug != profile_slug:
             raise HTTPException(status_code=409, detail="profile slug does not match route")
         repository = ProcurementRepository(session)
@@ -234,9 +389,11 @@ def create_app(
 
     @app.get("/api/recommendations/{profile_slug}", response_model=list[Recommendation])
     def recommendations(
+        request: Request,
         profile_slug: str,
         session: SessionDep,
     ) -> list[Recommendation]:
+        profile_slug = _authorized_profile_slug(request, profile_slug) or profile_slug
         repository = ProcurementRepository(session)
         profile = repository.get_profile(profile_slug)
         if profile is None:
@@ -301,15 +458,21 @@ def create_app(
 
     @app.get("/api/ingestion/runs", response_model=list[IngestionRunView])
     def ingestion_runs(
+        request: Request,
         session: SessionDep,
         limit: int = 50,
     ) -> tuple[IngestionRunView, ...]:
+        _require_operator(request)
         if not 1 <= limit <= 500:
             raise HTTPException(status_code=422, detail="limit must be between 1 and 500")
         return IngestionRepository(session).list_current_product_runs(limit=limit)
 
     @app.post("/api/ingestion/run", response_model=list[LiveSourceResult])
-    def run_ingestion(command: ManualIngestionCommand) -> tuple[LiveSourceResult, ...]:
+    def run_ingestion(
+        request: Request,
+        command: ManualIngestionCommand,
+    ) -> tuple[LiveSourceResult, ...]:
+        _require_operator(request)
         if ingestion_runner is None:
             raise HTTPException(status_code=503, detail="live ingestion is not configured")
         return ingestion_runner.run_cycle(
@@ -319,7 +482,11 @@ def create_app(
         )
 
     @app.post("/api/ingestion/eis-upload", response_model=LiveSourceResult)
-    async def upload_eis_package(file: Annotated[UploadFile, File()]) -> LiveSourceResult:
+    async def upload_eis_package(
+        request: Request,
+        file: Annotated[UploadFile, File()],
+    ) -> LiveSourceResult:
+        _require_operator(request)
         if ingestion_runner is None:
             raise HTTPException(status_code=503, detail="manual EIS ingestion is not configured")
         filename = file.filename or ""
@@ -356,7 +523,12 @@ def create_app(
         "/api/analytics/product/{profile_slug}",
         response_model=ProductAnalytics,
     )
-    def product_analytics(profile_slug: str, session: SessionDep) -> ProductAnalytics:
+    def product_analytics(
+        request: Request,
+        profile_slug: str,
+        session: SessionDep,
+    ) -> ProductAnalytics:
+        profile_slug = _authorized_profile_slug(request, profile_slug) or profile_slug
         repository = ProcurementRepository(session)
         profile = repository.get_profile(profile_slug)
         if profile is None:
@@ -381,7 +553,12 @@ def create_app(
         )
 
     @app.post("/api/alerts/sync/{profile_slug}", response_model=list[AlertView])
-    def sync_alerts(profile_slug: str, session: SessionDep) -> tuple[AlertView, ...]:
+    def sync_alerts(
+        request: Request,
+        profile_slug: str,
+        session: SessionDep,
+    ) -> tuple[AlertView, ...]:
+        profile_slug = _authorized_profile_slug(request, profile_slug) or profile_slug
         try:
             created = AlertService(session, now=now).sync_profile(profile_slug)
         except LookupError as error:
@@ -390,14 +567,24 @@ def create_app(
         return created
 
     @app.get("/api/alerts/{profile_slug}", response_model=list[AlertView])
-    def alerts(profile_slug: str, session: SessionDep) -> tuple[AlertView, ...]:
+    def alerts(
+        request: Request,
+        profile_slug: str,
+        session: SessionDep,
+    ) -> tuple[AlertView, ...]:
+        profile_slug = _authorized_profile_slug(request, profile_slug) or profile_slug
         if ProcurementRepository(session).get_profile(profile_slug) is None:
             raise HTTPException(status_code=404, detail="company profile not found")
         return AlertRepository(session).list_for_profile(profile_slug)
 
     @app.post("/api/alerts/{alert_id}/read", response_model=AlertView)
-    def mark_alert_read(alert_id: UUID, session: SessionDep) -> AlertView:
-        alert = AlertRepository(session).mark_read(alert_id, at=now())
+    def mark_alert_read(request: Request, alert_id: UUID, session: SessionDep) -> AlertView:
+        account = _request_account(request)
+        alert = AlertRepository(session).mark_read(
+            alert_id,
+            at=now(),
+            profile_slug=account.profile_slug if account is not None else None,
+        )
         if alert is None:
             raise HTTPException(status_code=404, detail="alert not found")
         session.commit()
@@ -415,7 +602,12 @@ def create_app(
         session: SessionDep,
         profile: str | None = None,
     ) -> HTMLResponse:
-        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        workspace = _load_web_workspace(
+            session,
+            profile_slug=_authorized_profile_slug(request, profile),
+            now=now,
+            account=_request_account(request),
+        )
         repository = workspace.repository
         records = workspace.records
         record = next(
@@ -470,7 +662,12 @@ def create_app(
         session: SessionDep,
         profile: str | None = None,
     ) -> HTMLResponse:
-        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        workspace = _load_web_workspace(
+            session,
+            profile_slug=_authorized_profile_slug(request, profile),
+            now=now,
+            account=_request_account(request),
+        )
         context = _web_context(workspace, active_page="overview", now=now)
         actionable = tuple(
             item
@@ -526,7 +723,12 @@ def create_app(
             raise HTTPException(status_code=422, detail="unsupported decision filter")
         if sort not in allowed_sorts:
             raise HTTPException(status_code=422, detail="unsupported opportunity sort")
-        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        workspace = _load_web_workspace(
+            session,
+            profile_slug=_authorized_profile_slug(request, profile),
+            now=now,
+            account=_request_account(request),
+        )
         filtered_opportunities = _filter_opportunities(
             workspace.opportunities,
             search=search,
@@ -599,7 +801,12 @@ def create_app(
         session: SessionDep,
         profile: str | None = None,
     ) -> HTMLResponse:
-        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        workspace = _load_web_workspace(
+            session,
+            profile_slug=_authorized_profile_slug(request, profile),
+            now=now,
+            account=_request_account(request),
+        )
         context = _web_context(workspace, active_page="analytics", now=now)
         context.update(
             {
@@ -618,7 +825,9 @@ def create_app(
         request: Request,
         session: SessionDep,
         profile: str | None = None,
-    ) -> HTMLResponse:
+    ) -> Response:
+        if _request_account(request) is not None:
+            return RedirectResponse(url="/company", status_code=303)
         workspace = _load_web_workspace(session, profile_slug=profile, now=now)
         context = _web_context(workspace, active_page="companies", now=now)
         return templates.TemplateResponse(
@@ -633,11 +842,33 @@ def create_app(
         session: SessionDep,
         profile: str | None = None,
     ) -> HTMLResponse:
+        if _request_account(request) is not None:
+            raise HTTPException(status_code=403, detail="account cannot create another company")
         workspace = _load_web_workspace(session, profile_slug=profile, now=now)
         context = _web_context(workspace, active_page="companies", now=now)
         return templates.TemplateResponse(
             request=request,
             name="company_new.html",
+            context=context,
+        )
+
+    @app.get("/company", response_class=HTMLResponse, include_in_schema=False)
+    def own_company_page(request: Request, session: SessionDep) -> HTMLResponse:
+        account = _request_account(request)
+        if account is None:
+            raise HTTPException(status_code=404, detail="account company route is unavailable")
+        repository = ProcurementRepository(session)
+        workspace = _load_web_workspace(
+            session,
+            profile_slug=account.profile_slug,
+            now=now,
+            account=account,
+        )
+        context = _web_context(workspace, active_page="company", now=now)
+        context.update({"profile_history": repository.list_profile_history(account.profile_slug)})
+        return templates.TemplateResponse(
+            request=request,
+            name="company_detail.html",
             context=context,
         )
 
@@ -651,11 +882,21 @@ def create_app(
         profile_slug: str,
         session: SessionDep,
     ) -> HTMLResponse:
+        profile_slug = _authorized_profile_slug(request, profile_slug) or profile_slug
         repository = ProcurementRepository(session)
         if repository.get_profile(profile_slug) is None:
             raise HTTPException(status_code=404, detail="company profile not found")
-        workspace = _load_web_workspace(session, profile_slug=profile_slug, now=now)
-        context = _web_context(workspace, active_page="companies", now=now)
+        workspace = _load_web_workspace(
+            session,
+            profile_slug=profile_slug,
+            now=now,
+            account=_request_account(request),
+        )
+        context = _web_context(
+            workspace,
+            active_page="company" if workspace.account is not None else "companies",
+            now=now,
+        )
         context.update(
             {
                 "profile_history": repository.list_profile_history(profile_slug),
@@ -673,7 +914,13 @@ def create_app(
         session: SessionDep,
         profile: str | None = None,
     ) -> HTMLResponse:
-        workspace = _load_web_workspace(session, profile_slug=profile, now=now)
+        _require_operator(request)
+        workspace = _load_web_workspace(
+            session,
+            profile_slug=_authorized_profile_slug(request, profile),
+            now=now,
+            account=_request_account(request),
+        )
         context = _web_context(workspace, active_page="data", now=now)
         context.update(
             {
@@ -696,12 +943,23 @@ def _load_web_workspace(
     *,
     profile_slug: str | None,
     now: Callable[[], datetime],
+    account: AuthenticatedAccount | None = None,
 ) -> WebWorkspace:
     repository = ProcurementRepository(session)
-    profiles = repository.list_profiles()
-    selected = repository.get_profile(profile_slug) if profile_slug is not None else None
-    if selected is None and profiles:
-        selected = profiles[0]
+    profiles: tuple[CompanyProfile, ...]
+    selected: CompanyProfile | None
+    if account is not None:
+        if profile_slug is not None and profile_slug != account.profile_slug:
+            raise HTTPException(status_code=404, detail="company profile not found")
+        selected = repository.get_profile(account.profile_slug)
+        if selected is None:
+            raise HTTPException(status_code=503, detail="account profile is unavailable")
+        profiles = (selected,)
+    else:
+        profiles = repository.list_profiles()
+        selected = repository.get_profile(profile_slug) if profile_slug is not None else None
+        if selected is None and profiles:
+            selected = profiles[0]
     records = current_product_records(repository.list_current_records())
     opportunities = current_opportunities(records)
     recommendations = tuple(
@@ -737,6 +995,7 @@ def _load_web_workspace(
         lineages=lineages,
         award_outcomes=award_outcomes,
         analytics=analytics,
+        account=account,
     )
 
 
@@ -748,9 +1007,10 @@ def _web_context(
 ) -> dict[str, object]:
     return {
         "active_page": active_page,
-        "nav_items": NAV_ITEMS,
+        "nav_items": COMPANY_NAV_ITEMS if workspace.account is not None else NAV_ITEMS,
         "profiles": workspace.profiles,
         "selected": workspace.selected,
+        "account": workspace.account,
         "workspace_date": _format_workspace_date(now()),
         "decision_labels": DECISION_LABELS,
         "reason_labels": REASON_LABELS,

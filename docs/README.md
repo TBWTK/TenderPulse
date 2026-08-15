@@ -3,7 +3,7 @@ title: TenderPulse
 project: TenderPulse
 type: project
 status: active
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # TenderPulse
@@ -16,14 +16,14 @@ TenderPulse превращает ограниченные, регулярно о
 
 ## Акторы и сценарии
 
-- **Представитель компании** создаёт профиль, проверяет рекомендации и отмечает полезность.
+- **Представитель компании** входит по выданному коду, уточняет свой профиль и проверяет рекомендации.
 - **Тендерный специалист** фильтрует источники, сверяет требования/сроки и подписывается на alerts.
 - **Аналитик** изучает покупателей, победителей, суммы, категории и географию в витринах.
 - **Оператор** запускает Docker-стек, управляет bounded ingestion и контролирует freshness/errors.
 
 ## Границы
 
-### MVP 2.0 — active scope
+### MVP 2.0 — accepted baseline
 
 - Пользовательский current scope содержит только закупки российских заказчиков; ЕИС является
   подтверждённым live-authority, а российские ЭТП — официальными destinations/card sources до
@@ -34,6 +34,26 @@ TenderPulse превращает ограниченные, регулярно о
   contractor coverage и unknown; совпадение страны `RU` само по себе не является преимуществом.
 - Русский guided UI разделяет обзор, actionable/rejected тендеры, scoped analytics, каталог/редактор
   компаний и bounded-загрузку на самостоятельные маршруты с единым profile context.
+
+Пользователь принял этот baseline 16.08.2026. MVP 2.1 добавляет локальную account boundary и готовит
+тот же pipeline к следующему закрытому пилоту, не объявляя пилот уже проведённым.
+
+### MVP 2.1 — локальная подготовка к пилоту
+
+- Два invitation-style account входят по локальному коду и видят только одну связанную компанию.
+- Рабочие профили: клининг и офисное снабжение; legacy versions сохраняются вне account visibility.
+- Normal company navigation не содержит global profile selector и operator ingestion console.
+- Existing Docker worker регулярно загружает bounded ЕИС RSS; Airflow и скрытый scraping не добавляются.
+- UI использует progressive disclosure и проверяется на mobile, intermediate и desktop breakpoints.
+
+### Выход из MVP 2.1: закрытый пилот
+
+- Одна реальная компания проходит onboarding через тот же UI и получает текущую очередь ЕИС.
+- Пользовательская разметка проверяет качество matching, географии и AI-evidence на bounded-выборке.
+- Двухнедельный эксплуатационный прогон доказывает freshness, failures, alerts, persistence и recovery.
+- Реальные решения `участвовать / отклонить / отложить` сохраняют основания и образуют product evidence.
+- Только итоговое pilot-решение `go` открывает Production v1; полный contract находится в
+  [текущем состоянии](STATE.md), а evidence map — в [качестве](QUALITY.md).
 
 ### Сохранённая foundation MVP 1.0
 
@@ -49,7 +69,7 @@ TenderPulse превращает ограниченные, регулярно о
   webhook ведут журнал попыток; внешняя отправка выключена по умолчанию.
 - Основная очередь содержит только `recommended`/`review`. `not_relevant`/`expired` остаются доступными
   в отдельном audit-разделе без AI- или alert-действий; оба представления строятся из одного результата matcher.
-- Аналитика выбранного профиля явно разделяет текущий срез active/planned notices, SCD2 history и
+- Аналитика профиля явно разделяет текущие решения/actionable deadlines и вторичные history/
   current award outcomes: decision funnel, полноту полей, источники, категории, географию, покупателей,
   сохранённые версии, победителей и суммы. Это наблюдаемые данные, а не прогноз вероятности победы.
 - Каждая карточка открывает timeline всех сохранённых версий с raw SHA, ingestion run и официальным URL.
@@ -61,7 +81,8 @@ TenderPulse превращает ограниченные, регулярно о
 - Полная выгрузка источников, скрытый web scraping и обещание полноты всех юрисдикций.
 - Автоматическая подача заявки, юридическая проверка допуска и предсказание победы как факта.
 - Активные закупки США из USAspending; для этого позже нужен отдельный SAM.gov connector.
-- Публичное multi-tenant развёртывание до появления аутентификации, RBAC и tenant isolation.
+- Публичное multi-tenant развёртывание: local code/session не заменяет production identity, perimeter,
+  rate limiting, RBAC/RLS и tenant-isolation audit.
 
 ## Источники и проверенные границы
 
@@ -88,6 +109,7 @@ TenderPulse превращает ограниченные, регулярно о
 - [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md)
 - [ADR-003: official ЕИС RSS and TLS boundary](decisions/ADR-003-eis-rss-and-tls-boundary.md)
 - [ADR-004: Russian source and geography boundary](decisions/ADR-004-russian-source-and-geography-boundary.md)
+- [ADR-005: local account and tenant boundary](decisions/ADR-005-local-account-and-tenant-boundary.md)
 
 <!-- immune-project-engineering:docs:start -->
 - [Аудит и достаточность контекста](AUDIT.md)

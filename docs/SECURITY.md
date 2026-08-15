@@ -1,8 +1,8 @@
 ---
 title: Модель угроз
 type: security
-status: draft
-updated: 2026-08-08
+status: active
+updated: 2026-08-16
 ---
 
 # Модель угроз
@@ -23,15 +23,19 @@ payloads, пользовательские файлы/поля, LLM output и UR
 | Prompt injection | source text is data, no LLM tools, structured schema and citations | semantic manipulation remains possible |
 | Stored XSS from source/LLM text | server template autoescape; dynamic evidence is built with `textContent`/DOM nodes, never `innerHTML` | future UI code must keep the same sink policy |
 | Poisoned/changed source | raw hash, source locator, SCD2 diff, validation issues | source itself may publish wrong facts |
-| Cross-company leakage | local single-tenant MVP; no public deployment | missing auth/RBAC blocks public use |
+| Access-code disclosure | high-entropy code, keyed hash + secret pepper, no URL/log/Git, one-time local delivery | host/chat holder can use local credential until rotation |
+| Session theft/fixation | opaque server session, expiry/revocation, rotate on login, HttpOnly/SameSite cookie | localhost without TLS; public use remains blocked |
+| CSRF | unsafe authenticated API requires matching CSRF header/cookie; logout is POST | XSS would defeat browser CSRF token |
+| Cross-company leakage | account → one profile binding; server authorization on page/API, foreign slug fail-closed | app-level isolation is not yet PostgreSQL RLS |
 | Alert duplication | transactional outbox + stable webhook `Idempotency-Key` + attempt history | receiver must implement deduplication |
 | Webhook secret/SSRF | opt-in config only, HTTPS validation, destination stored only as SHA-256, no response body | host operator controls egress target; query-token rotation is external |
 | XML entity attack | DTD/entity resolution disabled, ZIP size/member limits | parser/library vulnerabilities |
 
 ## Deployment boundary
 
-До появления authentication, RBAC, tenant isolation, CSRF controls and recovery tests сервис доступен
-только локально или в защищённом внутреннем контуре. Компания должна разрешить передачу конкретных
+MVP 2.1 добавляет local authentication, one-profile authorization и CSRF, но не заявляет public-ready
+identity: нет self-registration, password recovery, rate-limit perimeter, secret manager, RLS и production
+TLS/session policy. Сервис остаётся только на localhost. Компания должна разрешить передачу конкретных
 полей профиля и фрагментов notice внешнему GigaChat; deterministic matcher работает без LLM.
 
 ## Certificate policy

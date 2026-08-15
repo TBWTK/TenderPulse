@@ -6,6 +6,29 @@ const errorMessage = (payload, fallback) => {
   return fallback;
 };
 
+const cookieValue = (name) => document.cookie
+  .split(';')
+  .map((item) => item.trim())
+  .find((item) => item.startsWith(`${name}=`))
+  ?.slice(name.length + 1);
+
+const apiFetch = (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  const csrf = cookieValue('tenderpulse_csrf');
+  if (csrf && !['GET', 'HEAD', 'OPTIONS'].includes(String(options.method || 'GET').toUpperCase())) {
+    headers.set('X-CSRF-Token', decodeURIComponent(csrf));
+  }
+  return fetch(url, {...options, headers});
+};
+
+document.querySelector('#logout-button')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  const response = await apiFetch('/logout', {method: 'POST'});
+  if (response.ok) window.location.assign('/login');
+  else button.disabled = false;
+});
+
 const splitValues = (value, separator) => String(value).split(separator).map((item) => item.trim()).filter(Boolean);
 
 const parseClassifications = (value) => {
@@ -93,7 +116,7 @@ ingestionForm?.addEventListener('submit', async (event) => {
   const sources = data.getAll('sources');
   status.textContent = 'Получаю и фиксирую raw evidence…';
   try {
-    const response = await fetch('/api/ingestion/run', {
+    const response = await apiFetch('/api/ingestion/run', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -117,7 +140,7 @@ eisUploadForm?.addEventListener('submit', async (event) => {
   const status = document.querySelector('#eis-upload-status');
   status.textContent = 'Проверяю и сохраняю пакет…';
   try {
-    const response = await fetch('/api/ingestion/eis-upload', {method: 'POST', body: new FormData(eisUploadForm)});
+    const response = await apiFetch('/api/ingestion/eis-upload', {method: 'POST', body: new FormData(eisUploadForm)});
     const payload = await response.json();
     if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка пакета'));
     status.textContent = `ЕИС: ${payload.status}, ${payload.record_count} записей`;
@@ -133,7 +156,7 @@ document.querySelectorAll('.ai-button').forEach((button) => {
     button.disabled = true;
     button.textContent = 'Проверяю evidence…';
     try {
-      const response = await fetch(`/api/records/${button.dataset.source}/${button.dataset.record}/evidence/extract`, {method: 'POST'});
+      const response = await apiFetch(`/api/records/${button.dataset.source}/${button.dataset.record}/evidence/extract`, {method: 'POST'});
       const payload = await response.json();
       if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка извлечения'));
       renderEvidence(button.closest('.tender-card').querySelector('[data-evidence-output]'), payload);
@@ -151,7 +174,7 @@ document.querySelectorAll('.detail-ai-button').forEach((button) => {
     button.disabled = true;
     button.textContent = 'Проверяю сохранённую версию…';
     try {
-      const response = await fetch(`/api/records/${button.dataset.source}/${button.dataset.record}/evidence/extract`, {method: 'POST'});
+      const response = await apiFetch(`/api/records/${button.dataset.source}/${button.dataset.record}/evidence/extract`, {method: 'POST'});
       const payload = await response.json();
       if (!response.ok) throw new Error(errorMessage(payload, 'Ошибка извлечения'));
       renderEvidence(document.querySelector('[data-evidence-output]'), payload);
@@ -199,7 +222,7 @@ profileForm?.addEventListener('submit', async (event) => {
       name: String(data.get('name')).trim(),
     };
     status.textContent = `Сохраняю v${update.version}…`;
-    const response = await fetch(`/api/profiles/${update.slug}`, {
+    const response = await apiFetch(`/api/profiles/${update.slug}`, {
       method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(update),
     });
     const payload = await response.json();
@@ -224,7 +247,7 @@ createProfileForm?.addEventListener('submit', async (event) => {
       ...profileFields(data),
     };
     status.textContent = 'Создаю версионируемый профиль…';
-    const response = await fetch('/api/profiles', {
+    const response = await apiFetch('/api/profiles', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(profile),
     });
     const payload = await response.json();
@@ -240,14 +263,14 @@ document.querySelector('#sync-alerts')?.addEventListener('click', async (event) 
   const button = event.currentTarget;
   button.disabled = true;
   button.textContent = 'Синхронизирую…';
-  const response = await fetch(`/api/alerts/sync/${button.dataset.profile}`, {method: 'POST'});
+  const response = await apiFetch(`/api/alerts/sync/${button.dataset.profile}`, {method: 'POST'});
   button.textContent = response.ok ? 'Alerts готовы' : 'Не выполнено';
   if (response.ok) window.setTimeout(() => window.location.reload(), 500);
 });
 
 document.querySelectorAll('.alert-item:not(.read)').forEach((button) => {
   button.addEventListener('click', async () => {
-    const response = await fetch(`/api/alerts/${button.dataset.alert}/read`, {method: 'POST'});
+    const response = await apiFetch(`/api/alerts/${button.dataset.alert}/read`, {method: 'POST'});
     if (response.ok) button.classList.add('read');
   });
 });

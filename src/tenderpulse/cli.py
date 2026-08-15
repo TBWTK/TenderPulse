@@ -6,9 +6,15 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 
+from tenderpulse.auth import seed_local_accounts
 from tenderpulse.bootstrap import seed_demo
 from tenderpulse.persistence.repository import ProcurementRepository
-from tenderpulse.runtime import create_database, create_raw_store, utc_now
+from tenderpulse.runtime import (
+    create_database,
+    create_local_account_seeds,
+    create_raw_store,
+    utc_now,
+)
 from tenderpulse.settings import Settings
 
 
@@ -38,6 +44,16 @@ def init_db(settings: Settings) -> None:
 def seed(settings: Settings) -> None:
     _, factory = create_database(settings)
     result = seed_demo(factory, create_raw_store(settings), now=utc_now)
+    if settings.auth_enabled:
+        if settings.auth_token_pepper is None:
+            raise RuntimeError("AUTH_TOKEN_PEPPER is required when AUTH_ENABLED=true")
+        with factory.begin() as session:
+            seed_local_accounts(
+                session,
+                create_local_account_seeds(settings),
+                pepper=settings.auth_token_pepper,
+                now=utc_now,
+            )
     print(f"demo seed complete: runs={result.run_count} records={result.record_count}")
 
 

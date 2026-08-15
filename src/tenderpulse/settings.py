@@ -28,7 +28,14 @@ class Settings(BaseSettings):
     gigachat_oauth_url: str = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     gigachat_api_base_url: str = "https://api.giga.chat/v1"
 
-    live_ingestion_enabled: bool = False
+    auth_enabled: bool = True
+    auth_token_pepper: SecretStr | None = None
+    cleaning_access_code: SecretStr | None = None
+    office_access_code: SecretStr | None = None
+    auth_session_ttl_seconds: int = Field(default=43200, ge=300, le=2592000)
+    auth_cookie_secure: bool = False
+
+    live_ingestion_enabled: bool = True
     ingestion_interval_seconds: int = Field(default=3600, ge=60)
     source_record_limit: int = Field(default=25, ge=1, le=50)
     eis_lookback_days: int = Field(default=7, ge=1, le=31)

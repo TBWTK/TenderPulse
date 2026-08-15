@@ -110,8 +110,14 @@ class AlertRepository:
             for alert, profile, version, record in self._session.execute(statement).all()
         )
 
-    def mark_read(self, alert_id: UUID, *, at: datetime) -> AlertView | None:
-        row = self._context_for_id(alert_id)
+    def mark_read(
+        self,
+        alert_id: UUID,
+        *,
+        at: datetime,
+        profile_slug: str | None = None,
+    ) -> AlertView | None:
+        row = self._context_for_id(alert_id, profile_slug=profile_slug)
         if row is None:
             return None
         alert, profile, version, record = row
@@ -122,10 +128,14 @@ class AlertRepository:
     def _context_for_id(
         self,
         alert_id: UUID,
+        *,
+        profile_slug: str | None = None,
     ) -> (
         tuple[AlertEventRow, CompanyProfileRow, ProcurementVersionRow, ProcurementRecordRow] | None
     ):
         statement = self._context_statement().where(AlertEventRow.id == alert_id)
+        if profile_slug is not None:
+            statement = statement.where(CompanyProfileRow.slug == profile_slug)
         result = self._session.execute(statement).one_or_none()
         return result._tuple() if result is not None else None
 

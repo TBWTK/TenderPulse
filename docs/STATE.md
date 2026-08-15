@@ -2,106 +2,99 @@
 title: Текущее состояние
 type: state
 status: active
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Текущее состояние
 
 ## Active objective
 
-Добиться пользовательской приёмки MVP 2.0 через новый понятный веб-интерфейс: разделить перегруженную
-страницу на самостоятельные рабочие разделы, ввести единый дизайн-код и сохранить все доказанные
-сценарии тендеров, компаний, аналитики, загрузки и прослеживаемости.
+Подготовить закрытый пилот TenderPulse на одной реальной российской компании: согласовать профиль,
+разметить bounded-выборку ЕИС и измерить практическую точность actionable-рекомендаций.
 
 ## Acceptance criteria
 
-- [x] Глобальная навигация ведёт на самостоятельные маршруты: обзор, тендеры, аналитика, компании и
-  загрузка данных; активный раздел, выбранная компания и назначение страницы понятны без прокрутки.
-- [x] Обзор показывает только следующий полезный шаг: actionable-счётчики, ближайшие сроки,
-  свежесть данных, последние alerts и короткие переходы; на нём нет редакторов и длинных аудитов.
-- [x] Тендеры имеют компактные фильтры, ясную иерархию карточки и отдельное представление отклонённых;
-  detail сохраняет официальную ссылку, географическое объяснение, requirements и lineage.
-- [x] Компании разделены на каталог, отдельный редактор и отдельное создание; сложные поля сгруппированы,
-  снабжены подсказками, а история версий не конкурирует с основным действием.
-- [x] Аналитика и загрузка данных находятся на отдельных страницах и не содержат несвязанных форм;
-  аналитические scope/unknown и bounded ЕИС-контракт остаются явными.
-- [x] Единый дизайн-код определяет типографику, цвет, отступы, состояния, карточки, кнопки, формы и
-  responsive-поведение; при ширине 390 px нет горизонтального переполнения и потери действий.
-- [x] Семантические landmarks, видимый keyboard focus, labels, skip-link и понятные статусы обеспечивают
-  базовую доступность; критичный сценарий не зависит только от цвета или hover.
-- [x] Все существующие business/API/evidence/matching тесты остаются зелёными; новые route-isolation,
-  navigation, responsive и browser journey проверки доказывают отсутствие прежней перегрузки.
+MVP 2.1 — verified:
+
+- [x] Неавторизованный HTML-запрос перенаправляется на `/login`, API отвечает `401`; валидный local
+  access code создаёт server-side session, неверный код не раскрывает account, logout отзывает session.
+- [x] Access codes хешируются с обязательным secret pepper, не сохраняются в Git/log/URL/browser
+  storage; cookie имеет `HttpOnly`, `SameSite`, ограниченный lifetime, а unsafe API защищены CSRF.
+- [x] Два account привязаны каждый к одной компании; чужой profile slug не переключает контекст и
+  отвечает `404`/`403`. Shared procurement data не становится tenant-owned.
+- [x] В account-контуре доступны только `Чистая территория` и `Офисное снабжение`; второй профиль
+  покрывает мебель, канцелярию, принтеры/МФУ и расходники и исключает разработку ПО.
+- [x] Company user видит обзор, тендеры, аналитику, свой профиль и logout; глобальный selector,
+  создание чужих компаний и операторский раздел данных отсутствуют.
+- [x] Обзор ограничен первичными KPI и следующим шагом; history/data-quality/outcomes аналитики
+  раскрываются вторично и не используют пользовательский жаргон SCD2.
+- [x] На viewport 390, 768, 1024 и 1280 px нет horizontal overflow, offscreen controls и тесной
+  трёхколоночной history card на промежуточной ширине.
+- [x] Docker worker выполняет bounded ЕИС RSS cycle сразу и затем каждый час, сохраняет run evidence,
+  продолжает работу после failed cycle и не вызывает TED/USAspending.
+- [x] Automatic attachment adapter не заявлен без официального безопасного contract; manual XML/ZIP,
+  official link и явный `unknown` сохранены.
+- [x] Telegram/email/webhook expansion и public deployment остаются planned; существующие in-app и
+  webhook contracts не деградировали.
+- [x] Изменение реализовано test-first; `172` tests и branch coverage `86.07%`, Ruff/format/strict mypy,
+  `54` dbt tests, rebuilt Docker, live ЕИС cycle, restart и browser acceptance прошли.
+- [x] Два local-demo code подготовлены вне Git для передачи пользователю; реализация оформляется
+  восстановимым Git checkpoint без ложного заявления об обновлении remote/default branch.
 
 ## Current verified state
 
-- UX-релиз 15.08.2026: `/`, `/tenders`, `/analytics`, `/companies`, `/companies/new`,
-  `/companies/{slug}` и `/data` имеют отдельные назначения и общий route navigation/profile context.
-- Главная уменьшена с `6800` до `1095 px` при viewport `1280×720`, с `57` до `10` content blocks и
-  с `5` до `0` форм; это меньше двух viewport вместо прежних 9,4.
-- Browser inspection всех семи journeys: правильный active state, `0` unlabeled controls, skip-link,
-  отсутствие horizontal overflow. На `390×844` все пять nav-действий видимы в пределах `10..380 px`.
-- Очередь показывает `recommended/review`; `10` отклонённых записей свёрнуты отдельно и имеют `0`
-  AI-actions. Кнопка объясняет, что извлекает требования/сроки только из сохранённой версии.
-- Финальный regression: `160` tests, branch coverage `87.43%`; Ruff/format/strict mypy — pass;
-  dbt `PASS=54 WARN=0 ERROR=0`; `git diff --check` — pass; пересобранные api/worker/db/minio — healthy.
-- Финальный regression 15.08.2026: `157` deterministic tests проходят с branch coverage `87.21%`;
-  Ruff, format и strict mypy проходят, dbt — `54/54`, Docker Compose — healthy.
-- Browser E2E подтвердил четыре отраслевые очереди, Москва/Камчатка, remote IT во Владивостоке,
-  фильтры, detail/official ЕИС link, rejected audit, аналитику и русские подсказки профиля.
-- Пользовательский `mvp2-restart-proof` изменён через UI с v1 на v2; после restart api/worker история
-  `[1, 2]` и мебельная рекомендация `recommended` сохранились в PostgreSQL.
-- Current API/UI/analytics/alerts и журнал загрузок показывают только ЕИС/RU; legacy foreign raw/history
-  сохранены для аудита, но не попадают в пользовательский current-контур.
-- UX-аудит 15.08.2026: технически зелёная главная имеет `6800 px` scroll height при viewport `720 px`,
-  `57` section/article blocks, `5` форм и восемь разных h1/h2-задач; пользователь MVP не принял.
+- Миграция `0008_local_accounts` владеет accounts, keyed-hash credentials и revocable sessions;
+  CSRF и account/profile authorization применяются на сервере.
+- Account visibility принадлежит bindings: `cleaning-moscow` и `office-supply-moscow`. Legacy profile
+  versions и procurement lineage сохранены, но не доступны company accounts.
+- Ближайшие сроки аналитики включают только `recommended`/`review`, а rejected records не создают
+  ложный actionable backlog.
+- Штатные Compose-образы собраны; API, worker, PostgreSQL и MinIO healthy. Worker получил `25` записей
+  из официального ЕИС RSS с TLS verification и повторил цикл после restart.
+- Browser acceptance прошёл на 390/768/1024/1280 px; реальные cleaning/office login и cross-company
+  denial проверены через HTTP journey.
 
 ## Changed areas
 
-- Delivered UX mutation: server-rendered page routes/templates, shared navigation/layout/design tokens,
-  focused tender/company/analytics/data pages, responsive and accessibility contracts.
-- Not affected: canonical procurement model, matching/geography, persistence/schema, ingestion bounds,
-  AI evidence, alert policy, dbt marts and external source adapters.
+- Auth/session schema, profile visibility, API/page authorization, analytics projection, UI/navigation,
+  worker defaults/resilience, Docker/env, documentation and test/eval evidence changed coherently.
+- Canonical procurement, raw/history lineage, organization/outcome authority and source adapters were
+  preserved; only their authorized product projection changed.
 
 ## Decisions made
 
-- ЕИС — единственный подтверждённый live source-authority MVP 2.0. Российские ЭТП не парсятся скрыто:
-  новый adapter допустим только после фиксации официального API/RSS/export contract, limits и tests.
-- Имеющиеся foreign raw/history не удаляются, но исключаются из current product projections; новые
-  live cycles не вызывают TED/USAspending.
-- География использует один typed owner: ISO 3166-2 Russian region codes, `onsite|remote|hybrid`,
-  service regions, nationwide/travel/contractor policy. UI и matcher не дублируют это решение.
-- Четыре профиля — обязательный seed, а не runtime limit. Любое число active user profiles допустимо;
-  ingestion остаётся bounded и сохраняет использованные profile versions.
-- Вероятность победы и анализ конкурентов не вычисляются; historical winners/amounts остаются facts.
-- Один длинный dashboard больше не является владельцем всего UI. FastAPI page routes владеют задачами,
-  общий layout — навигацией/design tokens, а API/domain contracts остаются без изменений.
-
-## Next exact step
-
-Провести повторную пользовательскую приёмку в локальном приложении `http://127.0.0.1:8010`;
-до явного подтверждения пользователя проект остаётся технически готовым к review, но MVP не объявляется принятым.
-
-## Blockers
-
-- Нет.
+- MVP 2.1 — local pre-pilot hardening, а не доказательство ценности на реальной компании.
+- Один company account владеет одной profile lineage; notices/raw/history общие, рекомендации и alerts
+  вычисляются только в разрешённом profile context.
+- Self-registration, password recovery, social login, public deployment и PostgreSQL RLS не входят в этап.
+- Airflow не добавляется: schedule принадлежит одному наблюдаемому Docker worker.
+- Telegram/email и автоматические attachments отложены до выбора канала и подтверждения source contract.
+- Физическое удаление legacy evidence, полная выгрузка ЕИС и автоматическая подача заявок запрещены.
 
 ## Non-goals
 
-- Анализ конкурентов, гарантированный прогноз победы и объяснение решения комиссии.
-- Автоматическая подача заявки или юридическое заключение о допуске.
-- Неограниченная выгрузка, скрытый scraping и user-provided source URLs.
-- Production multi-tenancy, auth/RBAC и публичное deployment.
-- Изменение matching, procurement schema, dbt-метрик или live-source контрактов.
-- SPA-фреймворк, визуальный page builder и внешняя дизайн-система.
+- Self-registration, password recovery, social login, public deployment и PostgreSQL RLS.
+- Telegram/email delivery, Airflow, automatic attachment scraping и автоматическая подача заявок.
+- Доказательство pilot precision, 14-дневной надёжности или production readiness.
+
+## Next exact step
+
+Получить от владельца продукта одну реальную компанию и её ограничения, затем составить и вслепую
+разметить первые 50 notices ЕИС для pilot precision gate.
+
+## Blockers
+
+- Реальная компания и human labels ещё не предоставлены; это блокирует пилотную валидацию, но не MVP 2.1.
 
 ## Verification
 
 ```bash
-.venv/bin/pytest --cov=tenderpulse --cov-branch --cov-report=term-missing -q
+make test
 make lint
 make dbt-test
 docker compose config --quiet
-docker compose ps
+docker compose ps -a
 git diff --check
 python3 /Users/tbwtk/.codex/skills/project-control/scripts/project_control.py audit .
+python3 /Users/tbwtk/.codex/skills/immune-project-engineering/scripts/immune_project.py audit . --phase implementation
 ```

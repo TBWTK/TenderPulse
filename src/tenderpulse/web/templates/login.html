@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Вход в TenderPulse">
+  <title>Вход · TenderPulse</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v=20260816-mvp21">
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="login-brand" aria-label="TenderPulse">
+      <span class="brand-mark" aria-hidden="true">TP</span>
+      <div><strong>TenderPulse</strong><p>Закупки для вашей компании без информационного шума.</p></div>
+    </section>
+    <section class="login-card">
+      <span class="eyebrow">Локальный доступ</span>
+      <h1>Войти в компанию</h1>
+      <p>Введите выданный код. После входа TenderPulse покажет только профиль и рекомендации вашей компании.</p>
+      <form method="post" action="/login" class="login-form">
+        <input type="hidden" name="next" value="{{ next_path }}">
+        <label class="field"><span>Код доступа</span><input name="access_code" type="password" autocomplete="current-password" required autofocus></label>
+        {% if login_error %}<p class="form-error" role="alert">{{ login_error }}</p>{% endif %}
+        <button class="button primary full-width" type="submit">Войти</button>
+      </form>
+      <p class="login-note">Самостоятельная регистрация пока закрыта. Доступ выдаётся отдельно для каждой тестовой компании.</p>
+    </section>
+  </main>
+</body>
+</html>

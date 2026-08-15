@@ -2,7 +2,7 @@
 title: Запуск и эксплуатация
 type: runbook
 status: active
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Запуск и эксплуатация
@@ -18,29 +18,38 @@ docker compose up --build -d
 docker compose ps -a
 ```
 
+До первого запуска заполните три независимых значения длиной не менее 32 символов:
+`AUTH_TOKEN_PEPPER`, `CLEANING_ACCESS_CODE`, `OFFICE_ACCESS_CODE`. Pepper не передаётся пользователю;
+коды выдаются соответствующим компаниям вне Git/log/URL. `AUTH_COOKIE_SECURE=false` допустим только
+для `http://127.0.0.1`; любое TLS-развёртывание обязано включить secure cookie.
+
 Web/API: `http://127.0.0.1:8010`; PostgreSQL: `127.0.0.1:5433`; MinIO console:
 `127.0.0.1:9001`. Порты задаются `TENDERPULSE_*_PORT`.
 
 Init применяет Alembic, идемпотентно загружает один российский ЕИС demo-export из 6 notices и 1
-award, создаёт четыре отсутствующих demo-профиля и alerts. Повторный init сохраняет новый ingestion
-run, но не создаёт canonical version без изменения. Пользовательская active version и созданные
-пользователем slug-и не сбрасываются.
+award, создаёт два рабочих профиля и два local account binding. Повторный init сохраняет новый
+ingestion run, но не создаёт canonical version без изменения и не сбрасывает пользовательскую active
+profile version. Legacy profile/history физически сохраняются, но не доступны company account.
 
 ## Пользовательский workflow
 
-- `/` — короткий рабочий обзор выбранной компании без mutation-форм и длинных списков.
-- `/tenders?profile={slug}` — actionable-очередь, фильтры и отдельный свёрнутый rejected audit.
-- `/analytics?profile={slug}` — scoped аналитика matching/current/history/outcomes.
-- `/companies`, `/companies/new`, `/companies/{slug}` — каталог, создание и отдельный редактор профиля.
-- `/data?profile={slug}` — freshness, bounded ЕИС run/upload и история запусков.
-- `/tenders/{source}/{source_record_id}?profile={slug}` — внутренняя карточка с requirements,
-  geography, lineage, результатами и отдельным официальным переходом.
-- `GET/POST /api/profiles`, `PUT /api/profiles/{slug}`, `GET /api/profiles/{slug}/history` — создание,
-  следующая immutable version и история. Любое число distinct active slug допустимо.
-- `GET /api/recommendations/{slug}` — current ЕИС/RU active/planned notices.
+- `/login` принимает локальный код и создаёт revocable server-side session; `/logout` отзывает её.
+- `/` — короткий рабочий обзор авторизованной компании без mutation-форм и длинных списков.
+- `/tenders` — actionable-очередь, фильтры и отдельный свёрнутый rejected audit.
+- `/analytics` — решения и actionable deadlines; data quality/history/outcomes раскрываются вторично.
+- `/company` — подсказки, редактирование собственного профиля и immutable version history.
+- `/tenders/{source}/{source_record_id}` — карточка с requirements, geography, lineage, результатами и
+  отдельным официальным переходом.
+- `GET /api/profiles` возвращает один разрешённый профиль; `PUT /api/profiles/{own_slug}` создаёт
+  следующую immutable version. Чужой slug отвечает `404`, создание профиля company role запрещено.
+- `GET /api/recommendations/{own_slug}` — current ЕИС/RU active/planned notices.
 - `GET /api/analytics/product/{slug}` — полный current scope, даже если UI-очередь отфильтрована.
 - `GET /api/analytics/award-outcomes` — только текущие российские award facts.
 - `GET /api/records/{source}/{id}/lineage` — все сохранённые версии, включая legacy history.
+
+Company navigation не содержит selector, `/companies/new` и `/data`; прямой запрос к operator surface
+получает `403`. В MVP 2.1 operator UI не имеет отдельного выданного account и schedule принадлежит
+worker. API кроме `/api/health` требует session; unsafe запросы дополнительно требуют CSRF header/cookie.
 
 Основная очередь содержит `recommended` и `review`; `not_relevant`/`expired` находятся в audit и не
 получают AI/alert actions. Alert создаётся только для `recommended` и сохраняет profile/record version,
@@ -59,7 +68,7 @@ EIS_SUB_CA_FILE=/app/certs/russian_trusted_sub_ca_pem.crt
 
 `POST /api/ingestion/run` принимает только `sources=["eis"]`, limit `1..50` и окно `1..31` день.
 URL фиксирован: `https://zakupki.gov.ru/epz/order/extendedsearch/rss.html`; response ≤2 MiB. Параметры
-и версии всех профилей сохраняются в run. Пустой валидный RSS — `0 records`; foreign source, limit 51,
+и версии только account-visible профилей сохраняются в run. Пустой валидный RSS — `0 records`; foreign source, limit 51,
 битая schema или transport error видны как отказ, а не как правдоподобный пустой результат.
 
 `POST /api/ingestion/eis-upload` принимает `.xml`/`.zip` ≤10 MiB; ZIP ≤50 members и ≤20 MiB
@@ -91,6 +100,8 @@ docker compose ps -a
 docker compose down
 ```
 
-После restart проверьте созданный slug через `/api/profiles` и его history. `docker compose down`
+После restart войдите обоими кодами, проверьте один разрешённый slug через `/api/profiles`, `/company`
+и последний `ingestion_run`. `docker compose down`
 сохраняет named volumes. Удаление volumes — отдельная destructive operation и не входит в штатную
-остановку. До public deployment нужны auth/RBAC, CSRF, tenant isolation, backup/restore и durable queue.
+остановку. До public deployment нужны production identity/RBAC, rate limiting, RLS/изоляция,
+backup/restore и durable queue; local access-code boundary не является public-ready authentication.

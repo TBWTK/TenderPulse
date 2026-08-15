@@ -9,7 +9,7 @@ from tenderpulse.domain.matching import (
     current_opportunities,
 )
 from tenderpulse.domain.models import LifecycleStatus, ProcurementRecord, RecordKind
-from tenderpulse.profiles import load_demo_profiles
+from tenderpulse.profiles import load_mvp2_legacy_test_profiles as load_demo_profiles
 
 
 def _profile(slug: str):

@@ -2,15 +2,16 @@
 title: Архитектура
 type: architecture
 status: active
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Архитектура
 
 ## Контекст
 
-TenderPulse запускается одним Docker Compose project. Web/API управляет versioned-профилями и
-bounded ЕИС-загрузкой. Каждый цикл перечитывает все active profile versions из PostgreSQL и сохраняет
+TenderPulse запускается одним Docker Compose project. В MVP 2.1 Web/API начинает запрос с local
+account session и разрешённого company profile, а не с query selector. Web/API управляет versioned-профилем
+и bounded ЕИС-загрузкой. Каждый цикл перечитывает account-visible profile versions из PostgreSQL и сохраняет
 их номера в ingestion run, но число demo-профилей не является runtime-limit. Worker обращается только
 к официальному ЕИС RSS, сохраняет bytes в S3-compatible raw store и регистрирует SHA/run; XML/ZIP
 остаётся bounded manual fallback. Нормализатор пишет canonical JSON и SCD2-версии в PostgreSQL, dbt
@@ -20,7 +21,7 @@ bounded ЕИС-загрузкой. Каждый цикл перечитывае�
 
 ```mermaid
 flowchart LR
-  Company["Компания / тендерный специалист"] --> Web["Web UI"] --> API["FastAPI"]
+  Company["Компания / тендерный специалист"] --> Login["Local access code → session"] --> Web["Web UI"] --> API["FastAPI"]
   Operator["Оператор / scheduler"] --> Worker["Ingestion worker"]
   Worker --> EIS["ЕИС RSS 44-ФЗ / XML/ZIP"]
   Worker --> Raw[("S3 raw evidence")]
@@ -47,6 +48,12 @@ flowchart LR
 - LLM не создаёт facts: его claims имеют prompt/model/input hash, citations и validation status.
 - Company profile изменяется только добавлением следующей immutable version; bootstrap добавляет
   отсутствующие demo-профили, но никогда не реактивирует seed поверх пользовательской версии.
+- Account binding, а не `company_profiles.active`, владеет tenant visibility. `active` продолжает
+  означать ровно current profile version; legacy history не удаляется при смене рабочего каталога.
+- Authenticated company request получает один profile slug из server-side session. Чужой slug никогда
+  не вызывает fallback к первому профилю; navigation visibility не заменяет API authorization.
+- Procurement raw/canonical/history shared между accounts. Profile history, recommendation, analytics,
+  AI action и alert доступны только в account-authorized profile context.
 - Runtime source scope читает те же current DB profiles, что matcher/alerts; `load_demo_profiles` допустим
   только для bootstrap/fixtures. Неожиданное число или дубликаты active profiles останавливают fetch.
 - `source_policy.current_product_records` владеет российской current projection: `source=eis` и `RU`.
@@ -58,7 +65,8 @@ flowchart LR
   добавляет явный coverage status старым attempts, не превращая отсутствие evidence в `not_present`.
 - `ProductAnalytics` — единая typed projection для API и страницы аналитики. Decision/coverage/distribution
   показатели читают current active/planned notices; history читает все SCD2 versions; outcomes — current
-  award lots. UI обязан показывать эти scope labels и не называть projection вероятностью победы.
+  award lots. `nearest_deadlines` содержит только `recommended|review`, чтобы rejected audit не становился
+  рабочим календарём. UI обязан показывать scope labels и не называть projection вероятностью победы.
 - Все внешние URL зафиксированы adapter config; пользователь не может превратить ingestion в SSRF.
 - TLS verification не отключается, секреты не логируются и не попадают в raw artifacts.
 - Код, schema, OpenAPI, docs, fixtures, tests и marts изменяются как одна projection группы понятий.
@@ -80,6 +88,7 @@ flowchart LR
 | Raw store | immutable bytes + metadata | interpretation | run fails before canonical write |
 | Normalizer | source → canonical mapping | ranking | rejected record + explicit validation issue |
 | PostgreSQL | entities, SCD2, jobs, evidence, outbox | raw bytes | health degraded, transaction rolls back |
+| Auth/session | account identity, credential hash, session expiry/revocation, profile binding | procurement facts | generic 401/login, чужой profile fail-closed |
 | dbt | analytics projections/tests | source facts | mart build fails loudly |
 | Matcher | deterministic score components | source parsing | returns unknown/gaps with evidence |
 | GigaChat adapter | OAuth cache, structured extraction | canonical truth | retryable/permanent error, deterministic fallback |
@@ -89,22 +98,21 @@ flowchart LR
 ## Web information architecture
 
 Server-rendered FastAPI/Jinja остаётся технологическим владельцем UI: для этого MVP SPA не добавляет
-ценности, но создаёт второй API/state owner. Общий layout владеет design tokens, global navigation,
-profile context, accessibility landmarks и responsive shell. Каждый page route владеет одной задачей:
+ценности, но создаёт второй API/state owner. Общий layout владеет design tokens, account navigation,
+authorized profile context, accessibility landmarks и responsive shell. Каждый page route владеет одной задачей:
 
 | Маршрут | Основная задача | Не показывает |
 | --- | --- | --- |
 | `/` | краткий обзор и следующий шаг | редакторы, полную аналитику, ingestion forms |
 | `/tenders` | поиск, фильтры, actionable/rejected queue | company editor, data loading |
 | `/analytics` | профильные метрики и объяснимые scopes | tender cards и mutation forms |
-| `/companies` | каталог профилей | полный редактор и ingestion |
-| `/companies/new` | создание компании | аналитические/тендерные панели |
-| `/companies/{slug}` | редактирование и version history | каталог закупок и ingestion |
-| `/data` | freshness, bounded ЕИС run/upload и run history | профили и аналитику |
+| `/company` | редактирование своей компании и version history | чужие профили и ingestion |
+| `/data` | operator-only freshness/run/upload/history | company navigation; company role получает 403 |
+| `/login`, `/logout` | access-code session lifecycle | GigaChat key, registration и profile selector |
 
-Domain/API contracts не меняются. Page-context builders проецируют существующие typed owners; шаблоны
-не пересчитывают matching, geography или analytics. Profile switch сохраняет текущий task route, а
-tender filters существуют только на `/tenders`.
+Page-context builders проецируют typed owners; шаблоны не пересчитывают matching, geography, auth или
+analytics. Account binding сохраняет company context на всех маршрутах, tender filters существуют только
+на `/tenders`, а invalid/cross-company context не исправляется скрытым fallback.
 
 ## Основной flow
 
@@ -139,6 +147,7 @@ flowchart LR
 - [ADR-002: organization identity boundary](decisions/ADR-002-organization-identity-boundary.md).
 - [ADR-003: official ЕИС RSS and TLS boundary](decisions/ADR-003-eis-rss-and-tls-boundary.md).
 - [ADR-004: Russian source and geography boundary](decisions/ADR-004-russian-source-and-geography-boundary.md).
+- [ADR-005: local account and tenant boundary](decisions/ADR-005-local-account-and-tenant-boundary.md).
 
 <!-- immune-project-engineering:architecture:start -->
 ## Технологический выбор

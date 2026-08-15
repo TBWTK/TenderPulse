@@ -15,7 +15,7 @@ from tenderpulse.alerts import AlertService
 from tenderpulse.domain.models import ProcurementRecord
 from tenderpulse.persistence.models import AlertDeliveryAttemptRow, Base
 from tenderpulse.persistence.repository import ProcurementRepository
-from tenderpulse.profiles import load_demo_profiles
+from tenderpulse.profiles import load_mvp2_legacy_test_profiles as load_demo_profiles
 from tenderpulse.settings import Settings
 
 

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="TenderPulse — объяснимый поиск российских государственных закупок">
   <title>{% block title %}TenderPulse{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v=20260815-ui4">
-  <script defer src="{{ url_for('static', path='/app.js') }}?v=20260815-ui4"></script>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v=20260816-mvp21b">
+  <script defer src="{{ url_for('static', path='/app.js') }}?v=20260816-mvp21b"></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Перейти к содержанию</a>
@@ -17,13 +17,15 @@
         <span><strong>TenderPulse</strong><small>закупки без информационного шума</small></span>
       </a>
       <nav class="main-nav" aria-label="Основная навигация">
-        <a href="/"{% if active_page == 'overview' %} aria-current="page"{% endif %}>Обзор</a>
-        <a href="/tenders"{% if active_page == 'tenders' %} aria-current="page"{% endif %}>Тендеры</a>
-        <a href="/analytics"{% if active_page == 'analytics' %} aria-current="page"{% endif %}>Аналитика</a>
-        <a href="/companies"{% if active_page == 'companies' %} aria-current="page"{% endif %}>Компании</a>
-        <a href="/data"{% if active_page == 'data' %} aria-current="page"{% endif %}>Данные</a>
+        {% for key, href, label in nav_items %}<a href="{{ href }}"{% if active_page == key %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
       </nav>
-      {% if profiles %}
+      {% if account %}
+      <div class="account-menu">
+        <span>Ваша компания</span>
+        <strong>{{ selected.name }}</strong>
+        <button class="account-logout" id="logout-button" type="button">Выйти</button>
+      </div>
+      {% elif profiles %}
       <label class="profile-switch" for="profile-switch">
         <span>Компания</span>
         <select id="profile-switch" aria-label="Выберите профиль компании">
@@ -40,7 +42,7 @@
   </main>
   <footer class="app-footer">
     <span>TenderPulse · российский сегмент</span>
-    <span>Unknown остаётся unknown · решения объяснимы</span>
+    <span>Неизвестные данные не скрываются · решения объяснимы</span>
   </footer>
 </body>
 </html>

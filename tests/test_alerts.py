@@ -10,7 +10,7 @@ from tenderpulse.alerts import AlertService
 from tenderpulse.persistence.alert_repository import AlertRepository
 from tenderpulse.persistence.models import Base
 from tenderpulse.persistence.repository import ProcurementRepository
-from tenderpulse.profiles import load_demo_profiles
+from tenderpulse.profiles import load_mvp2_legacy_test_profiles as load_demo_profiles
 
 
 def _session() -> Session:

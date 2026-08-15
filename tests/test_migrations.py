@@ -19,6 +19,8 @@ def test_initial_migration_creates_lineage_schema(tmp_path: Path) -> None:
     assert {
         "alembic_version",
         "ai_extraction_attempts",
+        "access_credentials",
+        "accounts",
         "alert_delivery_attempts",
         "alert_events",
         "company_profiles",
@@ -29,10 +31,11 @@ def test_initial_migration_creates_lineage_schema(tmp_path: Path) -> None:
         "procurement_records",
         "procurement_versions",
         "raw_artifacts",
+        "web_sessions",
     } <= tables
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "0007_profile_active_invariant"
+            "0008_local_accounts"
         )
     assert "uq_company_profiles_one_active" in {
         item["name"] for item in inspect(engine).get_indexes("company_profiles")

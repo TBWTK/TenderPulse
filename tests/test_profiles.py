@@ -92,24 +92,20 @@ def test_company_profile_rejects_unusable_matching_input(
         CompanyProfile.model_validate(payload)
 
 
-def test_four_russian_demo_profiles_cover_required_business_types() -> None:
+def test_two_mvp21_profiles_cover_cleaning_and_office_supply() -> None:
     profiles = load_demo_profiles()
 
-    assert {profile.slug for profile in profiles} == {
-        "auto-service-moscow",
+    assert [profile.slug for profile in profiles] == [
         "cleaning-moscow",
-        "it-russia-integrator",
-        "landscaping-moscow",
-    }
-    assert len(profiles) == 4
+        "office-supply-moscow",
+    ]
+    assert len(profiles) == 2
     assert all(profile.countries == ("RU",) for profile in profiles)
     assert all(profile.description and profile.services for profile in profiles)
     assert all(profile.base_region == "RU-MOW" for profile in profiles)
 
-    automotive = next(item for item in profiles if item.slug == "auto-service-moscow")
-    it_company = next(item for item in profiles if item.slug == "it-russia-integrator")
-    assert automotive.delivery_mode is ServiceDeliveryMode.ONSITE
-    assert automotive.service_regions == ("RU-MOW", "RU-MOS")
-    assert automotive.contractors_allowed is False
-    assert it_company.delivery_mode is ServiceDeliveryMode.REMOTE
-    assert it_company.nationwide is True
+    cleaning, office = profiles
+    assert cleaning.delivery_mode is ServiceDeliveryMode.ONSITE
+    assert office.delivery_mode is ServiceDeliveryMode.ONSITE
+    assert cleaning.service_regions == office.service_regions == ("RU-MOW", "RU-MOS")
+    assert cleaning.contractors_allowed is office.contractors_allowed is False

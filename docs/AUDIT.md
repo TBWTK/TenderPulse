@@ -2,25 +2,29 @@
 title: Аудит TenderPulse
 type: audit
 status: active
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Аудит TenderPulse
 
 ## Вывод о достаточности контекста
 
-`sufficient` для начала UX-переработки. Пользователь явно отклонил текущий MVP из-за перегруженности
-и непонятности интерфейса, но подтвердил, что основная продуктовая логика выглядит рабочей. Изменение
-не затрагивает data/domain/API contracts; наблюдаемый текущий UI и deterministic suite дают baseline.
+`sufficient` для MVP 2.1. Пользователь поручил реализацию после review, приняв рекомендованные границы:
+локальные invitation accounts вместо public registration, два account-visible профиля, server GigaChat
+credential, localhost, deferred notification expansion и existing worker вместо Airflow. Automatic
+attachments остаются contract-gated; неизвестный официальный download contract не блокирует auth/UI/RSS.
 
 ## Источники и доступность контекста
 
 | Область | Статус | Источник/evidence | Влияние неизвестного | Следующее действие |
 | --- | --- | --- | --- | --- |
-| Бизнес-задача и ожидаемый результат | confirmed | обратная связь 15.08.2026, `docs/STATE.md` | Субъективный вкус остаётся | Route IA + screenshots + повторная review |
-| Акторы и сценарии | confirmed | `docs/README.md`, работающий UI/API | Материальных unknown нет | Сохранить company/tender/analytics/data journeys |
-| Данные и интеграции | confirmed | `docs/DATA.md`, architecture, tests | UI может скрыть evidence | Не менять owners; route/context tests |
-| Развёртывание и эксплуатация | confirmed | Compose, `docs/RUNBOOK.md`, healthy baseline | Новый frontend build не нужен | Оставить FastAPI/Jinja/CSS в текущем image |
+| Business outcome | confirmed | user audit response + `docs/STATE.md` | нет | closed-pilot validation |
+| Auth model | confirmed | tests + ADR-005 + HTTP journeys | public identity не входит | pilot access review |
+| Company catalog | confirmed | cleaning + office supply evals | real fit ещё не измерен | label real-company sample |
+| Current data | confirmed | PostgreSQL inspection 16.08.2026 | legacy history сохранена | retain shared lineage |
+| Scheduled ingestion | confirmed | Docker worker + live run log | 14-day reliability неизвестна | pilot run ledger |
+| Attachments | unknown | `docs/DATA.md`, no adapter/code | unsafe scraping/format expansion | official contract review before adapter |
+| UI defect | confirmed | browser 390/768/1024/1280 | subjective pilot feedback ещё нет | pilot observation |
 
 Допустимые статусы: `confirmed`, `inferred`, `unknown`, `not applicable`.
 
@@ -28,60 +32,77 @@ updated: 2026-08-15
 
 ### Проблема и желаемый исход
 
-Одна страница одновременно является обзором, поиском тендеров, аналитической витриной, редактором
-профиля, формой создания компании и ingestion console. Browser baseline: `6800 px` при viewport
-`720 px`, `57` content blocks, `5` форм и `8` заголовков h1/h2. Желаемый исход — пользователь понимает
-текущую задачу и следующий шаг без изучения всей системы.
+MVP 2.0 технически позволяет выбрать любой DB profile, но не знает пользователя или владельца компании.
+Рабочая БД показывает семь test/legacy профилей. Analytics смешивает семь областей, а company user видит
+operator controls. Желаемый исход: пользователь вводит local access code, сразу попадает в одну свою
+компанию и видит короткий decision workflow; source data обновляется независимо от browser session.
 
-### Границы и non-goals
+### Acceptance и non-goals
 
-В scope: route-based information architecture, shared layout/navigation, focused pages, design tokens,
-responsive/accessibility states и сохранение существующих действий. Не в scope: matching, procurement
-schema, dbt semantics, source/LLM contracts, authentication, SPA/framework migration и branding research.
+Acceptance принадлежит `docs/STATE.md`, evidence map — `docs/QUALITY.md`. Не в scope: public sign-up,
+password recovery, social OAuth, GigaChat BYOK, Telegram/email, public deployment, physical history deletion,
+Airflow и attachment scraping без official contract.
 
-## Аудит текущего состояния
+## Аудит реализованного состояния
 
-`main` и `origin/main` указывали на `5a50cf6`, worktree до начала изменения был clean. MVP 2.0 имел
-`157 passed`, branch coverage `87.21%`, dbt `54/54`, healthy Docker и browser E2E. Web owner сейчас —
-один `dashboard.html` с anchor navigation и route `/`; `tender_detail.html` уже отдельный. Пользовательская
-приёмка отменяет прежний вывод о готовности UI, но не результаты domain/data проверок.
+- Миграция `0008_local_accounts` вводит отдельные authority для account, access credential и server
+  session. Company context выводится из session binding, а не из query selector.
+- Два account видят только `cleaning-moscow` и `office-supply-moscow`; запрос чужого profile/API
+  отклоняется. Legacy profiles/raw/history не удалены и не подменяют tenant visibility.
+- Access code хранится только как keyed HMAC hash; browser получает revocable HttpOnly session и CSRF
+  cookie. Реальные demo secrets остаются в ignored `.env`, не в tracked artifacts.
+- Analytics использует progressive disclosure; ближайшие сроки фильтруются до actionable решений.
+  Проверены 390/768/1024/1280 px без overflow и offscreen controls.
+- Worker по умолчанию выполняет immediate и hourly bounded ЕИС RSS. Штатный Docker run получил 25
+  записей по TLS; component test доказывает продолжение после failed cycle.
+- Full release evidence: `172` tests, `86.07%` branch coverage, Ruff/format/strict mypy, dbt `54/54`,
+  rebuilt Compose health/restart, authenticated HTTP journeys и browser inspection.
 
 ## Архитектурные варианты
 
-| Вариант | Сильные стороны | Риски/стоимость | Соответствие требованиям |
+| Решение | Сильные стороны | Риск/стоимость | Вывод |
 | --- | --- | --- | --- |
-| Только CSS/типографика | минимальный diff | не исправляет смешение задач и 6800 px flow | недостаточно |
-| Accordions/tabs внутри `/` | сохраняет один route | скрывает сложность, слабые deep links/navigation state | частично |
-| Отдельные server-rendered routes | один state owner, deep links, progressive enhancement | новые context/templates/tests | рекомендуется |
-| SPA | богатые transitions/state | второй toolchain/state owner без MVP-выгоды | избыточно |
+| Оставить query selector | без migration | нет identity/isolation | отклонено |
+| Raw token на каждом request | мало server state | утечка browser secret, слабый logout | отклонено |
+| Access code → server session | revoke/expiry/audit, простой UX | schema + CSRF | выбрано |
+| Удалить legacy profiles | визуально просто | потеря lineage/evidence | отклонено |
+| Account binding | чистая visibility authority | authorization mutation | выбрано |
+| Airflow | DAG/backfill UI | лишние services/metadata/ops | отложено |
+| Existing worker + run evidence | минимальная topology, уже протестирован | нужен resilience gate | выбрано |
+| CSS-only analytics fix | малый diff | не исправляет information hierarchy | недостаточно |
+| Progressive disclosure + breakpoint repair | меньше cognitive load, facts сохранены | template/journey changes | выбрано |
 
-## Рекомендация и обоснование
+## Риски и mitigation
 
-Оставить Python/FastAPI/Jinja и vanilla CSS/JS: они уже владеют page/API contract, работают в Docker и
-достаточны для route-based UI. Добавить shared base/partials и focused templates. Это сохраняет server
-semantics, TestClient verification и отсутствие нового build/dependency boundary.
-
-## Риски и неизвестные
-
-| Риск/unknown | Вероятность | Влияние | Проверка или mitigation | Владелец |
-| --- | --- | --- | --- | --- |
-| Новый дизайн всё ещё воспринимается сложным | medium | high | page isolation + screenshots + stakeholder review | Product/UI |
-| Потеря действия при split | medium | high | route capability tests + full regression + browser journeys | API/Web |
-| Mobile overflow/недоступный control | medium | medium | 390×844 browser inspection, labels/focus tests | CSS/templates |
-| Старые `/#anchor` ссылки | low | low | `/` остаётся overview; новые nav links документированы | API/Web |
+| Риск | Влияние | Проверка/mitigation |
+| --- | --- | --- |
+| Cross-company API leakage | critical | adversarial every-route tests; server profile owner |
+| Plaintext access code | high | keyed hashes, ignored env, secret/log scan |
+| CSRF/session fixation | high | rotate session, POST logout, CSRF mismatch tests |
+| Seed hides/deletes history | high | upgrade legacy fixture; row/history counts unchanged |
+| Broad office profile false positives | high | furniture/stationery/MFP positive + software negative eval |
+| Worker dies after parser/storage error | high | failed-cycle then successful-cycle component test + Docker restart |
+| Responsive fix passes only endpoints | medium | 390/768/1024/1280 browser DOM metrics/screenshots |
+| Attachment source is not machine-readable | high | fail-closed contract gate; no guessed scraper |
 
 ## Ландшафт проверок
 
-Route isolation/navigation/accessibility contracts; existing API/domain suite; TestClient journeys for
-tenders, profiles and ingestion; browser screenshots and DOM metrics at desktop/mobile; console errors;
-Docker rebuild/health; dbt regression; project-control/IMMUNE audits. Live ЕИС/GigaChat не нужен:
-external contract не меняется, deterministic fixtures остаются владельцем release evidence.
+Auth unit/integration, cookie/CSRF security, tenant adversarial API/page journeys, Alembic upgrade from
+current schema, legacy-data bootstrap, business matching evals, worker failure/recovery, static DOM safety,
+browser intermediate breakpoints, full regression/coverage, dbt, Docker rebuild/health/restart, local
+credential secret scan and opt-in bounded live ЕИС smoke.
 
 ## Открытые вопросы и блокеры
 
-Нет блокеров. Конкретный визуальный вкус пользователя остаётся предметом финальной review, но не меняет
-выбранную обратимую server-rendered архитектуру.
+MVP 2.1 не заблокирован. Для закрытого пилота нужны реальная компания и human-labeled выборка. Official
+attachment contract остаётся explicit unknown; adapter запрещён без bounded machine-readable semantics.
 
-## Решение о начале реализации
+## Решение о поставке
 
-`allowed`: intent, architecture и verification map зафиксированы; docs-phase gate должен пройти до кода.
+`accepted for local pre-pilot`: все критерии MVP 2.1 имеют evidence. Это не `production-ready` и не
+подтверждение ≥80% precision на реальной компании; эти gates принадлежат следующему этапу.
+
+## Решение о начале
+
+Историческое решение — `allowed`: business intent, ADR-005, acceptance и fail-first evidence были
+зафиксированы до production implementation. Итоговое решение о поставке приведено выше.

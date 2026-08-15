@@ -57,16 +57,17 @@ def test_company_switch_starts_with_an_unfiltered_recommendation_queue() -> None
 
 def test_shared_layout_has_route_navigation_profile_context_and_skip_link() -> None:
     template = (WEB / "templates" / "base.html").read_text()
-    routes = ("/", "/tenders", "/analytics", "/companies", "/data")
+    api_source = (WEB.parent / "api.py").read_text()
 
-    positions = [template.index(f'href="{route}"') for route in routes]
-
-    assert positions == sorted(positions)
+    assert "{% for key, href, label in nav_items %}" in template
+    for route in ("/", "/tenders", "/analytics", "/companies", "/data"):
+        assert f'"{route}"' in api_source
     assert 'href="#main-content"' in template
     assert 'id="main-content"' in template
     assert 'aria-label="Основная навигация"' in template
     assert 'aria-current="page"' in template
     assert 'id="profile-switch"' in template
+    assert 'id="logout-button"' in template
 
 
 def test_page_templates_keep_mutation_forms_on_their_owner_pages() -> None:
@@ -91,6 +92,27 @@ def test_page_templates_keep_mutation_forms_on_their_owner_pages() -> None:
         assert 'id="profile-form"' not in templates[name]
         assert 'id="create-profile-form"' not in templates[name]
         assert 'id="ingestion-form"' not in templates[name]
+
+
+def test_analytics_uses_progressive_disclosure_and_plain_language_history() -> None:
+    template = (WEB / "templates" / "analytics.html").read_text()
+    stylesheet = (WEB / "static" / "app.css").read_text()
+
+    assert 'class="analytics-primary"' in template
+    assert 'class="analytics-secondary"' in template
+    assert "Дополнительная аналитика" in template
+    assert "История обновлений" in template
+    assert "История SCD2" not in template
+    assert "@media (max-width: 960px)" not in stylesheet
+    assert "@media (max-width: 1080px)" in stylesheet
+    assert ".analytics-primary" in stylesheet
+
+
+def test_company_overview_does_not_offer_operator_data_page() -> None:
+    template = (WEB / "templates" / "overview.html").read_text()
+
+    assert "{% if not account %}" in template
+    assert 'href="/company"' in template
 
 
 def test_design_system_defines_focus_responsive_and_reduced_motion_contracts() -> None:

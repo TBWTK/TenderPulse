@@ -2,12 +2,55 @@
 title: Качество
 type: quality
 status: active
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Качество
 
-## MVP 2.0 UX acceptance — active
+## MVP 2.1 — complete evidence
+
+| Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- | --- |
+| Login/session lifecycle | unit + integration | fixture PostgreSQL/SQLite + TestClient | `tests/test_auth.py` | generic failure, session expiry/revocation, secure cookie contract | pass |
+| Cross-company isolation | adversarial API/page eval | two accounts/two profiles | foreign slug/query/API mutations | own profile succeeds; чужой profile `404/403`, no fallback | pass |
+| Secret/CSRF safety | security contract | app config + HTTP | hash inspection, cookie flags, unsafe requests | no plaintext code; missing/mismatch CSRF rejected | pass |
+| Two-company catalog | migration/bootstrap E2E | legacy DB + reseed | upgrade → seed → restart | exactly two account-visible profiles; legacy history preserved | pass |
+| Office relevance | business eval | Russian fixtures | furniture/stationery/MFP/software cases | office supply ranks; software development rejects | pass |
+| Role-based IA | route/HTML/browser | authenticated company session | nav + direct `/data`/creation attempts | no selector/operator controls; own company editor works | pass |
+| Calm analytics | content + browser | seeded analytics | section budget + progressive disclosure | primary metrics limited; history/outcomes secondary; no SCD2 label | pass |
+| Responsive UI | browser visual/DOM | 390/768/1024/1280 | overflow/overlap/action bounds | width equal, controls usable, no cramped 3-column history | pass |
+| Automatic ЕИС RSS | worker/component + Docker | fixture and live ЕИС | immediate cycle, failed cycle, next cycle | bounded EIS-only run evidence; worker continues; failures visible | pass |
+| Document boundary | contract review + negative tests | official locator/manual files | unsupported automatic attachment request | no hidden scraping; manual XML/ZIP and `unknown` explicit | pass |
+| Regression/release | full suite + dbt + Docker | local and rebuilt Compose | documented verification chain | coverage ≥85%, all gates healthy, restart preserves auth/profile | pass |
+
+Fail-first order: auth/tenant contracts → schema migration/bootstrap → UI authorization → worker/responsive.
+Runtime presence is not evidence until the dedicated row is `passing` with recorded output.
+Initial fail-first run 16.08.2026: selected MVP 2.1 suite stopped during collection with
+`ModuleNotFoundError: tenderpulse.auth`; this proves the accepted auth owner does not yet exist before code.
+
+Final evidence 16.08.2026: `172` tests pass with `86.07%` branch coverage; Ruff, format and strict mypy
+pass; dbt reports `PASS=54 WARN=0 ERROR=0`. Rebuilt Compose services are healthy; a live official ЕИС
+RSS cycle ingested `25` bounded records. Authenticated cleaning/office HTTP journeys deny foreign profile
+access. Browser DOM inspection at 390/768/1024/1280 px reports no overflow/offscreen controls, and nearest
+deadlines contain only actionable decisions.
+
+## Закрытый пилот — evidence plan
+
+| Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- | --- |
+| Реальный company fit | Human-labeled eval | ≥1 реальная компания, ≥50 ЕИС notices | blind label → matcher comparison | actionable precision ≥80%; hard onsite geo false admission = 0 | blocked |
+| Live freshness/reliability | Run ledger + raw lineage | защищённый pilot Docker | 14-дневный scheduled run audit | ≥95% циклов успешны; freshness ≤24 h; failure явный | planned |
+| Извлечение без выдумывания | Human audit + citations | ≥30 размеченных notice versions | claims/coverage/citation comparison | 100% claims grounded; ≥90% `found` подтверждены; gaps = `unknown` | blocked |
+| Полезный alert | Delivery/replay integration | выбранный pilot channel | new version → deliver → unchanged replay | доставка до следующего цикла, без дубля | blocked |
+| Решение пользователя | Product outcome log | ≥10 real recommendations | `participate/reject/defer` journey | решение и причина восстанавливаются из versions/evidence | planned |
+| Защита и recovery | Security/operations rehearsal | непубличный pilot contour | access review + backup/restore + restart/retry | доступ ограничен; PostgreSQL/MinIO восстановлены; failures видимы | planned |
+| Выход в Production v1 | Stakeholder decision record | результаты всех pilot gates | product review | только `go`, `extend` с gap или `stop`; скрытых failed gates нет | planned |
+
+Blocked rows требуют профиль и пользовательскую разметку, решение о document scope и выбор канала alerts.
+`Recall` и полнота российского рынка не являются честной метрикой, пока не задана ограниченная вселенная
+источника. Live-source/LLM проверки дополняют, но не заменяют сохранённую пилотную разметку.
+
+## MVP 2.0 UX acceptance — complete
 
 | Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
 | --- | --- | --- | --- | --- | --- |
@@ -24,6 +67,7 @@ Baseline evidence: текущая `/` имеет `6800 px` высоты при v
 `5` форм и `8` h1/h2-задач. Техническая корректность не закрывает пользовательскую приёмку.
 Fail-first evidence: выборочный запуск новых route/template/accessibility tests — `9 failed, 3 passed`;
 сигнатуры ошибок подтверждают отсутствие focused routes/base layout, route-preserving profile switch и design tokens.
+Stakeholder acceptance: пользователь принял новый интерфейс и MVP 2.0 16.08.2026.
 
 ## MVP 2.0 UX final evidence — 2026-08-15
 
