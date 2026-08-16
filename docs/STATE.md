@@ -77,6 +77,8 @@ updated: 2026-08-16
 - Browser baseline выявил перегрузку `179` cards и mobile overflow `396 > 390`. Fail-first shortlist
   policy ограничил экран 15 версиями (до 10 actionable + 5 blind controls); итоговые 1280/768/390
   inspections дают `scrollWidth == viewport`, 15 official links/forms и no matcher output/console errors.
+- Verified implementation checkpoint `d3ed7bc` опубликован в `origin/codex/ui-redesign`; закрывающий
+  docs checkpoint сохраняет exact next step — проверку будущего human-review документа.
 
 ## Changed areas
 
