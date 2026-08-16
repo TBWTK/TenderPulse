@@ -27,6 +27,8 @@ payloads, пользовательские файлы/поля, LLM output и UR
 | Session theft/fixation | opaque server session, expiry/revocation, rotate on login, HttpOnly/SameSite cookie | localhost without TLS; public use remains blocked |
 | CSRF | unsafe authenticated API requires matching CSRF header/cookie; logout is POST | XSS would defeat browser CSRF token |
 | Cross-company leakage | account → one profile binding; server authorization on page/API, foreign slug fail-closed | app-level isolation is not yet PostgreSQL RLS |
+| Review tampering / stale evidence | CSRF, account binding, exact profile/record version + raw SHA check, append-only revisions | local account holder may deliberately mislabel own queue |
+| Profile disclosure to source | send only bounded selected service phrase; full profile/budget/constraints stay local; run records exact phrase | service phrase itself is disclosed to official ЕИС |
 | Alert duplication | transactional outbox + stable webhook `Idempotency-Key` + attempt history | receiver must implement deduplication |
 | Webhook secret/SSRF | opt-in config only, HTTPS validation, destination stored only as SHA-256, no response body | host operator controls egress target; query-token rotation is external |
 | XML entity attack | DTD/entity resolution disabled, ZIP size/member limits | parser/library vulnerabilities |

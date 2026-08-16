@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 from xml.etree import ElementTree
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from tenderpulse.domain.models import (
     LifecycleStatus,
@@ -25,6 +25,7 @@ from tenderpulse.sources.common import SourceContractError, raw_sha256
 EIS_RSS_URL = "https://zakupki.gov.ru/epz/order/extendedsearch/rss.html"
 MAX_EIS_RSS_RECORDS = 50
 MAX_EIS_RSS_BYTES = 2 * 1024 * 1024
+MAX_EIS_SEARCH_LENGTH = 200
 _PURCHASE_NUMBER_RE = re.compile(r"^\d{19}$")
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _CURRENCY_CODES = {
@@ -48,6 +49,14 @@ class EisRssQuery(BaseModel):
     published_from: date
     published_to: date
     limit: int = Field(default=10, ge=1, le=MAX_EIS_RSS_RECORDS)
+    search_string: str | None = Field(default=None, min_length=2, max_length=MAX_EIS_SEARCH_LENGTH)
+
+    @field_validator("search_string", mode="before")
+    @classmethod
+    def validate_search_string(cls, value: object) -> object:
+        if value is None or not isinstance(value, str):
+            return value
+        return normalize_eis_search_string(value)
 
     @model_validator(mode="after")
     def validate_window(self) -> Self:
@@ -59,7 +68,7 @@ class EisRssQuery(BaseModel):
 
     def to_params(self) -> dict[str, str]:
         page_size = 10 if self.limit <= 10 else 20 if self.limit <= 20 else 50
-        return {
+        parameters = {
             "fz44": "on",
             "pageNumber": "1",
             "recordsPerPage": f"_{page_size}",
@@ -68,6 +77,21 @@ class EisRssQuery(BaseModel):
             "publishDateFrom": self.published_from.strftime("%d.%m.%Y"),
             "publishDateTo": self.published_to.strftime("%d.%m.%Y"),
         }
+        if self.search_string is not None:
+            parameters["searchString"] = self.search_string
+            parameters["morphology"] = "on"
+        return parameters
+
+
+def normalize_eis_search_string(value: str) -> str:
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise ValueError("EIS search string cannot contain control characters")
+    normalized = " ".join(value.split())
+    if len(normalized) < 2:
+        raise ValueError("EIS search string must contain at least 2 characters")
+    if len(normalized) > MAX_EIS_SEARCH_LENGTH:
+        raise ValueError(f"EIS search string cannot exceed {MAX_EIS_SEARCH_LENGTH} characters")
+    return normalized
 
 
 def parse_eis_rss(

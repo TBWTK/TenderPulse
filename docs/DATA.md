@@ -38,6 +38,7 @@ updated: 2026-08-16
 | Blind pilot label | provisional agent judgement/reason/confidence, без matcher fields | eval labeler | sample ID + rubric version |
 | Pilot prediction | frozen matcher decision/evidence references | eval runner | sample ID + profile version + policy version |
 | Pilot report | scoped metrics/disagreements/review shortlist | eval evaluator | sample hash + labels hash + predictions hash |
+| Human review revision | ручная оценка exact source/profile state | human-review service | account + profile version + record version + revision |
 
 ## Lifecycle и версии
 
@@ -113,6 +114,12 @@ Tracked sample не содержит source bytes: raw SHA/run/version дела�
 - ЕИС current и legacy foreign records — публичные данные; source URL сохраняется рядом с artifact.
 - Профиль компании может содержать коммерчески чувствительные сведения; он не отправляется внешней
   модели целиком и не попадает в telemetry/raw source storage.
+- В ЕИС отправляется только выбранная нормализованная service phrase. Exact profile slug/version,
+  strategy version и query сохраняются в ingestion run; полный профиль и ограничения не отправляются.
+- Human review note является account-scoped пользовательским вводом. Каждая revision хранит label/reason,
+  exact canonical/raw identity и автора; mutation старой revision запрещена.
+- UI shortlist — ephemeral projection, не новая procurement truth: максимум 15 current versions, до
+  10 matcher-actionable и 5 controls. Сохранённая review revision не содержит matcher decision/score.
 - Raw artifact содержит только ответ allowlisted procurement source, не `.env` и не access token.
 - GigaChat claim хранит model, prompt version, input hash, output hash, citations и validation result.
 - CPV, ОКПД2 и PSC не считаются эквивалентными. Crosswalk — отдельный versioned evidence set; при его

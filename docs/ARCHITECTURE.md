@@ -56,6 +56,9 @@ flowchart LR
   AI action и alert доступны только в account-authorized profile context.
 - Runtime source scope читает те же current DB profiles, что matcher/alerts; `load_demo_profiles` допустим
   только для bootstrap/fixtures. Неожиданное число или дубликаты active profiles останавливают fetch.
+- `discovery` — единственный owner profile-aware source plan: он выбирает не более трёх уникальных
+  service phrases из exact profile version (keywords только fallback), применяет общий hard cap и не
+  принимает решения о budget/geography/qualification. Каждый plan item создаёт отдельный ingestion run.
 - `source_policy.current_product_records` владеет российской current projection: `source=eis` и `RU`.
   `current_opportunities` дополняет её `kind=notice`, `lifecycle=active|planned`; API, UI, analytics,
   dbt и alerts не скрывают foreign records собственными эвристиками.
@@ -87,6 +90,12 @@ flowchart LR
   остаётся явным `null`, поэтому evaluator не выдумывает 0% или 100% precision/recall.
   Sample может агрегировать минимальный набор bounded ЕИС requests; каждый request отдельно соблюдает
   source limits, а artifact сохраняет membership и параметры каждого capture вместо скрытого pagination.
+- Human review — account-authorized append-only revision stream, связанный с exact profile version,
+  record version и raw SHA. Review UI читает canonical source facts, но не matcher output; stale identity
+  отклоняется, а исправление создаёт следующую revision вместо перезаписи.
+  `build_human_review_shortlist` ограничивает рабочую очередь 15 versions: первые 10 actionable по
+  ranking order и 5 rejected controls; при нехватке группы остаток детерминированно дополняется из той
+  же current universe. Категория selection не передаётся в template.
 
 ### IMMUNE как архитектурное ограничение
 
@@ -108,6 +117,8 @@ flowchart LR
 | Auth/session | account identity, credential hash, session expiry/revocation, profile binding | procurement facts | generic 401/login, чужой profile fail-closed |
 | dbt | analytics projections/tests | source facts | mart build fails loudly |
 | Matcher | deterministic score components | source parsing | returns unknown/gaps with evidence |
+| Discovery planner | profile version → bounded ЕИС query plan | relevance decision, source parsing | invalid/duplicate/overflow plan fails before fetch |
+| Human review | immutable account/profile/record judgement revisions | matcher truth, legal eligibility | stale or foreign identity fails closed |
 | GigaChat adapter | OAuth cache, structured extraction | canonical truth | retryable/permanent error, deterministic fallback |
 | API/Web | versioned profile commands, separated decision queue, product analytics and current evidence projections | background execution | 4xx input, 409 state, 502 dependency |
 | Alert dispatcher | idempotent delivery attempts | recommendation score | outbox retained with reason/retry state |
@@ -123,6 +134,7 @@ authorized profile context, accessibility landmarks и responsive shell. Каж�
 | `/` | краткий обзор и следующий шаг | редакторы, полную аналитику, ingestion forms |
 | `/tenders` | поиск, фильтры, actionable/rejected queue | company editor, data loading |
 | `/analytics` | профильные метрики и объяснимые scopes | tender cards и mutation forms |
+| `/reviews` | blind ручная оценка exact notice versions | matcher decision, score и reasons |
 | `/company` | редактирование своей компании и version history | чужие профили и ingestion |
 | `/data` | operator-only freshness/run/upload/history | company navigation; company role получает 403 |
 | `/login`, `/logout` | access-code session lifecycle | GigaChat key, registration и profile selector |
@@ -135,7 +147,7 @@ analytics. Account binding сохраняет company context на всех ма
 
 ```mermaid
 flowchart LR
-  Filter["Current DB profiles + bounded filter"] --> Fetch["Source adapter"]
+  Filter["Exact profile versions"] --> Plan["Bounded discovery plan"] --> Fetch["Source adapter"]
   Fetch --> Hash["Raw bytes + SHA-256"] --> Validate["Contract validation"]
   Validate --> Normalize["Canonical mapping"] --> Version["SCD2 compare/write"]
   Version --> Match["Deterministic features"] --> Extract["Optional GigaChat evidence"]

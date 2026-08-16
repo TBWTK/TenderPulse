@@ -192,6 +192,33 @@ class WebSessionRow(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class HumanReviewRow(Base):
+    __tablename__ = "human_reviews"
+    __table_args__ = (
+        UniqueConstraint("account_id", "profile_id", "record_version_id", "revision"),
+        UniqueConstraint("supersedes_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    account_id: Mapped[UUID] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True
+    )
+    profile_id: Mapped[UUID] = mapped_column(
+        ForeignKey("company_profiles.id", ondelete="RESTRICT"), index=True
+    )
+    record_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("procurement_versions.id", ondelete="RESTRICT"), index=True
+    )
+    supersedes_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("human_reviews.id", ondelete="RESTRICT"), nullable=True
+    )
+    revision: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str] = mapped_column(String(32), index=True)
+    reason: Mapped[str] = mapped_column(String(32), index=True)
+    note: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class AIExtractionAttemptRow(Base):
     __tablename__ = "ai_extraction_attempts"
 

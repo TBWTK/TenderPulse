@@ -9,28 +9,28 @@ updated: 2026-08-16
 
 ## Active objective
 
-Провести воспроизводимую agent-assisted blind evaluation профиля «Чистая территория» на не менее чем
-50 реальных извещениях ЕИС, измерить качество matching и превратить подтверждённые классы ошибок в
-test-first изменения, не выдавая агентскую разметку за человеческую приёмку закрытого пилота.
+Реализовать закрытый пилотный контур: bounded профильный поиск по официальному ЕИС RSS и
+версионированное ручное ревью точных procurement/profile versions. Подготовить систему к будущему
+документу владельца продукта, не подменяя его оценки агентской разметкой и не объявляя метрики качества
+до импорта реальных human labels.
 
 ## Acceptance criteria
 
-- [x] Sample содержит ≥50 уникальных current ЕИС notice versions из документированного набора bounded
-  captures (каждый request ≤50 records и ≤31 дня); для каждой
-  записи сохранены source ID/URL, capture/run metadata, canonical version и raw SHA без source bytes.
-- [x] Blind-label rubric зафиксирован до раскрытия matcher output и различает `relevant`, `not_relevant`
-  и `insufficient_evidence`, а также отдельно отмечает geography/budget/qualification uncertainty.
-- [x] Агентская разметка покрывает все sample records и сохраняет reason/confidence; отсутствие данных
-  не превращается в отрицательный или положительный факт.
-- [x] Matcher results вычислены только после фиксации labels и связаны с точными profile/record versions.
-- [x] Reproducible evaluator валидирует artifact schemas, запрещает duplicate/leakage и считает confusion,
-  actionable precision, bounded-sample recall, abstention/coverage и hard onsite geography admissions.
-- [x] Любой исправляемый повторяемый класс FP/FN сначала получает failing regression eval, затем меняется
-  его owner mechanism; спорные случаи остаются explicit review/unknown.
-- [x] Agent-assisted результат явно не закрывает human-labeled gate: сформирован отдельный review packet
-  и список минимум 10–15 приоритетных записей для проверки владельцем продукта.
-- [x] Full test/lint/dbt, Docker health, docs/IMMUNE audit, artifact integrity и secret scan проходят;
-  verified checkpoint отправлен в подтверждённую Git-ветку.
+- [x] `EisRssQuery` передаёт проверенную bounded `searchString` и `morphology=on` только на фиксированный
+  официальный RSS URL; пустые/control/слишком длинные строки отклоняются до HTTP.
+- [x] Один versioned discovery-owner детерминированно выбирает не более трёх service phrases на профиль,
+  дедуплицирует их и fail-loud при нарушении глобального лимита.
+- [x] Live ingestion создаёт отдельный auditable run для каждой profile/query pair и сохраняет exact
+  profile slug/version, strategy version, date/limit/search parameters и raw SHA; ошибка одного запроса
+  видима и не скрывает результаты независимых запросов.
+- [x] Human review append-only хранит account, exact profile/record versions, raw SHA, label, reason,
+  note, revision и timestamps; stale/cross-company mutations fail closed.
+- [x] Отдельная company-страница `/reviews` показывает только исходные факты и official link, но не
+  matcher decision/score/reasons до фиксации оценки; форма доступна и адаптивна.
+- [x] Human labels и pilot precision не сгенерированы системой. Будущий документ импортируется только
+  после получения и проверки его schema/universe; отсутствие документа остаётся явным gap.
+- [x] Failing tests предшествуют production code; full pytest/coverage, lint/mypy, migrations, dbt,
+  rebuilt Docker, responsive browser inspection, bounded live ЕИС smoke, audits и Git checkpoint проходят.
 
 ## Current verified state
 
@@ -70,57 +70,52 @@ test-first изменения, не выдавая агентскую разме
   `evals/cleaning_pilot_2026-08-16/`; agent labels не закрывают human pilot gate.
 - Verified implementation checkpoint `79f22e2a0fce39ce90a427b27d333994145ff625` опубликован в
   `origin/codex/ui-redesign`; direct remote-ref check вернул тот же hash.
+- Profile-aware worker выполнил 6 отдельных official ЕИС queries: `25/0/0` cleaning и `25/25/9`
+  office records; каждый successful run содержит query/profile/version/strategy/raw evidence.
+- Миграция `0009_human_reviews` применена к PostgreSQL. Review API сохраняет immutable revision и
+  отклоняет stale/concurrent identity; два account не видят оценки друг друга.
+- Browser baseline выявил перегрузку `179` cards и mobile overflow `396 > 390`. Fail-first shortlist
+  policy ограничил экран 15 версиями (до 10 actionable + 5 blind controls); итоговые 1280/768/390
+  inspections дают `scrollWidth == viewport`, 15 official links/forms и no matcher output/console errors.
 
 ## Changed areas
 
-- Affected: pilot-eval contract/artifacts, bounded ЕИС capture projection, matcher phrase scoring,
-  evaluation metrics, regression evals, documentation and Git.
-- Not affected: auth/session schema, source/raw/SCD2 ownership, GigaChat extraction, office account,
-  notification transports, public deployment and automatic application submission.
+- Affected: ЕИС query/discovery plan, one-run-per-profile/query metadata, human-review domain/schema/API/UI,
+  Alembic/dbt integrity, responsive navigation, documentation and tests.
+- Not affected: canonical raw/SCD2 ownership, matcher weights/decisions, GigaChat extraction, account
+  credentials, notification transports, public deployment and automatic application submission.
 
 ## Decisions made
 
-- Agent labeler is blind to matcher decisions until labels are frozen; collection, labeling and scoring
-  are separate responsibilities, while exact source/profile versions make the comparison reproducible.
-- Agent labels are provisional expert evidence, not `human-labeled` acceptance. Human verification of
-  10–15 prioritized disagreements/uncertain records remains mandatory before claiming pilot precision.
-- `insufficient_evidence` is an abstention label. It is reported separately and never coerced into a
-  convenient positive/negative denominator.
-- Exact multi-word service phrase is stronger thematic evidence than one stem and contributes `0.30`,
-  but never proves geography, deadline, budget or qualification; sparse matches stop at `review`.
-- Zero positive denominator is reported as `null`. This capture cannot honestly prove or disprove the
-  human pilot target of actionable precision ≥80%.
-- Профиль считается pilot candidate, а не доказанной реальной юридической компанией.
-- Подрядчики расширяют географию только до `review`; они не доказывают наличие исполнителя.
-- Budget range — eligibility boundary для известных сумм, а не только scoring bonus.
-- Unknown amount и unknown legal requirements остаются видимыми; система не угадывает допуск.
-- `review_above_amount` — общий typed owner ручной квалификационной проверки, а не hardcoded проверка
-  имени cleaning-profile или парсинг свободного текста. Для pilot candidate порог равен 1 млн рублей.
-- Обычный клининг не получает выдуманную лицензию. Опасные отходы и специализированные pest-control
-  работы исключаются до отдельного юридического/операционного подтверждения.
-- Seed-файл владеет fresh-install default; работающая БД получает следующую version через штатный API,
-  чтобы не перезаписывать историю или возможные пользовательские изменения bootstrap-ом.
+- Source discovery отвечает только за recall: до трёх exact service phrases/profile, hard global cap 30;
+  budget/geography/qualification остаются в matcher/reviewer и не становятся недоказанными ЕИС filters.
+- Один profile/query владеет одним run. Одинаковый notice в разных responses сохраняет raw/run evidence,
+  но canonical SCD2 не создаёт ложную новую версию.
+- Human review — append-only revision stream с optimistic revision check. Исправление не переписывает
+  историю, stale profile/record/raw state получает `409`.
+- Blind UI не показывает matcher result, но shortlist строится из максимум 10 actionable кандидатов и
+  5 near-ranked controls. Это процедурная слепота, не security boundary: detail page доступна отдельно.
+- Agent labels не становятся human labels. Precision/recall не пересчитываются до получения и проверки
+  будущего документа пользователя.
 
 ## Next exact step
 
-Владелец продукта слепо заполняет 15 строк `evals/cleaning_pilot_2026-08-16/HUMAN_REVIEW.md`; затем
-система сравнивает human labels с frozen agent/matcher artifacts и решает, расширять ли positive sample.
+После получения документа ревью проверить его schema/universe и точные source/profile versions, импортировать
+только подтверждённые human labels и пересчитать scoped pilot metrics. До получения документа ничего не
+догенерировать от имени reviewer.
 
 ## Blockers
 
-- Нет блокера для agent-assisted evaluation. Human-labeled acceptance и юридическая проверка требований
-  остаются blocked до проверки владельцем продукта и документов компании.
+- Нет блокера для discovery/review infrastructure.
+- Импорт human labels и измерение human pilot quality заблокированы до получения документа пользователя.
 
 ## Non-goals
 
-- Объявление агентской разметки человеческой или юридически достаточной.
-- Изменение matching только ради достижения целевой метрики без анализа класса ошибок.
-- Сохранение полных live RSS/source documents в Git; tracked artifact содержит только bounded public facts
-  и lineage identifiers, необходимые для воспроизведения вывода.
-- Юридическое заключение о лицензиях, допусках или соответствии 44-ФЗ/223-ФЗ.
-- Начало 14-дневного reliability run или production rollout.
-- Изменение office profile, auth, alerts, attachment ingestion или production deployment.
-- Автоматическое привлечение подрядчика или подача заявки.
+- Выдумывать, дополнять или исправлять human review за пользователя.
+- Автоматически scraping-ить HTML карточки/вложения ЕИС без нового machine-readable source contract.
+- Считать source search рекомендацией, менять matcher под желаемую метрику или скрывать unknown.
+- Начинать 14-дневный reliability run, public deployment, production auth/RLS, alerts channels или
+  автоматическую подачу заявки.
 
 ## Verification
 
@@ -148,3 +143,14 @@ pilot/profile/matching suites pass, full suite passes at `85.85%` branch coverag
 mypy pass, dbt reports `PASS=54 WARN=0 ERROR=0`, rebuilt API/worker/PostgreSQL/MinIO are healthy and
 `GET /api/health` returns `{"status":"ok"}`. Artifact/secret scans pass; implementation checkpoint
 `79f22e2a0fce39ce90a427b27d333994145ff625` is verified on the remote branch.
+
+Discovery fail-first остановился на `ModuleNotFoundError: tenderpulse.discovery`. После реализации
+`.venv/bin/pytest tests/test_discovery.py tests/test_source_http.py tests/test_live_ingestion.py -q`
+проходит: `23 passed`.
+
+Human-review fail-first остановился на `ModuleNotFoundError: tenderpulse.human_reviews`; browser baseline
+показал 179 cards и mobile overflow. Current full suite проходит с `85.94%` branch coverage; migration
+`0009`, dbt `PASS=71`, live six-query worker cycle и responsive 1280/768/390 browser inspection проходят.
+Release audit: `238` tests, Ruff/format/strict mypy, Compose health, API health, `git diff --check`,
+project-control и IMMUNE audits проходят. PostgreSQL подтверждает `0009_human_reviews`, `0` созданных
+human labels и шесть последних discovery runs с raw SHA.

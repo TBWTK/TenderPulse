@@ -31,11 +31,21 @@ from tenderpulse.auth import (
 from tenderpulse.domain.history import RecordVersion
 from tenderpulse.domain.matching import Recommendation, TenderMatcher, current_opportunities
 from tenderpulse.domain.models import ProcurementRecord, SourceCode
+from tenderpulse.human_reviews import (
+    HumanReviewConflict,
+    HumanReviewLabel,
+    HumanReviewNotFound,
+    HumanReviewReason,
+    HumanReviewSubmission,
+    HumanReviewView,
+    build_human_review_shortlist,
+)
 from tenderpulse.ingestion_models import IngestionRunView, SourceFreshnessView
 from tenderpulse.live_ingestion import LiveSourceResult
 from tenderpulse.outcomes import AwardOutcomeView
 from tenderpulse.persistence.ai_repository import AIExtractionRepository
 from tenderpulse.persistence.alert_repository import AlertRepository
+from tenderpulse.persistence.human_review_repository import HumanReviewRepository
 from tenderpulse.persistence.ingestion_repository import IngestionRepository
 from tenderpulse.persistence.repository import ProcurementRepository
 from tenderpulse.product_analytics import ProductAnalytics, build_product_analytics
@@ -120,9 +130,24 @@ NAV_ITEMS = (
 COMPANY_NAV_ITEMS = (
     ("overview", "/", "Обзор"),
     ("tenders", "/tenders", "Тендеры"),
+    ("reviews", "/reviews", "Проверка"),
     ("analytics", "/analytics", "Аналитика"),
-    ("company", "/company", "Профиль компании"),
+    ("company", "/company", "Профиль"),
 )
+HUMAN_REVIEW_LABELS = {
+    "relevant": "Подходит",
+    "not_relevant": "Не подходит",
+    "insufficient_evidence": "Недостаточно данных",
+}
+HUMAN_REVIEW_REASON_LABELS = {
+    "scope": "предмет закупки",
+    "geography": "география",
+    "budget": "бюджет",
+    "qualification": "квалификация и опыт",
+    "deadline": "срок подачи",
+    "missing_data": "не хватает данных",
+    "other": "другая причина",
+}
 
 
 @dataclass(frozen=True)
@@ -166,6 +191,13 @@ def _require_operator(request: Request) -> None:
     account = _request_account(request)
     if account is not None and account.role != "operator":
         raise HTTPException(status_code=403, detail="operator access required")
+
+
+def _require_company_account(request: Request) -> AuthenticatedAccount:
+    account = _request_account(request)
+    if account is None or account.role != "company":
+        raise HTTPException(status_code=403, detail="company account required")
+    return account
 
 
 def _safe_next_path(value: str) -> str:
@@ -388,6 +420,40 @@ def create_app(
     @app.get("/api/records", response_model=list[ProcurementRecord])
     def records(session: SessionDep) -> tuple[ProcurementRecord, ...]:
         return current_product_records(ProcurementRepository(session).list_current_records())
+
+    @app.get("/api/reviews", response_model=list[HumanReviewView])
+    def human_reviews(request: Request, session: SessionDep) -> tuple[HumanReviewView, ...]:
+        account = _require_company_account(request)
+        return HumanReviewRepository(session).list_for_account(account.id)
+
+    @app.post(
+        "/api/reviews/{source}/{source_record_id}",
+        response_model=HumanReviewView,
+        status_code=201,
+    )
+    def append_human_review(
+        request: Request,
+        source: SourceCode,
+        source_record_id: str,
+        submission: HumanReviewSubmission,
+        session: SessionDep,
+    ) -> HumanReviewView:
+        account = _require_company_account(request)
+        try:
+            created = HumanReviewRepository(session).append(
+                account_id=account.id,
+                profile_slug=account.profile_slug,
+                source=source,
+                source_record_id=source_record_id,
+                submission=submission,
+                at=now(),
+            )
+        except HumanReviewNotFound as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except HumanReviewConflict as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        session.commit()
+        return created
 
     @app.get("/api/recommendations/{profile_slug}", response_model=list[Recommendation])
     def recommendations(
@@ -655,6 +721,41 @@ def create_app(
         return templates.TemplateResponse(
             request=request,
             name="tender_detail.html",
+            context=context,
+        )
+
+    @app.get("/reviews", response_class=HTMLResponse, include_in_schema=False)
+    def human_review_page(request: Request, session: SessionDep) -> HTMLResponse:
+        account = _require_company_account(request)
+        workspace = _load_web_workspace(
+            session,
+            profile_slug=account.profile_slug,
+            now=now,
+            account=account,
+        )
+        repository = HumanReviewRepository(session)
+        try:
+            all_candidates = repository.list_current_candidates(
+                account_id=account.id,
+                profile_slug=account.profile_slug,
+            )
+        except HumanReviewNotFound as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        candidates = build_human_review_shortlist(all_candidates, workspace.recommendations)
+        context = _web_context(workspace, active_page="reviews", now=now)
+        context.update(
+            {
+                "review_candidates": candidates,
+                "reviewed_count": sum(item.latest_review is not None for item in candidates),
+                "review_label_values": tuple(HumanReviewLabel),
+                "review_reason_values": tuple(HumanReviewReason),
+                "review_labels": HUMAN_REVIEW_LABELS,
+                "review_reason_labels": HUMAN_REVIEW_REASON_LABELS,
+            }
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="reviews.html",
             context=context,
         )
 

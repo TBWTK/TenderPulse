@@ -36,6 +36,8 @@ profile version. Legacy profile/history физически сохраняютс�
 - `/login` принимает локальный код и создаёт revocable server-side session; `/logout` отзывает её.
 - `/` — короткий рабочий обзор авторизованной компании без mutation-форм и длинных списков.
 - `/tenders` — actionable-очередь, фильтры и отдельный свёрнутый rejected audit.
+- `/reviews` — отдельная blind-очередь ручной оценки current notice versions без matcher score/decision;
+  каждая правка создаёт новую immutable revision с exact profile/record/raw identity.
 - `/analytics` — решения и actionable deadlines; data quality/history/outcomes раскрываются вторично.
 - `/company` — подсказки, редактирование собственного профиля и immutable version history.
 - `/tenders/{source}/{source_record_id}` — карточка с requirements, geography, lineage, результатами и
@@ -73,8 +75,17 @@ EIS_SUB_CA_FILE=/app/certs/russian_trusted_sub_ca_pem.crt
 
 `POST /api/ingestion/run` принимает только `sources=["eis"]`, limit `1..50` и окно `1..31` день.
 URL фиксирован: `https://zakupki.gov.ru/epz/order/extendedsearch/rss.html`; response ≤2 MiB. Параметры
-и версии только account-visible профилей сохраняются в run. Пустой валидный RSS — `0 records`; foreign source, limit 51,
+`searchString` + `morphology=on` строятся из первых трёх уникальных service phrases каждого current
+профиля; keywords используются только при пустом services. Каждый profile/query создаёт отдельный run
+с profile slug/version, strategy version и raw SHA. Общий hard cap — 30 queries/cycle. Полный профиль,
+budget/geography/constraints во внешний источник не отправляются. Пустой валидный RSS — `0 records`; foreign source, limit 51,
 битая schema или transport error видны как отказ, а не как правдоподобный пустой результат.
+
+`GET /api/reviews` возвращает только revisions текущего account. `POST /api/reviews/{source}/{id}` требует
+CSRF и exact `profile_version`, `record_version`, `raw_sha256`, `expected_latest_revision`, label/reason/note.
+Изменившаяся версия или параллельная оценка получает `409`; чужие оценки не выдаются. Экран является
+процедурно blind: обычная tender detail page доступна отдельно, поэтому reviewer не должен открывать её
+до фиксации оценки. Будущий документ ревью нельзя считать импортированным до проверки его universe/schema.
 
 `POST /api/ingestion/eis-upload` принимает `.xml`/`.zip` ≤10 MiB; ZIP ≤50 members и ≤20 MiB
 uncompressed. DTD/ENTITY, unsafe path и unsupported schema отклоняются. Parser сохраняет official

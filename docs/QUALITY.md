@@ -7,6 +7,29 @@ updated: 2026-08-16
 
 # Качество
 
+## Profile discovery and human-review contour — active evidence plan
+
+| Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- | --- |
+| Official query contract | unit + bounded live smoke | fixture HTTP / ЕИС RSS | query validation and captured request | fixed URL, search phrase + morphology, ≤50/≤31 days | passing |
+| Deterministic discovery | business contract eval | two exact profile versions | plan snapshot, dedupe and cap cases | ≤3 useful phrases/profile; overflow fails before fetch | passing |
+| Run traceability | component integration | fixture RSS/raw/repository | profile/query success + one-query failure | one run per pair; exact metadata/raw SHA/failure visible | passing |
+| Immutable review | migration + repository eval | SQLite/PostgreSQL | append revision and list history | exact account/profile/record/raw identity retained | passing |
+| Tenant/stale safety | adversarial API eval | two accounts + changed record/profile | foreign and stale submissions | fail closed with 404/409; no hidden fallback | passing |
+| Blind review UI | route/static/browser | 390/768/1280 px | inspect content, form, nav and overflow | raw facts/official link visible; matcher output absent | passing |
+| Honest pilot boundary | docs/artifact audit | no supplied human document | metrics/import assertions | no generated human labels or quality claim | passing |
+| Release coherence | full regression | local/Compose/dbt/Git | release commands | tests/coverage/lint/dbt/health/audits pass | passing |
+
+Fail-first order: query/plan/run tests → discovery implementation → review schema/repository/API/UI tests →
+implementation → full verification. Live source proves current compatibility only; deterministic fixtures
+own CI. The later human document is external acceptance evidence and is not fabricated for this stage.
+
+Fail-first signatures: missing `tenderpulse.discovery`, then missing `tenderpulse.human_reviews`;
+browser acceptance separately exposed 179-card overload and `396 > 390` mobile width. Final evidence:
+`238` tests, `85.94%` branch coverage, Ruff/format/strict mypy, Alembic `0009`, dbt `71/71`, healthy
+rebuilt Compose, six successful official profile queries, API health, 15-card 1280/768/390 browser
+inspection with no overflow/matcher output/console errors, and `0` persisted human reviews.
+
 ## MVP 2.1 — complete evidence
 
 | Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |

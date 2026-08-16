@@ -14,7 +14,7 @@ from tenderpulse.ingestion import IngestionCoordinator
 from tenderpulse.live_ingestion import LiveIngestionService
 from tenderpulse.persistence.models import Base, IngestionRunRow
 from tenderpulse.persistence.repository import ProcurementRepository
-from tenderpulse.profiles import load_mvp2_legacy_test_profiles as load_demo_profiles
+from tenderpulse.profiles import load_demo_profiles
 from tenderpulse.raw_store import MemoryRawStore
 from tenderpulse.sources.http import FetchResult, SourceFetchError
 
@@ -42,6 +42,13 @@ class FixtureSourceClient:
 class FailingEisClient(FixtureSourceClient):
     def fetch_eis(self, query) -> FetchResult:
         raise SourceFetchError("eis_http_503", "EIS returned HTTP 503", retryable=True)
+
+
+class SelectiveFailingEisClient(FixtureSourceClient):
+    def fetch_eis(self, query) -> FetchResult:
+        if query.search_string == "уборка помещений":
+            raise SourceFetchError("eis_http_503", "EIS returned HTTP 503", retryable=True)
+        return super().fetch_eis(query)
 
 
 class CapturingSourceClient(FixtureSourceClient):
@@ -88,9 +95,10 @@ def test_live_cycle_ingests_only_bounded_russian_eis_data() -> None:
 
     results = service.run_cycle(limit=10, eis_lookback_days=7)
 
-    assert [(result.source.value, result.status, result.record_count) for result in results] == [
-        ("eis", "succeeded", 2),
-    ]
+    assert len(results) == 6
+    assert {(result.source.value, result.status, result.record_count) for result in results} == {
+        ("eis", "succeeded", 2)
+    }
     with factory() as session:
         assert len(ProcurementRepository(session).list_current_records()) == 2
         runs = session.execute(
@@ -98,12 +106,16 @@ def test_live_cycle_ingests_only_bounded_russian_eis_data() -> None:
                 IngestionRunRow.source
             )
         ).all()
-    parameters_by_source = {source: parameters for source, parameters in runs}
-    assert set(parameters_by_source) == {"eis"}
-    assert parameters_by_source["eis"]["limit"] == 10
-    assert parameters_by_source["eis"]["profile_versions"] == {
-        profile.slug: 1 for profile in load_demo_profiles()
+    assert len(runs) == 6
+    assert {source for source, _parameters in runs} == {"eis"}
+    assert {parameters["limit"] for _source, parameters in runs} == {10}
+    assert {parameters["profile_slug"] for _source, parameters in runs} == {
+        "cleaning-moscow",
+        "office-supply-moscow",
     }
+    assert {parameters["profile_version"] for _source, parameters in runs} == {1}
+    assert all(parameters["search_string"] for _source, parameters in runs)
+    assert all(parameters["discovery_strategy_version"] for _source, parameters in runs)
 
 
 def test_known_eis_fetch_failure_is_persisted() -> None:
@@ -121,14 +133,38 @@ def test_known_eis_fetch_failure_is_persisted() -> None:
 
     results = service.run_cycle(limit=5, eis_lookback_days=7)
 
-    assert [(result.source.value, result.status) for result in results] == [
-        ("eis", "failed"),
-    ]
+    assert len(results) == 6
+    assert {(result.source.value, result.status) for result in results} == {("eis", "failed")}
     with factory() as session:
         failed = session.scalar(select(IngestionRunRow).where(IngestionRunRow.source == "eis"))
     assert failed is not None
     assert failed.error_code == "eis_http_503"
     assert failed.raw_sha256 is None
+
+
+def test_one_profile_query_failure_does_not_hide_independent_runs() -> None:
+    factory = _factory()
+
+    def now() -> datetime:
+        return datetime(2026, 8, 8, 2, tzinfo=UTC)
+
+    service = LiveIngestionService(
+        IngestionCoordinator(factory, MemoryRawStore(), now=now),
+        SelectiveFailingEisClient(),
+        profiles=load_demo_profiles,
+        now=now,
+    )
+
+    results = service.run_cycle(limit=5, eis_lookback_days=7)
+
+    assert [result.status for result in results].count("failed") == 1
+    assert [result.status for result in results].count("succeeded") == 5
+    with factory() as session:
+        runs = tuple(session.scalars(select(IngestionRunRow)))
+    assert len(runs) == 6
+    failed = next(run for run in runs if run.status == "failed")
+    assert failed.request_parameters["profile_slug"] == "cleaning-moscow"
+    assert failed.request_parameters["search_string"] == "уборка помещений"
 
 
 def test_current_profile_versions_are_recorded_on_each_eis_cycle_without_restart() -> None:
@@ -159,7 +195,7 @@ def test_current_profile_versions_are_recorded_on_each_eis_cycle_without_restart
     ]
     service.run_cycle(limit=5, eis_lookback_days=7)
 
-    assert len(client.eis_queries) == 2
+    assert len(client.eis_queries) == 12
     with factory() as session:
         runs = tuple(
             session.scalars(
@@ -167,7 +203,9 @@ def test_current_profile_versions_are_recorded_on_each_eis_cycle_without_restart
             )
         )
     recorded_versions = {
-        run.request_parameters["profile_versions"]["auto-service-moscow"] for run in runs
+        run.request_parameters["profile_version"]
+        for run in runs
+        if run.request_parameters["profile_slug"] == "cleaning-moscow"
     }
     assert recorded_versions == {1, 2}
     assert client.ted_queries == []

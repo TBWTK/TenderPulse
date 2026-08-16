@@ -9,10 +9,11 @@ updated: 2026-08-16
 
 ## Вывод о достаточности контекста
 
-`sufficient` для agent-assisted pre-evaluation на 50 public ЕИС notices. Пользователь явно разрешил
-субагентов и поручил выполнить этап. Профиль и matching contract версионированы; официальный bounded
-source доступен. Human ground truth и юридические документы компании отсутствуют, поэтому результат
-может диагностировать matcher и подготовить review packet, но не закрывает human pilot gate.
+`sufficient` для profile-aware ЕИС discovery и human-review infrastructure. Пользователь поручил
+реализацию и сообщил, что позже передаст готовый документ ревью. Профиль/source/matching contracts
+версионированы; официальный bounded source доступен. Формат и labels будущего документа неизвестны,
+поэтому текущий этап готовит immutable review contour, но не импортирует ground truth и не закрывает
+human pilot quality gate.
 
 ## Источники и доступность контекста
 
@@ -30,6 +31,8 @@ source доступен. Human ground truth и юридические докум
 | Licences/experience | unknown | user explicitly supplied no facts | legal/eligibility error | keep unknown; verify per tender |
 | Budget semantics | confirmed | typed matcher tests + v2 500k–25m profile | нет для deterministic contract | validate on labeled sample |
 | Real relevance sample | confirmed | frozen 50-record ЕИС sample + agent labels | no positive denominator | human review 15 priorities |
+| Profile discovery | confirmed | official form parameters + six-query live worker run | RSS detail fields sparse | retain bounded query/run lineage |
+| Human review document | unknown | user will provide later | no human metric may be claimed | validate schema/universe on receipt |
 
 Допустимые статусы: `confirmed`, `inferred`, `unknown`, `not applicable`.
 
@@ -66,6 +69,14 @@ Airflow и attachment scraping без official contract.
 - Sparse RSS case `0373200104826000065` доказал ошибку тематического threshold: точная многословная
   клининговая фраза отвергалась. После fail-first regression общий matcher даёт ей `review`; неизвестные
   region/deadline/qualification не превращаются в рекомендацию.
+- `discovery` детерминированно строит максимум три service queries на exact profile version и общий
+  hard cap 30. Live Docker worker получил шесть successful responses (`25/0/0 + 25/25/9`), сохранив
+  отдельные run parameters/raw SHA; source search не объявляется решением matcher.
+- `0009_human_reviews` добавляет append-only revisions с account/profile/record/raw identity и
+  optimistic concurrency. API требует CSRF, foreign history скрыта, stale identity получает `409`.
+- Первый browser render честно выявил перегрузку 179 cards и overflow 396/390. Owner-policy shortlist
+  теперь фиксирует 15 версий (до 10 actionable + 5 blind controls); 1280/768/390 проверки не показывают
+  matcher output, horizontal overflow или console errors.
 
 - Миграция `0008_local_accounts` вводит отдельные authority для account, access credential и server
   session. Company context выводится из session binding, а не из query selector.
@@ -79,6 +90,10 @@ Airflow и attachment scraping без official contract.
   записей по TLS; component test доказывает продолжение после failed cycle.
 - Full release evidence: `172` tests, `86.07%` branch coverage, Ruff/format/strict mypy, dbt `54/54`,
   rebuilt Compose health/restart, authenticated HTTP journeys и browser inspection.
+- Current profile-discovery/review release evidence: `238` tests, `85.94%` branch coverage,
+  Ruff/format/strict mypy, Alembic `0009`, dbt `71/71`, healthy Compose/API, six successful bounded
+  live queries and 1280/768/390 browser inspection. PostgreSQL содержит `0` human reviews: система
+  не выдала свою оценку за будущий документ пользователя.
 
 ## Архитектурные варианты
 
@@ -93,6 +108,12 @@ Airflow и attachment scraping без official contract.
 | Existing worker + run evidence | минимальная topology, уже протестирован | нужен resilience gate | выбрано |
 | CSS-only analytics fix | малый diff | не исправляет information hierarchy | недостаточно |
 | Progressive disclosure + breakpoint repair | меньше cognitive load, facts сохранены | template/journey changes | выбрано |
+| Один общий ЕИС RSS без профиля | один request | почти нет thematic recall | отклонено |
+| До 3 service queries/profile | bounded, объяснимо, exact version lineage | больше requests/overlap | выбрано |
+| Mutable review status | простая таблица | теряется причина изменения | отклонено |
+| Append-only review revisions | полная прослеживаемость, stale check | migration/API complexity | выбрано |
+| Показывать все current notices | полный охват UI | 179 cards, unusable | отклонено browser evidence |
+| Bounded 10+5 blind shortlist | рабочая очередь + controls | procedural selection bias | выбрано |
 
 ## Риски и mitigation
 
@@ -106,6 +127,8 @@ Airflow и attachment scraping без official contract.
 | Worker dies after parser/storage error | high | failed-cycle then successful-cycle component test + Docker restart |
 | Responsive fix passes only endpoints | medium | 390/768/1024/1280 browser DOM metrics/screenshots |
 | Attachment source is not machine-readable | high | fail-closed contract gate; no guessed scraper |
+| Review label contaminated matcher output | high | separate `/reviews`; matcher fields absent; procedural instruction |
+| Stale/concurrent review | high | exact version/raw + expected revision; immutable append or 409 |
 
 ## Ландшафт проверок
 

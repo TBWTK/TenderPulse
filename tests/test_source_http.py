@@ -81,14 +81,28 @@ def test_official_source_client_gets_allowlisted_eis_rss_query() -> None:
         published_from=date(2026, 8, 1),
         published_to=date(2026, 8, 8),
         limit=10,
+        search_string="  уборка   помещений  ",
     )
 
     result = client.fetch_eis(query)
 
     assert requests[0].url.copy_with(query=None) == httpx.URL(EIS_RSS_URL)
     assert dict(requests[0].url.params) == query.to_params()
+    assert query.to_params()["searchString"] == "уборка помещений"
+    assert query.to_params()["morphology"] == "on"
     assert requests[0].headers["accept"] == "application/rss+xml"
     assert result.content_type == "application/rss+xml"
+
+
+@pytest.mark.parametrize("search_string", ["", " ", "уборка\nпомещений", "я" * 201])
+def test_eis_profile_search_rejects_unbounded_or_unsafe_text(search_string: str) -> None:
+    with pytest.raises(ValueError):
+        EisRssQuery(
+            published_from=date(2026, 8, 1),
+            published_to=date(2026, 8, 8),
+            limit=10,
+            search_string=search_string,
+        )
 
 
 @pytest.mark.parametrize(

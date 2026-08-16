@@ -75,6 +75,53 @@ sources:
                     values: [buyer, supplier]
           - name: raw_sha256
             tests: [not_null]
+      - name: accounts
+        columns:
+          - name: id
+            tests: [not_null, unique]
+      - name: company_profiles
+        columns:
+          - name: id
+            tests: [not_null, unique]
+      - name: human_reviews
+        columns:
+          - name: id
+            tests: [not_null, unique]
+          - name: account_id
+            tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('app', 'accounts')
+                    field: id
+          - name: profile_id
+            tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('app', 'company_profiles')
+                    field: id
+          - name: record_version_id
+            tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('app', 'procurement_versions')
+                    field: id
+          - name: label
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [relevant, not_relevant, insufficient_evidence]
+          - name: reason
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [scope, geography, budget, qualification, deadline, missing_data, other]
+          - name: revision
+            tests: [not_null]
 
 models:
   - name: stg_current_procurement_records

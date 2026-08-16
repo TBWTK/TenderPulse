@@ -186,6 +186,40 @@ document.querySelectorAll('.detail-ai-button').forEach((button) => {
   });
 });
 
+document.querySelectorAll('[data-review-form]').forEach((form) => {
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    const status = form.querySelector('[data-review-status]');
+    const data = new FormData(form);
+    const latest = String(data.get('expected_latest_revision') || '').trim();
+    button.disabled = true;
+    status.textContent = 'Сохраняю точную ревизию…';
+    try {
+      const response = await apiFetch(`/api/reviews/${form.dataset.source}/${form.dataset.record}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          profile_version: Number(data.get('profile_version')),
+          record_version: Number(data.get('record_version')),
+          raw_sha256: String(data.get('raw_sha256')),
+          expected_latest_revision: latest ? Number(latest) : null,
+          label: String(data.get('label')),
+          reason: String(data.get('reason')),
+          note: String(data.get('note')),
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(errorMessage(payload, 'Оценка не сохранена'));
+      status.textContent = `Сохранено · ревизия ${payload.revision}`;
+      window.setTimeout(() => window.location.reload(), 600);
+    } catch (error) {
+      status.textContent = `Не сохранено: ${error.message}`;
+      button.disabled = false;
+    }
+  });
+});
+
 const profileFields = (data) => ({
   description: String(data.get('description') || '').trim(),
   services: splitValues(data.get('services'), /\r?\n/),

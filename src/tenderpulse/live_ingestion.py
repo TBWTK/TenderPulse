@@ -7,6 +7,7 @@ from functools import partial
 from typing import Protocol
 from uuid import UUID
 
+from tenderpulse.discovery import EisDiscoveryPlanItem, build_eis_discovery_plan
 from tenderpulse.domain.models import SourceCode
 from tenderpulse.ingestion import IngestionCoordinator
 from tenderpulse.profiles import CompanyProfile
@@ -60,15 +61,18 @@ class LiveIngestionService:
         profiles = self._profiles()
         if not profiles or len({profile.slug for profile in profiles}) != len(profiles):
             raise RuntimeError("live ingestion requires distinct active company profiles")
-        profile_versions = {profile.slug: profile.version for profile in profiles}
-        eis_query = EisRssQuery(
-            published_from=today - timedelta(days=eis_lookback_days),
-            published_to=today,
-            limit=limit,
-        )
-        return tuple(
-            self._run_eis(eis_query, profile_versions) for _source in dict.fromkeys(sources)
-        )
+        plan = build_eis_discovery_plan(profiles)
+        results: list[LiveSourceResult] = []
+        for _source in dict.fromkeys(sources):
+            for item in plan:
+                query = EisRssQuery(
+                    published_from=today - timedelta(days=eis_lookback_days),
+                    published_to=today,
+                    limit=limit,
+                    search_string=item.search_string,
+                )
+                results.append(self._run_eis(query, item))
+        return tuple(results)
 
     def ingest_eis_upload(self, *, raw: bytes, filename: str) -> LiveSourceResult:
         content_type = "application/zip" if raw.startswith(b"PK") else "application/xml"
@@ -88,12 +92,12 @@ class LiveIngestionService:
     def _run_eis(
         self,
         query: EisRssQuery,
-        profile_versions: dict[str, int],
+        plan_item: EisDiscoveryPlanItem,
     ) -> LiveSourceResult:
         parameters = _parameters(
             query,
             endpoint=EIS_RSS_URL,
-            profile_versions=profile_versions,
+            plan_item=plan_item,
         )
         try:
             fetched = self._source_client.fetch_eis(query)
@@ -127,11 +131,13 @@ def _parameters(
     query: EisRssQuery,
     *,
     endpoint: str,
-    profile_versions: dict[str, int] | None = None,
+    plan_item: EisDiscoveryPlanItem | None = None,
 ) -> dict[str, object]:
     payload = query.model_dump(mode="json")
     payload["endpoint"] = endpoint
     payload["mode"] = "live_bounded"
-    if profile_versions is not None:
-        payload["profile_versions"] = profile_versions
+    if plan_item is not None:
+        payload["profile_slug"] = plan_item.profile_slug
+        payload["profile_version"] = plan_item.profile_version
+        payload["discovery_strategy_version"] = plan_item.strategy_version
     return payload

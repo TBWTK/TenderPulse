@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Проверка закупок · TenderPulse{% endblock %}
+{% block content %}
+<header class="page-heading review-heading">
+  <div>
+    <p class="eyebrow">Закрытый пилот · ручная оценка</p>
+    <h1>Проверка закупок</h1>
+    <p class="page-lead">Оцените 15 приоритетных текущих версий. Решение и балл TenderPulse здесь намеренно не показаны.</p>
+  </div>
+  <div class="review-progress" aria-label="Прогресс проверки">
+    <strong>{{ reviewed_count }} / {{ review_candidates|length }}</strong>
+    <span>текущих версий оценено</span>
+  </div>
+</header>
+
+<aside class="info-strip" aria-label="Как проводить проверку">
+  <strong>Как проверить:</strong>
+  прочитайте предмет, заказчика, сумму и известные условия; откройте официальную запись при необходимости;
+  затем выберите один результат и объясните его. Если данных не хватает — так и отметьте.
+</aside>
+
+{% if review_candidates %}
+<section class="review-list" aria-label="Закупки для ручной проверки">
+  {% for candidate in review_candidates %}
+  {% set record = candidate.record %}
+  {% set latest = candidate.latest_review %}
+  <article class="review-card{{ ' is-reviewed' if latest else '' }}">
+    <div class="review-card-main">
+      <div class="review-meta">
+        <span>{{ record.source.value|upper }}</span>
+        <span>{{ record.source_record_id }}</span>
+        <span>record v{{ candidate.record_version }}</span>
+        {% if latest %}<span class="review-complete">оценено · ревизия {{ latest.revision }}</span>{% else %}<span>ожидает оценки</span>{% endif %}
+      </div>
+      <h2>{{ record.title }}</h2>
+      <dl class="fact-grid">
+        <div><dt>Заказчик</dt><dd>{{ record.buyer_name or 'Не указан' }}</dd></div>
+        <div><dt>Сумма</dt><dd>{{ (record.lots[0].amount|amount) if record.lots and record.lots[0].amount is not none else 'Не найдена' }}{% if record.lots and record.lots[0].currency %} {{ record.lots[0].currency }}{% endif %}</dd></div>
+        <div><dt>Регион</dt><dd>{{ record.delivery_location or (record.region_codes|join(', ')) or 'Не найден' }}</dd></div>
+        <div><dt>Срок</dt><dd>{{ record.deadline_at.strftime('%d.%m.%Y %H:%M') if record.deadline_at else 'Не найден' }}</dd></div>
+      </dl>
+      <p class="review-description">{{ record.description }}</p>
+      <a class="text-link" href="{{ record.evidence.source_url }}" target="_blank" rel="noopener noreferrer">Открыть официальную запись ↗</a>
+      <details class="trace-details">
+        <summary>Точная версия и evidence</summary>
+        <dl>
+          <div><dt>Profile</dt><dd>{{ selected.slug }} · v{{ candidate.profile_version }}</dd></div>
+          <div><dt>Raw SHA</dt><dd><code>{{ candidate.raw_sha256 }}</code></dd></div>
+        </dl>
+      </details>
+    </div>
+
+    <form class="review-form" data-review-form data-source="{{ record.source.value }}" data-record="{{ record.source_record_id }}">
+      <input type="hidden" name="profile_version" value="{{ candidate.profile_version }}">
+      <input type="hidden" name="record_version" value="{{ candidate.record_version }}">
+      <input type="hidden" name="raw_sha256" value="{{ candidate.raw_sha256 }}">
+      <input type="hidden" name="expected_latest_revision" value="{{ latest.revision if latest else '' }}">
+      <fieldset>
+        <legend>Ваш вывод</legend>
+        {% for value in review_label_values %}
+        <label class="review-choice">
+          <input type="radio" name="label" value="{{ value.value }}" required{% if latest and latest.label == value %} checked{% endif %}>
+          <span>{{ review_labels[value.value] }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      <label>
+        <span>Главная причина</span>
+        <select name="reason" required>
+          <option value="">Выберите причину</option>
+          {% for value in review_reason_values %}<option value="{{ value.value }}"{% if latest and latest.reason == value %} selected{% endif %}>{{ review_reason_labels[value.value] }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Пояснение</span>
+        <textarea name="note" rows="3" minlength="3" maxlength="1000" required placeholder="Какие факты определили ваш вывод?">{{ latest.note if latest else '' }}</textarea>
+      </label>
+      <button class="button primary" type="submit">{{ 'Сохранить новую ревизию' if latest else 'Сохранить оценку' }}</button>
+      <p class="form-status" data-review-status role="status" aria-live="polite"></p>
+    </form>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="empty-state">
+  <h2>Нет текущих закупок для проверки</h2>
+  <p>Запустите профильный bounded-поиск ЕИС. Пустая очередь не подменяется демонстрационными оценками.</p>
+</section>
+{% endif %}
+{% endblock %}
