@@ -115,8 +115,8 @@ attachment contract остаётся explicit unknown; adapter запрещён 
 
 ## Решение о поставке
 
-`accepted for local pre-pilot`: профиль и matching contract имеют local evidence; Git push проверяется
-отдельным release gate. Это не `production-ready` и не
+`accepted for local pre-pilot`: профиль и matching contract имеют local evidence, а checkpoint
+`99c9a18` подтверждён в GitHub direct remote-ref check. Это не `production-ready` и не
 подтверждение ≥80% precision на реальной компании; эти gates принадлежат следующему этапу.
 
 ## Решение о начале

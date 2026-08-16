@@ -45,7 +45,7 @@ deadlines contain only actionable decisions.
 | Geography via contractors | business eval | Москва/МО/другой регион | matcher evidence | direct region recommended; contractor region review | passing |
 | Legal unknown honesty | content/contract review | profile constraints + typed threshold | source audit + matcher/UI label | no invented licence; >1m unknown experience requires review | passing |
 | Versioned local onboarding | authenticated E2E + restart | Docker PostgreSQL | GET v1 → PUT v2 → restart → history | v1 retained, v2 active and account-bound | passing |
-| Regression and Git delivery | full release chain | local + Compose + GitHub | test/lint/dbt/health/audit/push | gates green, secrets absent, remote checkpoint visible | pending push |
+| Regression and Git delivery | full release chain | local + Compose + GitHub | test/lint/dbt/health/audit/push | gates green, secrets absent, remote checkpoint visible | passing |
 
 Fail-first order: business scenarios/profile facts → budget state machine/API label → implementation →
 authorized profile-version journey → full regression/Docker/Git. Synthetic fixtures prove the contract,
@@ -68,6 +68,8 @@ services are healthy, dbt reports `PASS=54 WARN=0 ERROR=0`, and the immediate Е
 bounded records. Browser inspection at 1280/768/390 px shows all budget controls, readable help text and
 the two-version history without clipping. The current 30-record queue yields 1 `review`, 29
 `not_relevant` and 0 fabricated recommendations; real precision remains unclaimed.
+Git checkpoint `99c9a18` was pushed to `origin/codex/ui-redesign`; a direct `git ls-remote` returned
+`99c9a1833b12f465ac67cd9f97571edc73379b73` for that branch before the closing docs-only checkpoint.
 
 ## Закрытый пилот — evidence plan
 

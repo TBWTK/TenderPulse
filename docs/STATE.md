@@ -31,7 +31,7 @@ updated: 2026-08-16
   fixtures не объявляются доказательством реальной precision.
 - [x] Текущая local DB получает новую immutable version cleaning-profile через authorized API, старая
   версия сохраняется, а restart не откатывает пользовательский профиль seed-ом.
-- [ ] Full test/lint/dbt, Docker health/restart, authenticated browser/HTTP smoke, docs audit и secret
+- [x] Full test/lint/dbt, Docker health/restart, authenticated browser/HTTP smoke, docs audit и secret
   scan проходят; checkpoint отправлен в GitHub по подтверждённой пользователем Git-authority.
 
 ## Current verified state
@@ -54,6 +54,8 @@ updated: 2026-08-16
   сохранённые значения, отсутствие обрезания и доступную историю из двух версий.
 - Текущая bounded live-очередь честно содержит `1 review` и `29 not_relevant`, без искусственно
   сгенерированных `recommended`; качество на реальном рынке ещё не измерено.
+- Checkpoint `99c9a18` опубликован в `origin/codex/ui-redesign`; `git ls-remote` подтвердил тот же
+  полный remote hash `99c9a1833b12f465ac67cd9f97571edc73379b73`.
 - Реальные подходящие/неподходящие закупки и подтверждённые лицензии пользователем не предоставлены.
 
 ## Changed areas
@@ -78,8 +80,8 @@ updated: 2026-08-16
 
 ## Next exact step
 
-Создать локальный Git checkpoint, отправить `codex/ui-redesign` в GitHub, проверить remote ref и затем
-закрыть последний release criterion. После delivery — разметить не менее 50 реальных извещений ЕИС.
+Собрать и вслепую разметить не менее 50 реальных извещений ЕИС для «Чистой территории», затем измерить
+actionable precision и разобрать false positive/false negative до решения о 14-дневном закрытом пилоте.
 
 ## Blockers
 
