@@ -26,7 +26,7 @@ human evidence, точно связать его с ранее размечен�
   sample, prediction или source-document state отклоняется.
 - [x] Full report показывает `TP=1, TN=49, FP=FN=0`, point precision/recall отдельно от 95% Wilson lower
   bound; `eligible_for_full_pilot_gate=false`, пока lower bound не доказывает целевые 80%.
-- [ ] Failing tests предшествуют implementation; tracked artifacts воспроизводятся byte-for-byte,
+- [x] Failing tests предшествуют implementation; tracked artifacts воспроизводятся byte-for-byte,
   focused/full tests, lint/mypy, docs/IMMUNE audits, secret scan и Git checkpoint проходят.
 
 ## Current verified state
@@ -109,6 +109,8 @@ human evidence, точно связать его с ранее размечен�
   focused suite проходит `46` tests. Full suite — `254` tests, `84.01%` branch coverage; lint/mypy проходят.
 - Rebuilt Compose установил `pypdf 6.16.1`; API/worker/PostgreSQL/MinIO healthy, init завершён с `0`,
   `GET /api/health` вернул `{"status":"ok"}`. dbt skipped: schema/marts/data contract не менялись.
+- Verified full-50 checkpoint `dd1ac23662157e10c30d9864c15c0364f48513a5` опубликован в
+  `origin/codex/ui-redesign`; direct remote-ref check вернул тот же hash.
 
 ## Changed areas
 
@@ -226,3 +228,4 @@ tracked JSON artifacts воспроизводятся byte-for-byte из exact P
 `254` tests, `84.01%` branch coverage; Ruff/format/strict mypy проходят. Rebuilt Docker runtime содержит
 `pypdf 6.16.1`, все long-running services healthy, init — `0`, API health — `ok`. dbt skipped because
 DB schema/marts не затронуты; `uv lock --check` проходит.
+Implementation checkpoint `dd1ac23662157e10c30d9864c15c0364f48513a5` подтверждён на remote branch.
