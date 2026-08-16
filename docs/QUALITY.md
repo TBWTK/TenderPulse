@@ -73,6 +73,29 @@ Git checkpoint `99c9a18` was pushed to `origin/codex/ui-redesign`; a direct `git
 
 ## Закрытый пилот — evidence plan
 
+### Agent-assisted 50-notice pre-evaluation — release pending
+
+| Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- | --- |
+| Live sample integrity | bounded data eval | official ЕИС RSS + PostgreSQL lineage | capture validator | ≥50 unique current notice versions from bounded request set; URL/version/raw SHA present | pass |
+| Blindness/no leakage | process + artifact contract | separate collector/labeler outputs | timestamps + schema checks | labels frozen without matcher decision/score/reasons | pass |
+| Honest expert labels | complete agent review | 50 public notice snapshots | rubric validation | every label has reason/confidence; unknown is explicit | pass |
+| Reproducible metrics | unit + artifact eval | frozen labels + matcher snapshot | evaluator CLI/tests | confusion, precision, sample recall, abstention and geo safety | pass |
+| Error mechanism | fail-first regression | prioritized FP/FN classes | focused tests before owner mutation | repeated defect fixed at owner or retained as explicit unknown | pass |
+| Human handoff | review packet | disagreements + low-confidence cases | 10–15 record shortlist | user can approve/correct without reviewing all implementation | pass |
+| Release coherence | full regression + Docker + docs + Git | local/Compose/GitHub | release commands | gates green; artifacts contain no secret/source bytes | planned |
+
+`actionable precision ≥80%` remains a human pilot gate. Agent-assisted metrics are reported with the
+prefix `provisional_agent_`; zero denominator is `unknown`, not 0% or 100%. `Recall` is scoped only to
+the frozen 50-record capture and is not a claim about the complete ЕИС market.
+
+Evidence 16.08.2026: two bounded captures produced 50 unique current records with verified lineage.
+Blind labels are `44 not_relevant / 6 insufficient_evidence / 0 relevant`; current matcher is
+`49 not_relevant / 1 review`. Metrics are `TN=44`, `TP=FP=FN=0`, abstention `12%`, matcher actionable
+coverage `2%`, hard onsite geography false admissions `0`. Precision and recall are `null` because no
+agent-positive denominator exists. Baseline rejected all 50; fail-first real-record regression moved
+the exact cleaning phrase case to review. The generated packet contains 15 diverse records.
+
 | Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
 | --- | --- | --- | --- | --- | --- |
 | Реальный company fit | Human-labeled eval | ≥1 реальная компания, ≥50 ЕИС notices | blind label → matcher comparison | actionable precision ≥80%; hard onsite geo false admission = 0 | blocked |

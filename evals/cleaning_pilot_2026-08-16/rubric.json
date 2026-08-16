@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0",
+  "rubric_id": "clean-territory-blind-v1",
+  "frozen_at": "2026-08-16T00:49:49Z",
+  "profile": {
+    "slug": "cleaning-moscow",
+    "services": [
+      "клининг помещений",
+      "уборка территорий"
+    ],
+    "service_regions": [
+      "RU-MOW",
+      "RU-MOS"
+    ],
+    "delivery_model": "onsite",
+    "contractors_allowed": true,
+    "budget_rub": {
+      "min": "500000",
+      "max": "25000000",
+      "inclusive": true
+    },
+    "qualification_review_above_rub": "1000000",
+    "known_exclusion_classes": [
+      "specialized_pest_control",
+      "hazardous_waste"
+    ],
+    "qualification_facts": {
+      "licenses": "unknown",
+      "experience": "unknown"
+    }
+  },
+  "allowed_input": [
+    "title",
+    "buyer",
+    "amount",
+    "currency",
+    "region",
+    "deadline",
+    "classifications",
+    "lifecycle"
+  ],
+  "forbidden_input": [
+    "matcher_decision",
+    "matcher_score",
+    "matcher_reason",
+    "recommendation_state",
+    "ai_evidence",
+    "attachments_or_hidden_text"
+  ],
+  "labels": [
+    "relevant",
+    "not_relevant",
+    "insufficient_evidence"
+  ],
+  "flags": {
+    "geography": [
+      "in_scope",
+      "outside_direct_scope_contractor_unverified",
+      "unknown",
+      "conflicting"
+    ],
+    "budget": [
+      "in_range",
+      "below_min",
+      "above_max",
+      "unknown",
+      "invalid_or_non_rub"
+    ],
+    "qualification": [
+      "unknown_below_review_trigger",
+      "manual_review_required_gt_1m",
+      "explicit_specialized_blocker",
+      "unknown_due_missing_amount",
+      "unknown_requirements"
+    ]
+  },
+  "confidence": {
+    "high": "0.95",
+    "medium": "0.75",
+    "low": "0.55",
+    "meaning": "Уверенность в label, не вероятность выигрыша"
+  },
+  "reason_codes": {
+    "positive": [
+      "REL_CLEANING_PREMISES",
+      "REL_CLEANING_TERRITORY",
+      "REL_SEASONAL_812912",
+      "REL_GEO_MOW_MOS",
+      "REL_BUDGET_IN_RANGE"
+    ],
+    "hard_negative": [
+      "NR_SCOPE_EXPLICITLY_UNRELATED",
+      "NR_SCOPE_PEST_CONTROL",
+      "NR_SCOPE_HAZARDOUS_WASTE",
+      "NR_CLEANING_ONLY_INCIDENTAL",
+      "NR_BUDGET_BELOW_MIN",
+      "NR_BUDGET_ABOVE_MAX",
+      "NR_DEADLINE_CLOSED"
+    ],
+    "insufficient_evidence": [
+      "IE_TITLE_GENERIC",
+      "IE_CLASSIFICATION_ONLY_BROAD_8129",
+      "IE_SCOPE_MIXED_OR_LOT_UNKNOWN",
+      "IE_GEO_MISSING_OR_AMBIGUOUS",
+      "IE_GEO_OUTSIDE_CONTRACTOR_UNVERIFIED",
+      "IE_AMOUNT_MISSING_OR_INVALID",
+      "IE_AMOUNT_CURRENCY_UNCONFIRMED",
+      "IE_QUALIFICATION_GT_1M",
+      "IE_REQUIREMENTS_NOT_IN_RSS",
+      "IE_DEADLINE_MISSING_OR_AMBIGUOUS",
+      "IE_FIELD_CONFLICT"
+    ]
+  },
+  "decision_order": [
+    "A deadline unambiguously closed before evaluation_as_of is not_relevant; missing or ambiguous deadline is insufficient_evidence.",
+    "Explicit cleaning of premises or territories is in scope; pest control, hazardous waste, repair, construction, landscaping and incidental-only cleaning are not_relevant.",
+    "A generic or mixed title, or broad classification without a clear cleaning lot, is insufficient_evidence.",
+    "Amount below 500000 or above 25000000 RUB is not_relevant; missing, invalid or unconfirmed currency is insufficient_evidence.",
+    "RU-MOW/RU-MOS is in scope. Another region is insufficient_evidence until a contractor is verified; buyer address alone is not delivery geography.",
+    "Amount strictly above 1000000 RUB requires manual qualification review because experience is unknown.",
+    "Relevant requires a clear cleaning scope, open deadline, in-range RUB amount, Moscow/Moscow Oblast geography and no qualification-review trigger.",
+    "Any independent hard blocker is not_relevant. Without one, any decision-critical unknown is insufficient_evidence."
+  ],
+  "human_review_selection": {
+    "target_count_min": 10,
+    "target_count_max": 15,
+    "pre_prediction_strata": [
+      "broad_or_mixed_scope",
+      "unknown_or_external_geography",
+      "budget_or_qualification_boundary",
+      "exclusion_or_deadline",
+      "high_confidence_relevant_control",
+      "high_confidence_not_relevant_control"
+    ],
+    "post_prediction_priority": [
+      "system_actionable_vs_blind_not_relevant",
+      "system_rejected_vs_blind_relevant",
+      "system_definite_vs_blind_insufficient_evidence",
+      "repeated_unrepresented_reason_class"
+    ],
+    "tie_breaker": "source_record_id ascending"
+  }
+}

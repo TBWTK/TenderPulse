@@ -117,7 +117,13 @@ class TenderMatcher:
             if self._contains(text, keyword.casefold())
         ]
         if keyword_matches:
-            contribution = min(Decimal("0.30"), Decimal("0.10") * len(keyword_matches))
+            token_contribution = min(Decimal("0.30"), Decimal("0.10") * len(keyword_matches))
+            exact_phrase_contribution = (
+                Decimal("0.30")
+                if any(" " in keyword for keyword in keyword_matches)
+                else Decimal("0")
+            )
+            contribution = max(token_contribution, exact_phrase_contribution)
             add_reason("keywords", str(contribution), keyword_matches)
 
         negative_matches = [

@@ -9,10 +9,10 @@ updated: 2026-08-16
 
 ## Вывод о достаточности контекста
 
-`sufficient` для synthetic onboarding cleaning pilot candidate. Пользователь подтвердил название,
-Москву, услуги, service regions Москва/МО, допустимость подрядчиков и бюджет 500 тыс.–25 млн рублей;
-системе поручено сформировать рабочие keywords/exclusions и осторожные требования. Юридические лицензии
-и реальные labeled notices неизвестны, поэтому legal claims и pilot precision остаются отдельными gates.
+`sufficient` для agent-assisted pre-evaluation на 50 public ЕИС notices. Пользователь явно разрешил
+субагентов и поручил выполнить этап. Профиль и matching contract версионированы; официальный bounded
+source доступен. Human ground truth и юридические документы компании отсутствуют, поэтому результат
+может диагностировать matcher и подготовить review packet, но не закрывает human pilot gate.
 
 ## Источники и доступность контекста
 
@@ -26,10 +26,10 @@ updated: 2026-08-16
 | Attachments | unknown | `docs/DATA.md`, no adapter/code | unsafe scraping/format expansion | official contract review before adapter |
 | UI defect | confirmed | browser 390/768/1024/1280 | subjective pilot feedback ещё нет | pilot observation |
 | Cleaning profile facts | confirmed | user message + local DB v2 16.08.2026 | нет | collect missing operational evidence |
-| Keywords/exclusions | inferred | business eval + narrow classifier contract | real false positives неизвестны | human-label ≥50 notices |
+| Keywords/exclusions | inferred | synthetic eval + 50-record agent pre-eval | human precision неизвестна | review 15-record packet |
 | Licences/experience | unknown | user explicitly supplied no facts | legal/eligibility error | keep unknown; verify per tender |
 | Budget semantics | confirmed | typed matcher tests + v2 500k–25m profile | нет для deterministic contract | validate on labeled sample |
-| Real relevance sample | unknown | examples not supplied | precision unmeasured | collect/label ≥50 ЕИС notices |
+| Real relevance sample | confirmed | frozen 50-record ЕИС sample + agent labels | no positive denominator | human review 15 priorities |
 
 Допустимые статусы: `confirmed`, `inferred`, `unknown`, `not applicable`.
 
@@ -60,6 +60,12 @@ Airflow и attachment scraping без official contract.
   1 `review`, 29 `not_relevant`.
 - Форма профиля проверена browser inspection на 1280/768/390 px; порог опыта, бюджет и история версий
   доступны без обрезания.
+- Agent-assisted pre-evaluation сохранил 50 current ЕИС versions из двух bounded captures, blind rubric,
+  50 separate labels, baseline/current predictions и воспроизводимый report. Agent labels содержат
+  44 отрицательных и 6 abstention, поэтому precision/recall честно остаются `null`.
+- Sparse RSS case `0373200104826000065` доказал ошибку тематического threshold: точная многословная
+  клининговая фраза отвергалась. После fail-first regression общий matcher даёт ей `review`; неизвестные
+  region/deadline/qualification не превращаются в рекомендацию.
 
 - Миграция `0008_local_accounts` вводит отдельные authority для account, access credential и server
   session. Company context выводится из session binding, а не из query selector.
@@ -110,14 +116,15 @@ credential secret scan and opt-in bounded live ЕИС smoke.
 
 ## Открытые вопросы и блокеры
 
-Synthetic onboarding не заблокирован. Для закрытого пилота нужны документы компании и human-labeled выборка. Official
-attachment contract остаётся explicit unknown; adapter запрещён без bounded machine-readable semantics.
+Synthetic onboarding и agent pre-evaluation не заблокированы. Для закрытого пилота нужны документы
+компании и human labels: 15-record packet уже сформирован, но не заполнен владельцем. Official attachment
+contract остаётся explicit unknown; adapter запрещён без bounded machine-readable semantics.
 
 ## Решение о поставке
 
-`accepted for local pre-pilot`: профиль и matching contract имеют local evidence, а checkpoint
-`99c9a18` подтверждён в GitHub direct remote-ref check. Это не `production-ready` и не
-подтверждение ≥80% precision на реальной компании; эти gates принадлежат следующему этапу.
+`accepted for local pre-pilot`: профиль, matching contract и agent-assisted evaluation имеют local
+evidence. Это не `production-ready` и не подтверждение ≥80% precision на реальной компании: sample
+не содержит agent-positive denominator, а human packet ещё не размечен.
 
 ## Решение о начале
 

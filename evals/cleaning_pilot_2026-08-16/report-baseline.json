@@ -1,0 +1,192 @@
+{
+  "sample_sha256": "caafafdc42ab7da509fc1ef6413accd6b08c55bfacbd8ed0497debe6e34a9460",
+  "labels_sha256": "36a12a9778b03282b1a396b67dfd661833b1ef221e0ee87d58dc637288a4f926",
+  "predictions_sha256": "721ec992e50a66e4d25739f9bd1eac7efa125375f1c45c2e13b218ac443c9fe8",
+  "profile_slug": "cleaning-moscow",
+  "profile_version": 2,
+  "metrics": {
+    "sample_size": 50,
+    "confusion": {
+      "true_positive": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "true_negative": 44
+    },
+    "provisional_agent_actionable_precision": null,
+    "bounded_sample_recall": null,
+    "agent_abstention_rate": 0.12,
+    "agent_label_coverage": 0.88,
+    "matcher_actionable_coverage": 0.0,
+    "hard_onsite_geography_false_admissions": 0
+  },
+  "human_review_shortlist": [
+    {
+      "sample_id": "eis:0166300024726000957:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/zk20/view/common-info.html?regNumber=0166300024726000957",
+      "title": "Выполнение работ по содержанию автомобильных дорог общего пользования местного значения, расположенных на территории муниципального образования город Тула",
+      "agent_label": "insufficient_evidence",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.75",
+      "priority_reasons": [
+        "system_definite_vs_blind_insufficient_evidence",
+        "agent_insufficient_evidence"
+      ]
+    },
+    {
+      "sample_id": "eis:0166300024726000958:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/zk20/view/common-info.html?regNumber=0166300024726000958",
+      "title": "Выполнение работ по содержанию автомобильных дорог общего пользования местного значения, расположенных на территории муниципального образования город Тула",
+      "agent_label": "insufficient_evidence",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.75",
+      "priority_reasons": [
+        "system_definite_vs_blind_insufficient_evidence",
+        "agent_insufficient_evidence"
+      ]
+    },
+    {
+      "sample_id": "eis:0373200104826000065:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0373200104826000065",
+      "title": "Санитарное содержание и уборка помещений в ГБУЗ \"ДГП № 131 ДЗМ\" по адресу: ул. Мосфильмовская, д. 27 А в 2027 году",
+      "agent_label": "insufficient_evidence",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "system_definite_vs_blind_insufficient_evidence",
+        "agent_insufficient_evidence"
+      ]
+    },
+    {
+      "sample_id": "eis:0106300008726000038:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/zk20/view/common-info.html?regNumber=0106300008726000038",
+      "title": "Приобретение квартиры",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0131300004626000064:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0131300004626000064",
+      "title": "Выполнение работ по капитальному ремонту автомобильной дороги по ул. Победы в с. Андреевка Нижнедевицкого района Воронежской области",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0160300033226000044:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0160300033226000044",
+      "title": "Благоустройство общественной территории Ленинского района муниципального образования \"Город Саратов\" (устройство площадки для воркаута)",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0163100004026000032:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0163100004026000032",
+      "title": "Оказание услуг по диагностике, техническому обслуживанию и ремонту автотранспортных средств УФСИН России по Смоленской области",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0166300024726000956:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/zk20/view/common-info.html?regNumber=0166300024726000956",
+      "title": "Выполнение работ по ремонту кровельного покрытия здания МБОУ ЦО № 10",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0166300024726000966:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/ok20/view/common-info.html?regNumber=0166300024726000966",
+      "title": "Выполнение дополнительных работ по капитальному ремонту здания с перепланировкой МБУДОДШИ № 6, расположенного по адресу: Тульская область, г.о. город Тула, р-н Привокзальный, ш. Одоевское, д. 9а.",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0166300024726000967:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0166300024726000967",
+      "title": "Выполнение работ по замене участка трубопровода ХВС по адресу: г. Тула, Центральный р-он, пос. Озерный",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0166300024726000968:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0166300024726000968",
+      "title": "Выполнение работ по сносу аварийного недвижимого имущества, расположенного на территории Зареченского округа",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0166300024726000969:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/zk20/view/common-info.html?regNumber=0166300024726000969",
+      "title": "Выполнение работ по текущему ремонту многоквартирных домов",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0169300012226000036:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0169300012226000036",
+      "title": "Оборудование заезда для школьного автобуса в коррекционную школу по ул. Школьная, 9 в п. Локомотивный, Локомотивного городского округа Челябинской области",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0311200024926000290:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/ok20/view/common-info.html?regNumber=0311200024926000290",
+      "title": "На выполнение работ по капитальному ремонту автодорог общего пользования Республики Татарстан",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    },
+    {
+      "sample_id": "eis:0328300007026000053:v1",
+      "source_url": "https://zakupki.gov.ru/epz/order/notice/zk20/view/common-info.html?regNumber=0328300007026000053",
+      "title": "Лекарственные препараты действующие на ЦНС на 2026 год",
+      "agent_label": "not_relevant",
+      "matcher_decision": "not_relevant",
+      "confidence": "0.95",
+      "priority_reasons": [
+        "deterministic_control_or_boundary_sample"
+      ]
+    }
+  ]
+}

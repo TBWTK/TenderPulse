@@ -89,6 +89,30 @@ zakupki.gov.ru URL, region/delivery mode, deadline, CPV/ОКПД2 и award winne
 Attempt привязан к current record version и содержит prompt/model/input/output hashes, validation
 status и verbatim citations. `unknown` означает недостаток evidence, не отсутствие требования.
 
+## Воспроизведение agent-assisted pilot eval
+
+Frozen artifacts лежат в `evals/cleaning_pilot_2026-08-16/`. Predictions разрешено строить только после
+фиксации labels; CLI проверяет hashes, timestamps, profile/version и полное равенство sample universe.
+
+```bash
+.venv/bin/python -m tenderpulse.pilot_eval predict \
+  evals/cleaning_pilot_2026-08-16/sample.json \
+  evals/cleaning_pilot_2026-08-16/labels.json \
+  --policy-version tender-matcher/exact-phrase-review-v1 \
+  --output /tmp/predictions.json
+.venv/bin/python -m tenderpulse.pilot_eval evaluate \
+  evals/cleaning_pilot_2026-08-16/sample.json \
+  evals/cleaning_pilot_2026-08-16/labels.json \
+  /tmp/predictions.json --output /tmp/report.json
+.venv/bin/python -m tenderpulse.pilot_eval review \
+  evals/cleaning_pilot_2026-08-16/sample.json \
+  /tmp/report.json --output /tmp/HUMAN_REVIEW.md
+```
+
+Сравнивайте `/tmp` с tracked current artifacts. `null` precision/recall означает отсутствие
+положительных labels/denominator в этой bounded выборке, а не нулевое качество. Human gate закрывается
+только после заполнения `HUMAN_REVIEW.md` без предварительного просмотра agent/matcher outcomes.
+
 ## Alerts и webhook
 
 In-app outbox работает локально. Для opt-in HTTPS webhook задайте `ALERT_WEBHOOK_URL`, timeout и

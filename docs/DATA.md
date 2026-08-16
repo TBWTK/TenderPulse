@@ -34,6 +34,10 @@ updated: 2026-08-16
 | Product analytics | typed current/history/outcome projection | analytics service | profile slug + current snapshot |
 | Alert event | idempotent in-app delivery snapshot | dispatcher | profile version + record version + channel + policy |
 | Alert delivery attempt | webhook status/retry evidence without destination/response content | dispatcher | alert + destination hash + attempt |
+| Pilot sample item | bounded public notice facts + lineage, без raw bytes | eval capture | source + source record ID + canonical version |
+| Blind pilot label | provisional agent judgement/reason/confidence, без matcher fields | eval labeler | sample ID + rubric version |
+| Pilot prediction | frozen matcher decision/evidence references | eval runner | sample ID + profile version + policy version |
+| Pilot report | scoped metrics/disagreements/review shortlist | eval evaluator | sample hash + labels hash + predictions hash |
 
 ## Lifecycle и версии
 
@@ -69,6 +73,25 @@ updated: 2026-08-16
 14. Matching scope выбирается общей функцией `current_opportunities`: `kind=notice` и lifecycle
     `active|planned`. Product analytics требует, чтобы recommendations ровно покрывали этот scope;
     несовпадение останавливает построение projection.
+15. Pilot sample замораживается до labels/predictions и хранит только bounded canonical public facts и
+    lineage identifiers. Labels и predictions — разные artifacts; evaluator проверяет hashes и полный
+    join по sample IDs. Agent label никогда не перезаписывает canonical procurement или recommendation.
+
+## Frozen agent-assisted pilot artifacts — 16.08.2026
+
+`evals/cleaning_pilot_2026-08-16/` хранит воспроизводимый pre-evaluation, а не production data:
+
+- `rubric.json` SHA-256 `ec74506e…f5f03`, frozen до sample/predictions;
+- `sample.json` SHA-256 `a9898f1e…9d56`: 50 current active ЕИС versions из двух однодневных captures;
+- `labels.json` SHA-256 `3ee83e79…b0c3`: 50 blind agent labels, без matcher fields;
+- `predictions-baseline.json` и `report-baseline.json` сохраняют наблюдаемое состояние до изменения;
+- `predictions.json` SHA-256 `af022303…1ac` и `report.json` SHA-256 `db0c2def…c7bb` — результат
+  `tender-matcher/exact-phrase-review-v1`;
+- `HUMAN_REVIEW.md` — 15 строк без раскрытия agent/matcher решений, предназначенных для владельца.
+
+Tracked sample не содержит source bytes: raw SHA/run/version делают происхождение проверяемым, но
+полный RSS остаётся в MinIO/PostgreSQL. RSS не дал region/deadline/classifications для этих 50 records;
+`null`/`unknown` — фактическое состояние capture, а не отрицательный факт.
 
 ## Scope аналитики
 

@@ -203,6 +203,41 @@ def test_cleaning_pilot_unknown_budget_is_review_not_a_guessed_recommendation() 
     )
 
 
+def test_exact_service_phrase_from_sparse_rss_requires_review_not_rejection() -> None:
+    record = _cleaning_notice(
+        source_record_id="0373200104826000065",
+        title=(
+            'Санитарное содержание и уборка помещений в ГБУЗ "ДГП № 131 ДЗМ" '
+            "по адресу: ул. Мосфильмовская, д. 27 А в 2027 году"
+        ),
+        code="00000000",
+        amount=Decimal("24501815.59"),
+    )
+    sparse_lot = record.lots[0].model_copy(update={"classifications": (), "deadline_at": None})
+    sparse_rss_record = record.model_copy(
+        update={
+            "classifications": (),
+            "region_codes": (),
+            "delivery_location": None,
+            "delivery_mode": ServiceDeliveryMode.UNKNOWN,
+            "deadline_at": None,
+            "lots": (sparse_lot,),
+        }
+    )
+
+    result = TenderMatcher(now=lambda: datetime(2026, 8, 16, tzinfo=UTC)).match(
+        load_demo_profiles()[0],
+        sparse_rss_record,
+    )
+
+    assert result.decision is MatchDecision.REVIEW
+    keyword_reason = next(reason for reason in result.reasons if reason.code == "keywords")
+    assert keyword_reason.contribution == Decimal("0.30")
+    assert GapCode.UNKNOWN_LOCATION in result.gaps
+    assert GapCode.UNKNOWN_DEADLINE in result.gaps
+    assert GapCode.QUALIFICATION_REVIEW_REQUIRED in result.gaps
+
+
 def test_cleaning_pilot_mixed_lots_keep_only_proven_eligible_amounts() -> None:
     profile = load_demo_profiles()[0]
     record = _cleaning_notice(

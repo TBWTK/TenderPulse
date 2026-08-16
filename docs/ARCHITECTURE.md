@@ -69,6 +69,9 @@ flowchart LR
   все подходящие по бюджету lots выше порога, matcher добавляет `qualification_review_required` и не
   поднимает решение выше `review`. Владелец правила — typed profile field; matcher не распознаёт право
   из свободного текста и не объявляет наличие лицензии/опыта.
+- Явное совпадение многословной service phrase даёт `0.30` тематического evidence и может поднять
+  sparse RSS record до `review`; одиночный stem сохраняет вес `0.10`. Это не рекомендация: budget,
+  geography, deadline и qualification gates продолжают ограничивать итоговое решение.
 - Тендерная страница читает последний extraction attempt только для текущей record version. Payload migration
   добавляет явный coverage status старым attempts, не превращая отсутствие evidence в `not_present`.
 - `ProductAnalytics` — единая typed projection для API и страницы аналитики. Decision/coverage/distribution
@@ -78,6 +81,12 @@ flowchart LR
 - Все внешние URL зафиксированы adapter config; пользователь не может превратить ingestion в SSRF.
 - TLS verification не отключается, секреты не логируются и не попадают в raw artifacts.
 - Код, schema, OpenAPI, docs, fixtures, tests и marts изменяются как одна projection группы понятий.
+- Pilot evaluation разделяет immutable public-fact sample, blind labels и matcher snapshot. Label artifact
+  не содержит decision/score/reasons; evaluator принимает их отдельными inputs, проверяет одинаковый
+  record universe/profile version и fail-loud на duplicate или missing lineage. Нулевой denominator
+  остаётся явным `null`, поэтому evaluator не выдумывает 0% или 100% precision/recall.
+  Sample может агрегировать минимальный набор bounded ЕИС requests; каждый request отдельно соблюдает
+  source limits, а artifact сохраняет membership и параметры каждого capture вместо скрытого pagination.
 
 ### IMMUNE как архитектурное ограничение
 

@@ -59,6 +59,10 @@ TenderPulse превращает ограниченные, регулярно о
 - Только итоговое pilot-решение `go` открывает Production v1; полный contract находится в
   [текущем состоянии](STATE.md), а evidence map — в [качестве](QUALITY.md).
 
+Agent-assisted pre-evaluation уже зафиксировал 50 real ЕИС records и сформировал отдельный packet
+`evals/cleaning_pilot_2026-08-16/HUMAN_REVIEW.md`. Это диагностический этап:
+слепая агентская разметка не заменяет пользовательскую и не доказывает целевые 80% precision.
+
 ### Сохранённая foundation MVP 1.0
 
 - ЕИС: актуальные notices 44-ФЗ из официального bounded RSS; ограниченные XML/ZIP-пакеты остаются
