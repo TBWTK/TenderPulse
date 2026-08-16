@@ -90,12 +90,20 @@ flowchart LR
   остаётся явным `null`, поэтому evaluator не выдумывает 0% или 100% precision/recall.
   Sample может агрегировать минимальный набор bounded ЕИС requests; каждый request отдельно соблюдает
   source limits, а artifact сохраняет membership и параметры каждого capture вместо скрытого pagination.
+- Filled Markdown review импортируется отдельным typed contract: exact document bytes/SHA,
+  сгенерированный blank-packet SHA, shortlist-report SHA, profile version и каждая
+  record-version/raw SHA проверяются до метрик. Matcher snapshot обязан предшествовать
+  импорту. Отчёт всегда помечен `agent_matcher_prioritized_shortlist` и
+  `eligible_for_full_pilot_gate=false`: 15 целевых строк не доказывают рыночную precision/recall.
 - Human review — account-authorized append-only revision stream, связанный с exact profile version,
   record version и raw SHA. Review UI читает canonical source facts, но не matcher output; stale identity
   отклоняется, а исправление создаёт следующую revision вместо перезаписи.
   `build_human_review_shortlist` ограничивает рабочую очередь 15 versions: первые 10 actionable по
   ranking order и 5 rejected controls; при нехватке группы остаток детерминированно дополняется из той
   же current universe. Категория selection не передаётся в template.
+  File-based pilot evidence и account UI revisions — разные projections: импорт не пишет
+  reviewer-supplied географию/deadlines/requirements в canonical procurement и не создаёт
+  operational DB revisions без отдельного account-authorized action.
 
 ### IMMUNE как архитектурное ограничение
 

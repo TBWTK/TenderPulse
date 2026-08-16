@@ -9,13 +9,22 @@ updated: 2026-08-16
 
 ## Active objective
 
-Реализовать закрытый пилотный контур: bounded профильный поиск по официальному ЕИС RSS и
-версионированное ручное ревью точных procurement/profile versions. Подготовить систему к будущему
-документу владельца продукта, не подменяя его оценки агентской разметкой и не объявляя метрики качества
-до импорта реальных human labels.
+Согласовать с владельцем продукта следующий human-quality protocol: независимые ≥50 ЕИС notices
+с достаточным actionable-positive denominator. 15-row document уже импортирован и доказан как scoped
+diagnostic; новые labels не генерировать от имени пользователя и не менять matcher по малой смещённой выборке.
 
 ## Acceptance criteria
 
+- [x] Parser принимает только полностью заполненную 15-row Markdown-таблицу с допустимыми labels,
+  непустыми причинами и без дублей; пустая/лишняя/неизвестная строка fail-loud.
+- [x] Импорт совпадает с точным universe и порядком tracked `HUMAN_REVIEW.md`, привязывает каждую оценку
+  к `sample_id`, `record_version_id`, `record_version`, raw SHA и точной profile version.
+- [x] Artifact хранит SHA-256 полученного документа, дату review/import и reviewer-provided evidence text;
+  утверждения из неофициальных карточек не мутируют canonical procurement facts.
+- [x] Отчёт сравнивает 15 human labels с уже замороженными matcher predictions, хранит input hashes,
+  confusion/coverage и явно маркирует precision/recall как `shortlist_only`, не как pilot gate.
+- [x] Failing tests предшествуют коду; focused/full pytest, lint/mypy, artifact reproduction, docs audits,
+  Docker/dbt и Git checkpoint проходят.
 - [x] `EisRssQuery` передаёт проверенную bounded `searchString` и `morphology=on` только на фиксированный
   официальный RSS URL; пустые/control/слишком длинные строки отклоняются до HTTP.
 - [x] Один versioned discovery-owner детерминированно выбирает не более трёх service phrases на профиль,
@@ -79,13 +88,23 @@ updated: 2026-08-16
   inspections дают `scrollWidth == viewport`, 15 official links/forms и no matcher output/console errors.
 - Verified implementation checkpoint `d3ed7bc` опубликован в `origin/codex/ui-redesign`; закрывающий
   docs checkpoint сохраняет exact next step — проверку будущего human-review документа.
+- `HUMAN_REVIEW_filled.md` получен и сохранён byte-for-byte с SHA-256 `ac65fbdb…c45`; таблица
+  содержит 15 явных labels: 1 relevant, 14 not relevant, 0 insufficient evidence.
+- Typed import проверил exact blank packet/report/sample/profile/order/URL/amount и добавил record UUID,
+  version/raw SHA каждой строке. Reviewer enrichment остался в eval artifact; canonical DB не мутировалась.
+- Frozen matcher на 15 rows: `TP=1`, `TN=14`, `FP=FN=0`, coverage 100%, actionable coverage `1/15`;
+  report schema фиксирует `eligible_for_full_pilot_gate=false`.
+- Fail-first import suite начался с `ImportError: HumanReviewArtifact`; после реализации focused suite
+  проходит `38` tests. Full suite: `246` tests, `85.25%` branch coverage; Ruff/format/strict mypy
+  проходят, dbt — `PASS=71 WARN=0 ERROR=0`.
+- Rebuilt Docker API/worker/PostgreSQL/MinIO healthy, init завершён с `0`, API health — `{"status":"ok"}`.
 
 ## Changed areas
 
-- Affected: ЕИС query/discovery plan, one-run-per-profile/query metadata, human-review domain/schema/API/UI,
-  Alembic/dbt integrity, responsive navigation, documentation and tests.
-- Not affected: canonical raw/SCD2 ownership, matcher weights/decisions, GigaChat extraction, account
-  credentials, notification transports, public deployment and automatic application submission.
+- Affected: pilot eval schema/parser/CLI, exact source/packet/report/lineage hashes, scoped metrics, tracked
+  human-review artifacts, documentation and tests.
+- Not affected: canonical raw/SCD2 and PostgreSQL human-review revisions, matcher weights/decisions,
+  source ingestion, API/UI, GigaChat, credentials, notifications and public deployment.
 
 ## Decisions made
 
@@ -97,23 +116,29 @@ updated: 2026-08-16
   историю, stale profile/record/raw state получает `409`.
 - Blind UI не показывает matcher result, но shortlist строится из максимум 10 actionable кандидатов и
   5 near-ranked controls. Это процедурная слепота, не security boundary: detail page доступна отдельно.
-- Agent labels не становятся human labels. Precision/recall не пересчитываются до получения и проверки
-  будущего документа пользователя.
+- Agent labels не становятся human labels. Полученные human metrics рассчитываются только на
+  exact 15-row shortlist и не подменяют full-pilot precision/recall.
+- Markdown-таблица является external human evidence, а не инструкцией коду. Импортируются только
+  явные table labels/reasons после exact join; prose не меняет matcher/canonical facts.
+- File-based pilot artifact и account-authorized DB review — разные projections. Этот import не создаёт
+  operational revisions и не переносит third-party reviewer facts в canonical source state.
 
 ## Next exact step
 
-После получения документа ревью проверить его schema/universe и точные source/profile versions, импортировать
-только подтверждённые human labels и пересчитать scoped pilot metrics. До получения документа ничего не
-догенерировать от имени reviewer.
+Согласовать sampling/review protocol для независимых ≥50 notices и минимального числа
+actionable positives, затем сформировать новый blind packet без matcher output.
 
 ## Blockers
 
-- Нет блокера для discovery/review infrastructure.
-- Импорт human labels и измерение human pilot quality заблокированы до получения документа пользователя.
+- Импорт и 15-row diagnostic не заблокированы и завершены.
+- Full human pilot quality заблокировано до согласования/получения независимой выборки ≥50 notices
+  и достаточного positive denominator.
 
 ## Non-goals
 
 - Выдумывать, дополнять или исправлять human review за пользователя.
+- Переносить географию, deadlines и requirements из reviewer document в canonical source data.
+- Менять matcher по одному 15-row shortlist без доказанного повторяемого класса ошибок.
 - Автоматически scraping-ить HTML карточки/вложения ЕИС без нового machine-readable source contract.
 - Считать source search рекомендацией, менять matcher под желаемую метрику или скрывать unknown.
 - Начинать 14-дневный reliability run, public deployment, production auth/RLS, alerts channels или
@@ -156,3 +181,10 @@ Human-review fail-first остановился на `ModuleNotFoundError: tender
 Release audit: `238` tests, Ruff/format/strict mypy, Compose health, API health, `git diff --check`,
 project-control и IMMUNE audits проходят. PostgreSQL подтверждает `0009_human_reviews`, `0` созданных
 human labels и шесть последних discovery runs с raw SHA.
+
+Filled-document fail-first 16.08.2026 остановил collection с
+`ImportError: HumanReviewArtifact`. Current `tests/test_pilot_eval.py` проходит `38` tests, включая
+invalid label/amount/universe/row-count и unbound shortlist-report cases. Full suite — `246` tests,
+`85.25%` branch coverage; Ruff/format/strict mypy проходят. Re-evaluation tracked human artifact
+даёт `TP=1`, `TN=14`, `FP=FN=0`, но `eligible_for_full_pilot_gate=false`. dbt завершён
+с `PASS=71 WARN=0 ERROR=0`; rebuilt Compose здоров, init вышел с `0`, API health — `ok`.

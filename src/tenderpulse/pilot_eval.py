@@ -7,7 +7,7 @@ import re
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -366,7 +366,129 @@ class PilotEvaluationReport(BaseModel):
     human_review_shortlist: tuple[HumanReviewItem, ...]
 
 
+class ImportedHumanReview(BaseModel):
+    model_config = _ARTIFACT_CONFIG
+
+    row_number: int = Field(ge=1)
+    sample_id: str = Field(min_length=1)
+    source_record_id: str = Field(pattern=r"^\d{19}$")
+    source_url: str
+    record_version_id: UUID
+    record_version: int = Field(ge=1)
+    raw_sha256: str
+    label: BlindLabelName
+    reviewed_subject: str = Field(min_length=1)
+    reviewed_amount: Decimal | None = Field(default=None, ge=0)
+    reviewed_currency: str | None = None
+    checked_execution_and_deadline: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(min_length=1, max_length=4000)
+    eligibility_notes: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("raw_sha256")
+    @classmethod
+    def validate_sha256(cls, value: str) -> str:
+        return _validate_sha256(value)
+
+    @field_validator("reviewed_currency")
+    @classmethod
+    def normalize_currency(cls, value: str | None) -> str | None:
+        return value.upper() if value is not None else None
+
+    @field_validator("source_url")
+    @classmethod
+    def validate_source_url(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if parsed.scheme != "https" or parsed.netloc != "zakupki.gov.ru":
+            raise ValueError("source_url must use the official EIS HTTPS host")
+        return value
+
+    @model_validator(mode="after")
+    def validate_amount(self) -> ImportedHumanReview:
+        if (self.reviewed_amount is None) != (self.reviewed_currency is None):
+            raise ValueError("reviewed amount and currency must be known or unknown together")
+        return self
+
+
+class HumanReviewArtifact(BaseModel):
+    model_config = _ARTIFACT_CONFIG
+
+    schema_version: Literal["pilot-human-reviews/v1"]
+    sample_sha256: str
+    blank_packet_sha256: str
+    shortlist_report_sha256: str
+    source_document_sha256: str
+    source_document_name: str = Field(min_length=1)
+    profile_slug: str = Field(min_length=1)
+    profile_version: int = Field(ge=1)
+    labeler_kind: Literal["human"]
+    reviewed_on: date
+    imported_at: datetime
+    selection_scope: Literal["agent_matcher_prioritized_shortlist"]
+    reviews: tuple[ImportedHumanReview, ...]
+
+    @field_validator(
+        "sample_sha256",
+        "blank_packet_sha256",
+        "shortlist_report_sha256",
+        "source_document_sha256",
+    )
+    @classmethod
+    def validate_hashes(cls, value: str) -> str:
+        return _validate_sha256(value)
+
+    @field_validator("imported_at")
+    @classmethod
+    def validate_imported_at(cls, value: datetime) -> datetime:
+        return _require_aware(value)
+
+    @field_validator("source_document_name")
+    @classmethod
+    def validate_source_document_name(cls, value: str) -> str:
+        if Path(value).name != value or value in {".", ".."}:
+            raise ValueError("source_document_name must be a filename without a path")
+        return value
+
+    @model_validator(mode="after")
+    def validate_review_universe(self) -> HumanReviewArtifact:
+        _require_unique_sample_ids(self.reviews)
+        source_ids = [review.source_record_id for review in self.reviews]
+        if len(source_ids) != len(set(source_ids)):
+            raise ValueError("human review contains duplicate source record IDs")
+        if [review.row_number for review in self.reviews] != list(range(1, len(self.reviews) + 1)):
+            raise ValueError("human review row numbers must be contiguous and ordered")
+        return self
+
+
+class HumanReviewMetrics(BaseModel):
+    model_config = _ARTIFACT_CONFIG
+
+    sample_size: int
+    confusion: ConfusionCounts
+    shortlist_actionable_precision: float | None
+    shortlist_recall: float | None
+    human_abstention_rate: float
+    human_label_coverage: float
+    matcher_actionable_coverage: float
+
+
+class HumanReviewEvaluationReport(BaseModel):
+    model_config = _ARTIFACT_CONFIG
+
+    schema_version: Literal["pilot-human-review-report/v1"]
+    sample_sha256: str
+    human_reviews_sha256: str
+    predictions_sha256: str
+    profile_slug: str
+    profile_version: int
+    selection_scope: Literal["agent_matcher_prioritized_shortlist"]
+    eligible_for_full_pilot_gate: Literal[False]
+    metrics: HumanReviewMetrics
+    disagreements: tuple[str, ...]
+
+
 def canonical_artifact_sha256(value: object) -> str:
+    if isinstance(value, bytes):
+        return hashlib.sha256(value).hexdigest()
     payload: object
     if isinstance(value, BaseModel):
         payload = value.model_dump(mode="json")
@@ -527,6 +649,320 @@ def evaluate_pilot(
         metrics=metrics,
         human_review_shortlist=shortlist,
     )
+
+
+def import_human_review_markdown(
+    sample: PilotSampleArtifact,
+    shortlist_report: PilotEvaluationReport,
+    *,
+    blank_packet: bytes,
+    document: bytes,
+    source_document_name: str,
+    imported_at: datetime,
+) -> HumanReviewArtifact:
+    _require_aware(imported_at)
+    sample_hash = canonical_artifact_sha256(sample)
+    if shortlist_report.sample_sha256 != sample_hash:
+        raise ArtifactValidationError("review shortlist does not reference the frozen sample")
+    expected_blank = render_human_review_markdown(sample, shortlist_report).encode("utf-8")
+    if blank_packet != expected_blank:
+        raise ArtifactValidationError("blank review packet does not match the generated shortlist")
+    try:
+        markdown = document.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ArtifactValidationError("human review document must be UTF-8") from error
+
+    reviewed_on = _parse_review_date(markdown)
+    rows = _parse_filled_review_rows(markdown)
+    expected_ids = [item.sample_id for item in shortlist_report.human_review_shortlist]
+    if len(rows) != len(expected_ids):
+        raise ArtifactValidationError(
+            f"human review row count {len(rows)} does not match shortlist {len(expected_ids)}"
+        )
+    item_by_id = {item.sample_id: item for item in sample.items}
+    expected_source_ids = [item_by_id[sample_id].source_record_id for sample_id in expected_ids]
+    actual_source_ids = [row[1] for row in rows]
+    if actual_source_ids != expected_source_ids:
+        raise ArtifactValidationError(
+            "human review does not match the exact shortlist universe/order"
+        )
+
+    reviews: list[ImportedHumanReview] = []
+    label_counts = {label: 0 for label in ("relevant", "not_relevant", "insufficient_evidence")}
+    for row, sample_id in zip(rows, expected_ids, strict=True):
+        (
+            row_number,
+            source_record_id,
+            source_url,
+            reviewed_subject,
+            reviewed_amount,
+            reviewed_currency,
+            checked_execution_and_deadline,
+            label,
+            reason,
+            eligibility_notes,
+        ) = row
+        item = item_by_id[sample_id]
+        if source_url != item.source_url:
+            raise ArtifactValidationError(
+                f"official source URL mismatch for shortlist row {row_number}"
+            )
+        if reviewed_amount != item.amount or reviewed_currency != item.currency:
+            raise ArtifactValidationError(f"amount mismatch for shortlist row {row_number}")
+        label_counts[label] += 1
+        reviews.append(
+            ImportedHumanReview(
+                row_number=row_number,
+                sample_id=sample_id,
+                source_record_id=source_record_id,
+                source_url=source_url,
+                record_version_id=item.record_version_id,
+                record_version=item.record_version,
+                raw_sha256=item.raw_sha256,
+                label=label,
+                reviewed_subject=reviewed_subject,
+                reviewed_amount=reviewed_amount,
+                reviewed_currency=reviewed_currency,
+                checked_execution_and_deadline=checked_execution_and_deadline,
+                reason=reason,
+                eligibility_notes=eligibility_notes,
+            )
+        )
+    _validate_declared_review_counts(markdown, label_counts, len(reviews))
+    return HumanReviewArtifact(
+        schema_version="pilot-human-reviews/v1",
+        sample_sha256=sample_hash,
+        blank_packet_sha256=canonical_artifact_sha256(blank_packet),
+        shortlist_report_sha256=canonical_artifact_sha256(shortlist_report),
+        source_document_sha256=canonical_artifact_sha256(document),
+        source_document_name=source_document_name,
+        profile_slug=shortlist_report.profile_slug,
+        profile_version=shortlist_report.profile_version,
+        labeler_kind="human",
+        reviewed_on=reviewed_on,
+        imported_at=imported_at,
+        selection_scope="agent_matcher_prioritized_shortlist",
+        reviews=tuple(reviews),
+    )
+
+
+def evaluate_human_review(
+    sample: PilotSampleArtifact,
+    reviews: HumanReviewArtifact,
+    predictions: PilotPredictionArtifact,
+    shortlist_report: PilotEvaluationReport,
+) -> HumanReviewEvaluationReport:
+    sample_hash = canonical_artifact_sha256(sample)
+    if reviews.sample_sha256 != sample_hash or predictions.sample_sha256 != sample_hash:
+        raise ArtifactValidationError("sample hash mismatch across human-review artifacts")
+    if (
+        shortlist_report.sample_sha256 != sample_hash
+        or reviews.shortlist_report_sha256 != canonical_artifact_sha256(shortlist_report)
+    ):
+        raise ArtifactValidationError("human reviews do not match the frozen shortlist report")
+    if (
+        reviews.profile_slug != predictions.profile_slug
+        or reviews.profile_version != predictions.profile_version
+        or reviews.profile_slug != shortlist_report.profile_slug
+        or reviews.profile_version != shortlist_report.profile_version
+    ):
+        raise ArtifactValidationError("profile mismatch between human reviews and predictions")
+    if predictions.generated_at >= reviews.imported_at:
+        raise ArtifactValidationError(
+            "human-review metrics require a prediction snapshot frozen before import"
+        )
+
+    items = {item.sample_id: item for item in sample.items}
+    prediction_by_id = {prediction.sample_id: prediction for prediction in predictions.predictions}
+    review_ids = [review.sample_id for review in reviews.reviews]
+    expected_review_ids = [item.sample_id for item in shortlist_report.human_review_shortlist]
+    if review_ids != expected_review_ids:
+        raise ArtifactValidationError("human review universe/order differs from shortlist report")
+    if len(review_ids) != len(set(review_ids)) or any(
+        sample_id not in items or sample_id not in prediction_by_id for sample_id in review_ids
+    ):
+        raise ArtifactValidationError("human review universe is outside sample/predictions")
+    for review in reviews.reviews:
+        item = items[review.sample_id]
+        prediction = prediction_by_id[review.sample_id]
+        if (
+            review.source_record_id != item.source_record_id
+            or review.source_url != item.source_url
+            or review.record_version_id != item.record_version_id
+            or review.record_version != item.record_version
+            or review.raw_sha256 != item.raw_sha256
+            or prediction.record_version_id != item.record_version_id
+            or prediction.record_version != item.record_version
+        ):
+            raise ArtifactValidationError(f"human review lineage mismatch for {review.sample_id}")
+
+    tp = fp = fn = tn = abstentions = matcher_actionable = 0
+    disagreements: list[str] = []
+    actionable = {"recommended", "review"}
+    for review in reviews.reviews:
+        prediction = prediction_by_id[review.sample_id]
+        is_actionable = prediction.decision in actionable
+        matcher_actionable += int(is_actionable)
+        if review.label == "insufficient_evidence":
+            abstentions += 1
+            continue
+        if review.label == "relevant":
+            if is_actionable:
+                tp += 1
+            else:
+                fn += 1
+                disagreements.append(review.sample_id)
+        elif is_actionable:
+            fp += 1
+            disagreements.append(review.sample_id)
+        else:
+            tn += 1
+
+    total = len(reviews.reviews)
+    if total == 0:
+        raise ArtifactValidationError("human review artifact is empty")
+    precision_denominator = tp + fp
+    recall_denominator = tp + fn
+    return HumanReviewEvaluationReport(
+        schema_version="pilot-human-review-report/v1",
+        sample_sha256=sample_hash,
+        human_reviews_sha256=canonical_artifact_sha256(reviews),
+        predictions_sha256=canonical_artifact_sha256(predictions),
+        profile_slug=reviews.profile_slug,
+        profile_version=reviews.profile_version,
+        selection_scope=reviews.selection_scope,
+        eligible_for_full_pilot_gate=False,
+        metrics=HumanReviewMetrics(
+            sample_size=total,
+            confusion=ConfusionCounts(
+                true_positive=tp,
+                false_positive=fp,
+                false_negative=fn,
+                true_negative=tn,
+            ),
+            shortlist_actionable_precision=(
+                tp / precision_denominator if precision_denominator else None
+            ),
+            shortlist_recall=tp / recall_denominator if recall_denominator else None,
+            human_abstention_rate=abstentions / total,
+            human_label_coverage=(total - abstentions) / total,
+            matcher_actionable_coverage=matcher_actionable / total,
+        ),
+        disagreements=tuple(disagreements),
+    )
+
+
+def _parse_review_date(markdown: str) -> date:
+    match = re.search(
+        r"^\s*Дата ревью:\s*\*\*(\d{2}\.\d{2}\.\d{4})\*\*\.\s*$",
+        markdown,
+        re.MULTILINE,
+    )
+    if match is None:
+        raise ArtifactValidationError("human review date is missing or invalid")
+    return datetime.strptime(match.group(1), "%d.%m.%Y").date()
+
+
+def _parse_filled_review_rows(
+    markdown: str,
+) -> list[
+    tuple[
+        int,
+        str,
+        str,
+        str,
+        Decimal | None,
+        str | None,
+        str,
+        BlindLabelName,
+        str,
+        str,
+    ]
+]:
+    rows: list[
+        tuple[
+            int,
+            str,
+            str,
+            str,
+            Decimal | None,
+            str | None,
+            str,
+            BlindLabelName,
+            str,
+            str,
+        ]
+    ] = []
+    allowed_labels = {"relevant", "not_relevant", "insufficient_evidence"}
+    for line in markdown.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if not cells or not cells[0].isdigit():
+            continue
+        if len(cells) != 8:
+            raise ArtifactValidationError("human review data row must contain exactly 8 columns")
+        row_number = int(cells[0])
+        link = re.fullmatch(r"\[(\d{19})\]\((https://zakupki\.gov\.ru/[^)]+)\)", cells[1])
+        if link is None:
+            raise ArtifactValidationError(f"invalid EIS link in human review row {row_number}")
+        amount, currency = _parse_reviewed_amount(cells[3], row_number)
+        raw_label = cells[5].strip("`")
+        if raw_label not in allowed_labels:
+            raise ArtifactValidationError(f"invalid human review label in row {row_number}")
+        if not cells[2] or not cells[4] or not cells[6] or not cells[7]:
+            raise ArtifactValidationError(f"human review row {row_number} contains an empty field")
+        rows.append(
+            (
+                row_number,
+                link.group(1),
+                link.group(2),
+                cells[2],
+                amount,
+                currency,
+                cells[4],
+                cast(BlindLabelName, raw_label),
+                cells[6],
+                cells[7],
+            )
+        )
+    if [row[0] for row in rows] != list(range(1, len(rows) + 1)):
+        raise ArtifactValidationError("human review row numbers must be contiguous and ordered")
+    return rows
+
+
+def _parse_reviewed_amount(
+    value: str,
+    row_number: int,
+) -> tuple[Decimal | None, str | None]:
+    normalized = value.replace("\xa0", " ").strip()
+    if normalized.casefold() == "unknown":
+        return None, None
+    match = re.fullmatch(r"([0-9][0-9 ]*(?:[.,][0-9]{1,2})?)\s+([A-Za-z]{3})", normalized)
+    if match is None:
+        raise ArtifactValidationError(f"invalid amount in human review row {row_number}")
+    try:
+        amount = Decimal(match.group(1).replace(" ", "").replace(",", "."))
+    except ArithmeticError as error:
+        raise ArtifactValidationError(f"invalid amount in human review row {row_number}") from error
+    return amount, match.group(2).upper()
+
+
+def _validate_declared_review_counts(
+    markdown: str,
+    actual: dict[str, int],
+    total: int,
+) -> None:
+    for label in ("relevant", "not_relevant", "insufficient_evidence"):
+        match = re.search(
+            rf"`{label}`\s*[—-]\s*\*\*(\d+)\s+из\s+(\d+)\*\*",
+            markdown,
+        )
+        if match is None:
+            raise ArtifactValidationError(
+                f"declared count is missing for human review label {label}"
+            )
+        declared_count, declared_total = (int(value) for value in match.groups())
+        if declared_count != actual[label] or declared_total != total:
+            raise ArtifactValidationError(f"declared count mismatch for human review label {label}")
 
 
 def render_human_review_markdown(
@@ -729,14 +1165,49 @@ def main() -> None:
     review.add_argument("sample", type=Path)
     review.add_argument("report", type=Path)
     review.add_argument("--output", required=True, type=Path)
+    import_human = commands.add_parser("import-human")
+    import_human.add_argument("sample", type=Path)
+    import_human.add_argument("report", type=Path)
+    import_human.add_argument("blank_packet", type=Path)
+    import_human.add_argument("document", type=Path)
+    import_human.add_argument("--output", required=True, type=Path)
+    evaluate_human = commands.add_parser("evaluate-human")
+    evaluate_human.add_argument("sample", type=Path)
+    evaluate_human.add_argument("human_reviews", type=Path)
+    evaluate_human.add_argument("predictions", type=Path)
+    evaluate_human.add_argument("shortlist_report", type=Path)
+    evaluate_human.add_argument("--output", type=Path)
     args = parser.parse_args()
     sample = _load(args.sample, PilotSampleArtifact)
     if args.command == "review":
-        report = _load(args.report, PilotEvaluationReport)
+        pilot_report = _load(args.report, PilotEvaluationReport)
         args.output.write_text(
-            render_human_review_markdown(sample, report),
+            render_human_review_markdown(sample, pilot_report),
             encoding="utf-8",
         )
+        return
+    if args.command == "import-human":
+        human_review_artifact = import_human_review_markdown(
+            sample,
+            _load(args.report, PilotEvaluationReport),
+            blank_packet=args.blank_packet.read_bytes(),
+            document=args.document.read_bytes(),
+            source_document_name=args.document.name,
+            imported_at=datetime.now(UTC),
+        )
+        _write_json(args.output, human_review_artifact)
+        return
+    if args.command == "evaluate-human":
+        human_report = evaluate_human_review(
+            sample,
+            _load(args.human_reviews, HumanReviewArtifact),
+            _load(args.predictions, PilotPredictionArtifact),
+            _load(args.shortlist_report, PilotEvaluationReport),
+        )
+        if args.output is None:
+            print(json.dumps(human_report.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        else:
+            _write_json(args.output, human_report)
         return
 
     labels = _load(args.labels, BlindLabelArtifact)
@@ -747,25 +1218,25 @@ def main() -> None:
         )
         if seed is None:
             raise ArtifactValidationError(f"profile seed not found: {labels.profile_slug}")
-        artifact = build_prediction_artifact(
+        prediction_artifact = build_prediction_artifact(
             sample,
             labels,
             seed.model_copy(update={"version": labels.profile_version}),
             generated_at=datetime.now(UTC),
             policy_version=args.policy_version,
         )
-        _write_json(args.output, artifact)
+        _write_json(args.output, prediction_artifact)
         return
 
-    report = evaluate_pilot(
+    pilot_report = evaluate_pilot(
         sample,
         labels,
         _load(args.predictions, PilotPredictionArtifact),
     )
     if args.output is None:
-        print(json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        print(json.dumps(pilot_report.model_dump(mode="json"), ensure_ascii=False, indent=2))
     else:
-        _write_json(args.output, report)
+        _write_json(args.output, pilot_report)
 
 
 def _write_json(path: Path, artifact: BaseModel) -> None:

@@ -118,11 +118,26 @@ Frozen artifacts лежат в `evals/cleaning_pilot_2026-08-16/`. Predictions �
 .venv/bin/python -m tenderpulse.pilot_eval review \
   evals/cleaning_pilot_2026-08-16/sample.json \
   /tmp/report.json --output /tmp/HUMAN_REVIEW.md
+.venv/bin/python -m tenderpulse.pilot_eval import-human \
+  evals/cleaning_pilot_2026-08-16/sample.json \
+  evals/cleaning_pilot_2026-08-16/report.json \
+  evals/cleaning_pilot_2026-08-16/HUMAN_REVIEW.md \
+  /path/to/HUMAN_REVIEW_filled.md --output /tmp/human-reviews.json
+.venv/bin/python -m tenderpulse.pilot_eval evaluate-human \
+  evals/cleaning_pilot_2026-08-16/sample.json \
+  /tmp/human-reviews.json \
+  evals/cleaning_pilot_2026-08-16/predictions.json \
+  evals/cleaning_pilot_2026-08-16/report.json --output /tmp/human-report.json
 ```
 
 Сравнивайте `/tmp` с tracked current artifacts. `null` precision/recall означает отсутствие
 положительных labels/denominator в этой bounded выборке, а не нулевое качество. Human gate закрывается
-только после заполнения `HUMAN_REVIEW.md` без предварительного просмотра agent/matcher outcomes.
+требует независимой выборки минимум 50 notices; заполненный 15-row `HUMAN_REVIEW.md`
+закрывает shortlist handoff, но не заменяет full-pilot evidence.
+Импорт fail-loud при лишней/пустой строке, дубле, неизвестном label, amount/URL/universe
+расхождении или prediction snapshot, созданном после review. `shortlist_*` метрики нельзя
+использовать как full-pilot или market-quality claim. CLI создаёт file evidence; он не пишет
+reviewer enrichment в canonical records и не создаёт account DB revisions.
 
 ## Alerts и webhook
 

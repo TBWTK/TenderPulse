@@ -27,12 +27,12 @@ human pilot quality gate.
 | Attachments | unknown | `docs/DATA.md`, no adapter/code | unsafe scraping/format expansion | official contract review before adapter |
 | UI defect | confirmed | browser 390/768/1024/1280 | subjective pilot feedback ещё нет | pilot observation |
 | Cleaning profile facts | confirmed | user message + local DB v2 16.08.2026 | нет | collect missing operational evidence |
-| Keywords/exclusions | inferred | synthetic eval + 50-record agent pre-eval | human precision неизвестна | review 15-record packet |
+| Keywords/exclusions | inferred | synthetic eval + 15-row human diagnostic | full human precision неизвестна | independent ≥50 review |
 | Licences/experience | unknown | user explicitly supplied no facts | legal/eligibility error | keep unknown; verify per tender |
 | Budget semantics | confirmed | typed matcher tests + v2 500k–25m profile | нет для deterministic contract | validate on labeled sample |
 | Real relevance sample | confirmed | frozen 50-record ЕИС sample + agent labels | no positive denominator | human review 15 priorities |
 | Profile discovery | confirmed | official form parameters + six-query live worker run | RSS detail fields sparse | retain bounded query/run lineage |
-| Human review document | unknown | user will provide later | no human metric may be claimed | validate schema/universe on receipt |
+| Human review document | confirmed | exact SHA + 15-row typed import 16.08.2026 | shortlist selection bias remains | expand to independent ≥50 sample |
 
 Допустимые статусы: `confirmed`, `inferred`, `unknown`, `not applicable`.
 
@@ -74,6 +74,12 @@ Airflow и attachment scraping без official contract.
   отдельные run parameters/raw SHA; source search не объявляется решением matcher.
 - `0009_human_reviews` добавляет append-only revisions с account/profile/record/raw identity и
   optimistic concurrency. API требует CSRF, foreign history скрыта, stale identity получает `409`.
+- Полученный `HUMAN_REVIEW_filled.md` совпал с exact 15-row packet/order/amount/URL и был
+  обогащён frozen `sample_id`, record UUID/version/raw SHA. Исходный SHA — `ac65fbdb…c45`;
+  таблица содержит 1 `relevant`, 14 `not_relevant`, 0 abstention.
+- Pre-existing matcher snapshot даёт на этих 15 строках `TP=1`, `TN=14`, `FP=FN=0`; код жёстко
+  маркирует отчёт `eligible_for_full_pilot_gate=false`. Reviewer сверял часть facts по
+  сторонним открытым карточкам из-за нестабильной ЕИС; это evidence не мутирует canonical data.
 - Первый browser render честно выявил перегрузку 179 cards и overflow 396/390. Owner-policy shortlist
   теперь фиксирует 15 версий (до 10 actionable + 5 blind controls); 1280/768/390 проверки не показывают
   matcher output, horizontal overflow или console errors.
@@ -139,16 +145,16 @@ credential secret scan and opt-in bounded live ЕИС smoke.
 
 ## Открытые вопросы и блокеры
 
-Synthetic onboarding и agent pre-evaluation не заблокированы. Для закрытого пилота нужны документы
-компании и human labels: 15-record packet уже сформирован, но не заполнен владельцем. Official attachment
-contract остаётся explicit unknown; adapter запрещён без bounded machine-readable semantics.
+15-record human handoff закрыт, но full pilot quality заблокировано до независимой human-разметки
+минимум 50 notices с достаточным positive denominator. Также нужны документы/факты опыта
+компании для eligibility. Official attachment contract остаётся explicit unknown; adapter запрещён
+без bounded machine-readable semantics.
 
 ## Решение о поставке
 
-`accepted for local pre-pilot`: профиль, matching contract и agent-assisted evaluation имеют local
-evidence; checkpoint `79f22e2a0fce39ce90a427b27d333994145ff625` подтверждён direct remote-ref
-check. Это не `production-ready` и не подтверждение ≥80% precision на реальной компании: sample не
-содержит agent-positive denominator, а human packet ещё не размечен.
+`accepted for local pre-pilot`: профиль, matching contract, agent-assisted evaluation и 15-row human
+diagnostic имеют exact local evidence. Это не `production-ready` и не подтверждение ≥80% precision на
+реальной компании: полученная human-выборка мала и selection-biased.
 
 ## Решение о начале
 

@@ -13,11 +13,16 @@ from pydantic import ValidationError
 from tenderpulse.pilot_eval import (
     ArtifactValidationError,
     BlindLabelArtifact,
+    HumanReviewArtifact,
+    HumanReviewEvaluationReport,
+    PilotEvaluationReport,
     PilotPredictionArtifact,
     PilotSampleArtifact,
     build_prediction_artifact,
     canonical_artifact_sha256,
+    evaluate_human_review,
     evaluate_pilot,
+    import_human_review_markdown,
     render_human_review_markdown,
 )
 from tenderpulse.profiles import CompanyProfile
@@ -28,6 +33,44 @@ PREDICTED_AT = LABELS_FROZEN_AT + timedelta(minutes=5)
 PROFILE_SLUG = "cleaning-moscow"
 PROFILE_VERSION = 2
 TRACKED_EVAL_DIR = Path(__file__).parents[1] / "evals" / "cleaning_pilot_2026-08-16"
+
+
+def _filled_review_markdown(
+    sample: PilotSampleArtifact,
+    labels: list[str] | None = None,
+) -> bytes:
+    review_labels = labels or ["not_relevant"] * len(sample.items)
+    relevant_count = sum(label == "relevant" for label in review_labels)
+    not_relevant_count = sum(label == "not_relevant" for label in review_labels)
+    insufficient_count = sum(label == "insufficient_evidence" for label in review_labels)
+    lines = [
+        "# Human review packet — «Чистая территория»",
+        "",
+        "Дата ревью: **16.08.2026**.",
+        "",
+        (
+            "**Итог:** `relevant` — "
+            f"**{relevant_count} из {len(review_labels)}**; `not_relevant` — "
+            f"**{not_relevant_count} из {len(review_labels)}**; "
+            f"`insufficient_evidence` — **{insufficient_count} из {len(review_labels)}**."
+        ),
+        "",
+        (
+            "| № | Закупка | Предмет | НМЦК | Проверенные место исполнения / "
+            "окончание подачи | Ваш label | Причина | Требования к опыту / лицензиям |"
+        ),
+        "| ---: | --- | --- | ---: | --- | --- | --- | --- |",
+    ]
+    for index, (item, label) in enumerate(zip(sample.items, review_labels, strict=True), start=1):
+        amount = f"{item.amount:.2f}" if item.amount is not None else "unknown"
+        currency = item.currency or ""
+        lines.append(
+            f"| {index} | [{item.source_record_id}]({item.source_url}) | {item.title} | "
+            f"{amount} {currency} | Москва / **20.08.2026 09:00 МСК** | "
+            f"`{label}` | Проверенная причина для строки {index}. | "
+            "Специальная лицензия не указана. |"
+        )
+    return ("\n".join(lines) + "\n").encode()
 
 
 def _uuid(index: int) -> str:
@@ -625,3 +668,191 @@ def test_human_review_markdown_is_derived_from_sample_without_prediction_leakage
     assert sample.items[0].source_url in markdown
     assert "recommended" not in markdown
     assert "Blind domain judgement" not in markdown
+
+
+def test_filled_human_review_import_preserves_exact_lineage_and_document_provenance() -> None:
+    sample = _sample(3)
+    agent_labels = _labels(sample)
+    predictions = _predictions(sample, agent_labels)
+    agent_report = evaluate_pilot(sample, agent_labels, predictions, minimum_sample_size=1)
+    blank_packet = render_human_review_markdown(sample, agent_report).encode()
+    document = _filled_review_markdown(
+        sample,
+        ["not_relevant", "relevant", "insufficient_evidence"],
+    )
+
+    artifact = import_human_review_markdown(
+        sample,
+        agent_report,
+        blank_packet=blank_packet,
+        document=document,
+        source_document_name="HUMAN_REVIEW_filled.md",
+        imported_at=PREDICTED_AT + timedelta(minutes=10),
+    )
+
+    assert artifact.schema_version == "pilot-human-reviews/v1"
+    assert artifact.labeler_kind == "human"
+    assert artifact.profile_slug == PROFILE_SLUG
+    assert artifact.profile_version == PROFILE_VERSION
+    assert artifact.sample_sha256 == canonical_artifact_sha256(sample)
+    assert artifact.blank_packet_sha256 == canonical_artifact_sha256(blank_packet)
+    assert artifact.shortlist_report_sha256 == canonical_artifact_sha256(agent_report)
+    assert artifact.source_document_sha256 == canonical_artifact_sha256(document)
+    assert [review.label for review in artifact.reviews] == [
+        "not_relevant",
+        "relevant",
+        "insufficient_evidence",
+    ]
+    assert [review.sample_id for review in artifact.reviews] == [
+        item.sample_id for item in sample.items
+    ]
+    assert artifact.reviews[1].record_version_id == sample.items[1].record_version_id
+    assert artifact.reviews[1].raw_sha256 == sample.items[1].raw_sha256
+    assert artifact.reviews[1].checked_execution_and_deadline.startswith("Москва")
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_error"),
+    [
+        (lambda value: value.replace(b"`not_relevant`", b"`unknown_label`", 1), "label"),
+        (lambda value: value.replace(b"750000.00", b"750001.00", 1), "amount"),
+        (
+            lambda value: value.replace(b"0123456789000000000", b"0999999999999999999", 1),
+            "shortlist universe",
+        ),
+        (lambda value: b"\n".join(value.splitlines()[:-1]) + b"\n", "row count"),
+    ],
+)
+def test_filled_human_review_import_fails_loud_on_unverifiable_rows(
+    mutation: Any,
+    expected_error: str,
+) -> None:
+    sample = _sample(3)
+    agent_labels = _labels(sample)
+    predictions = _predictions(sample, agent_labels)
+    agent_report = evaluate_pilot(sample, agent_labels, predictions, minimum_sample_size=1)
+    document = mutation(_filled_review_markdown(sample))
+
+    with pytest.raises(ArtifactValidationError, match=expected_error):
+        import_human_review_markdown(
+            sample,
+            agent_report,
+            blank_packet=render_human_review_markdown(sample, agent_report).encode(),
+            document=document,
+            source_document_name="HUMAN_REVIEW_filled.md",
+            imported_at=PREDICTED_AT + timedelta(minutes=10),
+        )
+
+
+def test_human_review_metrics_are_explicitly_shortlist_only() -> None:
+    sample = _sample(3)
+    agent_labels = _labels(sample)
+    predictions = _predictions(
+        sample,
+        agent_labels,
+        [
+            _prediction(sample, 0, decision="review", score=45),
+            _prediction(sample, 1, decision="review", score=45),
+            _prediction(sample, 2, decision="not_relevant", score=5),
+        ],
+    )
+    agent_report = evaluate_pilot(sample, agent_labels, predictions, minimum_sample_size=1)
+    item_by_id = {item.sample_id: item for item in sample.items}
+    shortlist_sample = sample.model_copy(
+        update={
+            "items": tuple(
+                item_by_id[item.sample_id] for item in agent_report.human_review_shortlist
+            )
+        }
+    )
+    label_by_id = {
+        "sample-00": "not_relevant",
+        "sample-01": "relevant",
+        "sample-02": "insufficient_evidence",
+    }
+    reviews = import_human_review_markdown(
+        sample,
+        agent_report,
+        blank_packet=render_human_review_markdown(sample, agent_report).encode(),
+        document=_filled_review_markdown(
+            shortlist_sample,
+            [label_by_id[item.sample_id] for item in shortlist_sample.items],
+        ),
+        source_document_name="HUMAN_REVIEW_filled.md",
+        imported_at=PREDICTED_AT + timedelta(minutes=10),
+    )
+
+    report = evaluate_human_review(sample, reviews, predictions, agent_report)
+
+    assert report.schema_version == "pilot-human-review-report/v1"
+    assert report.selection_scope == "agent_matcher_prioritized_shortlist"
+    assert report.eligible_for_full_pilot_gate is False
+    assert report.metrics.sample_size == 3
+    assert report.metrics.confusion.model_dump() == {
+        "true_positive": 1,
+        "false_positive": 1,
+        "false_negative": 0,
+        "true_negative": 0,
+    }
+    assert report.metrics.shortlist_actionable_precision == pytest.approx(0.5)
+    assert report.metrics.shortlist_recall == pytest.approx(1.0)
+    assert report.metrics.human_abstention_rate == pytest.approx(1 / 3)
+    assert report.metrics.human_label_coverage == pytest.approx(2 / 3)
+    assert report.metrics.matcher_actionable_coverage == pytest.approx(2 / 3)
+    assert report.human_reviews_sha256 == canonical_artifact_sha256(reviews)
+    assert report.predictions_sha256 == canonical_artifact_sha256(predictions)
+
+
+def test_tracked_human_review_artifacts_reproduce_scoped_report() -> None:
+    human_reviews = HumanReviewArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews.json").read_text(encoding="utf-8")
+    )
+    saved_report = HumanReviewEvaluationReport.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-report.json").read_text(encoding="utf-8")
+    )
+    sample = PilotSampleArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "sample.json").read_text(encoding="utf-8")
+    )
+    predictions = PilotPredictionArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "predictions.json").read_text(encoding="utf-8")
+    )
+    shortlist_report = PilotEvaluationReport.model_validate_json(
+        (TRACKED_EVAL_DIR / "report.json").read_text(encoding="utf-8")
+    )
+
+    reproduced = evaluate_human_review(sample, human_reviews, predictions, shortlist_report)
+
+    assert reproduced == saved_report
+    assert human_reviews.source_document_sha256 == (
+        "ac65fbdbf8b8623f55385c13990efa39265ba32741fcffa6898c0243f1d18c45"
+    )
+    assert len(human_reviews.reviews) == 15
+    assert sum(review.label == "relevant" for review in human_reviews.reviews) == 1
+    assert reproduced.metrics.confusion.model_dump() == {
+        "true_positive": 1,
+        "false_positive": 0,
+        "false_negative": 0,
+        "true_negative": 14,
+    }
+    assert reproduced.metrics.shortlist_actionable_precision == 1.0
+    assert reproduced.metrics.shortlist_recall == 1.0
+    assert reproduced.eligible_for_full_pilot_gate is False
+
+
+def test_human_review_evaluation_rejects_unbound_shortlist_report() -> None:
+    sample = _sample(3)
+    agent_labels = _labels(sample)
+    predictions = _predictions(sample, agent_labels)
+    shortlist_report = evaluate_pilot(sample, agent_labels, predictions, minimum_sample_size=1)
+    reviews = import_human_review_markdown(
+        sample,
+        shortlist_report,
+        blank_packet=render_human_review_markdown(sample, shortlist_report).encode(),
+        document=_filled_review_markdown(sample),
+        source_document_name="HUMAN_REVIEW_filled.md",
+        imported_at=PREDICTED_AT + timedelta(minutes=10),
+    )
+    tampered = reviews.model_copy(update={"shortlist_report_sha256": "f" * 64})
+
+    with pytest.raises(ArtifactValidationError, match="shortlist report"):
+        evaluate_human_review(sample, tampered, predictions, shortlist_report)

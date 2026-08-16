@@ -17,12 +17,12 @@ updated: 2026-08-16
 | Immutable review | migration + repository eval | SQLite/PostgreSQL | append revision and list history | exact account/profile/record/raw identity retained | passing |
 | Tenant/stale safety | adversarial API eval | two accounts + changed record/profile | foreign and stale submissions | fail closed with 404/409; no hidden fallback | passing |
 | Blind review UI | route/static/browser | 390/768/1280 px | inspect content, form, nav and overflow | raw facts/official link visible; matcher output absent | passing |
-| Honest pilot boundary | docs/artifact audit | no supplied human document | metrics/import assertions | no generated human labels or quality claim | passing |
+| Honest pilot boundary | docs/artifact audit | supplied 15-row document | exact import + scope assertions | human labels preserved; shortlist metric is not pilot claim | passing |
 | Release coherence | full regression | local/Compose/dbt/Git | release commands | tests/coverage/lint/dbt/health/audits pass | passing |
 
 Fail-first order: query/plan/run tests → discovery implementation → review schema/repository/API/UI tests →
 implementation → full verification. Live source proves current compatibility only; deterministic fixtures
-own CI. The later human document is external acceptance evidence and is not fabricated for this stage.
+own CI. Supplied human evidence remains a separate immutable artifact and is never fabricated or completed by code.
 
 Fail-first signatures: missing `tenderpulse.discovery`, then missing `tenderpulse.human_reviews`;
 browser acceptance separately exposed 179-card overload and `396 > 390` mobile width. Final evidence:
@@ -122,6 +122,23 @@ Full suite: `222 passed`, branch coverage `85.85%`; Ruff/format/strict mypy pass
 Compose is healthy. Artifact integrity/leakage/secret scans and both documentation audits pass.
 Checkpoint `79f22e2a0fce39ce90a427b27d333994145ff625` is present in `origin/codex/ui-redesign`.
 
+### Human-reviewed 15-record diagnostic — complete
+
+| Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- | --- |
+| Document integrity | raw SHA + tracked bytes | supplied Markdown | byte/hash comparison | exact SHA `ac65fbdb…c45` | passing |
+| Exact universe | contract eval | sample/report/blank packet | ID/order/URL/amount join | 15/15 rows map to exact record lineage | passing |
+| Fail-loud parsing | negative unit tests | malformed Markdown | label/amount/ID/row mutations | every unverifiable mutation rejected | passing |
+| Frozen comparison | typed eval | pre-existing predictions | hash/time/profile/version checks | snapshot predates import; no label leakage | passing |
+| Honest scope | schema + docs audit | 15 prioritized rows | report fields/assertions | `eligible_for_full_pilot_gate=false` | passing |
+| Reproducibility | tracked artifact test + CLI | local deterministic files | re-evaluate saved inputs | byte-equivalent typed report | passing |
+
+Evidence 16.08.2026: user-supplied table contains 1 `relevant`, 14 `not_relevant`, 0 abstentions.
+Existing matcher yields `TP=1`, `TN=14`, `FP=FN=0`, human label coverage `100%` and matcher actionable
+coverage `1/15`. `shortlist_actionable_precision=1.0` and `shortlist_recall=1.0` apply only to these
+15 selected records. The selection used agent/matcher priorities and does not satisfy the independent
+≥50-notice human pilot gate; the report encodes that prohibition instead of relying on prose.
+
 | Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
 | --- | --- | --- | --- | --- | --- |
 | Реальный company fit | Human-labeled eval | ≥1 реальная компания, ≥50 ЕИС notices | blind label → matcher comparison | actionable precision ≥80%; hard onsite geo false admission = 0 | blocked |
@@ -132,7 +149,9 @@ Checkpoint `79f22e2a0fce39ce90a427b27d333994145ff625` is present in `origin/code
 | Защита и recovery | Security/operations rehearsal | непубличный pilot contour | access review + backup/restore + restart/retry | доступ ограничен; PostgreSQL/MinIO восстановлены; failures видимы | planned |
 | Выход в Production v1 | Stakeholder decision record | результаты всех pilot gates | product review | только `go`, `extend` с gap или `stop`; скрытых failed gates нет | planned |
 
-Blocked rows требуют профиль и пользовательскую разметку, решение о document scope и выбор канала alerts.
+Blocked rows требуют independent ≥50-notice пользовательскую разметку, документы компании,
+решение о document scope и выбор канала alerts. 15-row diagnostic закрывает handoff,
+но не подменяет эти gates.
 `Recall` и полнота российского рынка не являются честной метрикой, пока не задана ограниченная вселенная
 источника. Live-source/LLM проверки дополняют, но не заменяют сохранённую пилотную разметку.
 

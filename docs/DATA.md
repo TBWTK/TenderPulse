@@ -38,6 +38,8 @@ updated: 2026-08-16
 | Blind pilot label | provisional agent judgement/reason/confidence, без matcher fields | eval labeler | sample ID + rubric version |
 | Pilot prediction | frozen matcher decision/evidence references | eval runner | sample ID + profile version + policy version |
 | Pilot report | scoped metrics/disagreements/review shortlist | eval evaluator | sample hash + labels hash + predictions hash |
+| Imported human review | reviewer labels/text + exact frozen lineage, без canonical mutation | eval importer | document + packet + shortlist hashes |
+| Human shortlist report | biased-scope comparison with pre-existing matcher snapshot | eval evaluator | human artifact + predictions + shortlist report hashes |
 | Human review revision | ручная оценка exact source/profile state | human-review service | account + profile version + record version + revision |
 
 ## Lifecycle и версии
@@ -77,6 +79,9 @@ updated: 2026-08-16
 15. Pilot sample замораживается до labels/predictions и хранит только bounded canonical public facts и
     lineage identifiers. Labels и predictions — разные artifacts; evaluator проверяет hashes и полный
     join по sample IDs. Agent label никогда не перезаписывает canonical procurement или recommendation.
+16. Filled human packet проверяет 15 exact source IDs/order, amounts, official URLs и явные
+    labels, затем обогащает каждую строку `sample_id`/record UUID/version/raw SHA из frozen sample.
+    Reviewer text хранится как evidence в import artifact, но не как source-authoritative fact.
 
 ## Frozen agent-assisted pilot artifacts — 16.08.2026
 
@@ -89,6 +94,14 @@ updated: 2026-08-16
 - `predictions.json` SHA-256 `af022303…1ac` и `report.json` SHA-256 `db0c2def…c7bb` — результат
   `tender-matcher/exact-phrase-review-v1`;
 - `HUMAN_REVIEW.md` — 15 строк без раскрытия agent/matcher решений, предназначенных для владельца.
+- `HUMAN_REVIEW_filled.md` SHA-256 `ac65fbdb…45`: exact полученные bytes, 1 `relevant`,
+  14 `not_relevant`, 0 `insufficient_evidence`;
+- `human-reviews.json` SHA-256 `1aec5fae…152c`: typed import с document/packet/shortlist/profile/record
+  hashes; `human-report.json` SHA-256 `f2dc3641…209`: `TP=1`, `TN=14`, `FP=FN=0`, coverage 100%.
+
+Human report не закрывает full pilot gate: shortlist имеет размер 15 и отобран по
+agent/matcher priorities. Его `shortlist_actionable_precision=1.0` и `shortlist_recall=1.0` описывают
+только эти 15 строк; `eligible_for_full_pilot_gate=false` является частью schema.
 
 Tracked sample не содержит source bytes: raw SHA/run/version делают происхождение проверяемым, но
 полный RSS остаётся в MinIO/PostgreSQL. RSS не дал region/deadline/classifications для этих 50 records;
