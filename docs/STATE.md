@@ -115,6 +115,8 @@ sample и exact 15-row human artifact, не показывает agent/matcher o
 - Fail-first remainder suite остановился на `ImportError: HumanReviewRemainderPacket`; после реализации
   focused suite проходит `42` tests. Full suite — `250` tests, `84.99%` branch coverage;
   Ruff/format/strict mypy, project-control/IMMUNE audits, diff и secret scan проходят.
+- Verified remainder checkpoint `b8b170c21c277e30381f6967d7b62d2058f750de` опубликован в
+  `origin/codex/ui-redesign`; direct remote-ref check вернул тот же hash.
 
 ## Changed areas
 
@@ -218,3 +220,4 @@ Remaining-35 fail-first 16.08.2026 остановил collection с
 tracked Markdown SHA-256 `6cde292f5cd43a6d26c6502681bb4ac48a2a2190c522431e4e3991a2f7e05dff`
 воспроизводится byte-for-byte. Full suite — `250` tests, `84.99%` branch coverage;
 Ruff/format/strict mypy, project-control/IMMUNE audits, `git diff --check` и secret scan проходят.
+Implementation checkpoint `b8b170c21c277e30381f6967d7b62d2058f750de` подтверждён на remote branch.
