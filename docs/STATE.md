@@ -98,6 +98,8 @@ diagnostic; новые labels не генерировать от имени по
   проходит `38` tests. Full suite: `246` tests, `85.25%` branch coverage; Ruff/format/strict mypy
   проходят, dbt — `PASS=71 WARN=0 ERROR=0`.
 - Rebuilt Docker API/worker/PostgreSQL/MinIO healthy, init завершён с `0`, API health — `{"status":"ok"}`.
+- Verified human-review checkpoint `c1439f93ea7a8fa345b3877529fe661f24939814` опубликован в
+  `origin/codex/ui-redesign`; direct remote-ref check вернул тот же hash.
 
 ## Changed areas
 
@@ -188,3 +190,4 @@ invalid label/amount/universe/row-count и unbound shortlist-report cases. Full 
 `85.25%` branch coverage; Ruff/format/strict mypy проходят. Re-evaluation tracked human artifact
 даёт `TP=1`, `TN=14`, `FP=FN=0`, но `eligible_for_full_pilot_gate=false`. dbt завершён
 с `PASS=71 WARN=0 ERROR=0`; rebuilt Compose здоров, init вышел с `0`, API health — `ok`.
+Implementation checkpoint `c1439f93ea7a8fa345b3877529fe661f24939814` подтверждён на remote branch.
