@@ -99,6 +99,11 @@ flowchart LR
   обязаны partition-ировать все 50 IDs. Generator читает из sample только official URL,
   title и amount, а все reviewer fields оставляет пустыми; labels/predictions/report не являются
   input рендеринга. Так полная coverage не создаёт label leakage.
+- PDF import — отдельный boundary adapter: он проверяет container, embedded official links и layout-table,
+  но canonical identity/amount берёт только из frozen sample после exact join. Remainder и initial review
+  artifacts являются immutable evidence; full artifact строится их строгим partition merge.
+  Pilot gate использует point metrics только как description и требует 95% Wilson lower bound не ниже
+  целевых 80%; один положительный пример не может выглядеть доказанным качеством 100%.
 - Human review — account-authorized append-only revision stream, связанный с exact profile version,
   record version и raw SHA. Review UI читает canonical source facts, но не matcher output; stale identity
   отклоняется, а исправление создаёт следующую revision вместо перезаписи.

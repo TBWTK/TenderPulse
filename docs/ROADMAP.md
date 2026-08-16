@@ -30,6 +30,7 @@ updated: 2026-08-16
 | Cleaning pilot onboarding | Версионированный профиль «Чистая территория» с честным budget/geo/qualification matching | 10+ synthetic scenarios, DB v1→v2/restart, 390/768/1280 browser, release gates | done |
 | Agent-assisted pilot eval | Blind pre-evaluation «Чистой территории» на ≥50 real ЕИС notices | frozen lineage sample, separate labels/predictions, reproducible metrics, human review packet | done |
 | Profile discovery + review contour | Профильные bounded ЕИС queries и immutable blind human-review workflow | query/run lineage, tenant/stale safety, responsive review UI, no fabricated labels | done |
+| Full-50 human relevance diagnostic | Вся frozen выборка размечена владельцем и сравнена с pre-existing matcher snapshot | exact PDF/lineage merge, confusion, 95% precision bound, honest gate | done |
 | Закрытый пилот | Реальная компания регулярно получает проверяемую actionable-очередь и принимает решения | ≥50 размеченных notices, precision ≥80%, 14 дней ingestion, AI/alert/recovery gates и ≥10 решений | planned |
 | Production v1 | Проверенная пилотом ценность работает в выбранной production-модели | Pilot go-decision, production security/operations SLO и rollout/rollback evidence | planned |
 

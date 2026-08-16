@@ -1,0 +1,33 @@
+{
+  "schema_version": "pilot-human-review-full-report/v1",
+  "sample_sha256": "caafafdc42ab7da509fc1ef6413accd6b08c55bfacbd8ed0497debe6e34a9460",
+  "human_reviews_sha256": "a8f1cee4fcdd536056c0d2480cc580a1dc2f9cc63b7965b1bda157066ea72cfa",
+  "predictions_sha256": "1cc187e93f09ce15e17a3861a3a140541bd0b9fe175b65533e3bf9b45a948cb5",
+  "profile_slug": "cleaning-moscow",
+  "profile_version": 2,
+  "selection_scope": "full_frozen_sample",
+  "target_actionable_precision": 0.8,
+  "confidence_level": 0.95,
+  "eligible_for_full_pilot_gate": false,
+  "gate_failures": [
+    "precision_confidence_below_target"
+  ],
+  "metrics": {
+    "sample_size": 50,
+    "positive_label_count": 1,
+    "confusion": {
+      "true_positive": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "true_negative": 49
+    },
+    "human_actionable_precision": 1.0,
+    "bounded_sample_recall": 1.0,
+    "precision_wilson_lower_bound_95": 0.20654329147389294,
+    "human_abstention_rate": 0.0,
+    "human_label_coverage": 1.0,
+    "matcher_actionable_coverage": 0.02,
+    "recommended_false_admissions": 0
+  },
+  "disagreements": []
+}

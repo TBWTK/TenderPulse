@@ -4,14 +4,19 @@ import argparse
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from io import BytesIO
+from math import sqrt
 from pathlib import Path
 from typing import Any, Literal, cast
 from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pypdf import PdfReader
+from pypdf.errors import PyPdfError
 
 from tenderpulse.domain.geography import ServiceDeliveryMode
 from tenderpulse.domain.matching import TenderMatcher
@@ -28,6 +33,8 @@ from tenderpulse.profiles import CompanyProfile, load_demo_profiles
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _ARTIFACT_CONFIG = ConfigDict(frozen=True, extra="forbid")
+_MAX_HUMAN_REVIEW_PDF_BYTES = 2 * 1024 * 1024
+_MAX_HUMAN_REVIEW_PDF_PAGES = 20
 
 
 class ArtifactValidationError(ValueError):
@@ -45,6 +52,12 @@ def _validate_sha256(value: str) -> str:
     if not _SHA256_RE.fullmatch(normalized):
         raise ValueError("value must be a lowercase hexadecimal SHA-256")
     return normalized
+
+
+def _validate_source_document_name(value: str) -> str:
+    if Path(value).name != value or value in {".", ".."}:
+        raise ValueError("source_document_name must be a filename without a path")
+    return value
 
 
 class PilotCapture(BaseModel):
@@ -444,18 +457,11 @@ class HumanReviewArtifact(BaseModel):
     @field_validator("source_document_name")
     @classmethod
     def validate_source_document_name(cls, value: str) -> str:
-        if Path(value).name != value or value in {".", ".."}:
-            raise ValueError("source_document_name must be a filename without a path")
-        return value
+        return _validate_source_document_name(value)
 
     @model_validator(mode="after")
     def validate_review_universe(self) -> HumanReviewArtifact:
-        _require_unique_sample_ids(self.reviews)
-        source_ids = [review.source_record_id for review in self.reviews]
-        if len(source_ids) != len(set(source_ids)):
-            raise ValueError("human review contains duplicate source record IDs")
-        if [review.row_number for review in self.reviews] != list(range(1, len(self.reviews) + 1)):
-            raise ValueError("human review row numbers must be contiguous and ordered")
+        _validate_imported_review_sequence(self.reviews)
         return self
 
 
@@ -487,6 +493,87 @@ class HumanReviewRemainderPacket(BaseModel):
         return self
 
 
+class HumanReviewRemainderArtifact(BaseModel):
+    model_config = _ARTIFACT_CONFIG
+
+    schema_version: Literal["pilot-human-review-remainder-filled/v1"]
+    sample_sha256: str
+    blank_packet_sha256: str
+    completed_reviews_sha256: str
+    shortlist_report_sha256: str
+    source_document_sha256: str
+    source_document_name: str = Field(min_length=1)
+    source_page_count: int = Field(ge=1)
+    embedded_official_link_count: int = Field(ge=1)
+    profile_slug: str = Field(min_length=1)
+    profile_version: int = Field(ge=1)
+    labeler_kind: Literal["human"]
+    reviewed_on: date
+    imported_at: datetime
+    selection_scope: Literal["remaining_unreviewed_frozen_sample"]
+    reviews: tuple[ImportedHumanReview, ...]
+
+    @field_validator(
+        "sample_sha256",
+        "blank_packet_sha256",
+        "completed_reviews_sha256",
+        "shortlist_report_sha256",
+        "source_document_sha256",
+    )
+    @classmethod
+    def validate_hashes(cls, value: str) -> str:
+        return _validate_sha256(value)
+
+    @field_validator("imported_at")
+    @classmethod
+    def validate_imported_at(cls, value: datetime) -> datetime:
+        return _require_aware(value)
+
+    @field_validator("source_document_name")
+    @classmethod
+    def validate_source_document_name(cls, value: str) -> str:
+        return _validate_source_document_name(value)
+
+    @model_validator(mode="after")
+    def validate_review_universe(self) -> HumanReviewRemainderArtifact:
+        _validate_imported_review_sequence(self.reviews, expected_size=35)
+        return self
+
+
+class FullHumanReviewArtifact(BaseModel):
+    model_config = _ARTIFACT_CONFIG
+
+    schema_version: Literal["pilot-human-reviews-full/v1"]
+    sample_sha256: str
+    initial_reviews_sha256: str
+    remainder_reviews_sha256: str
+    profile_slug: str = Field(min_length=1)
+    profile_version: int = Field(ge=1)
+    labeler_kind: Literal["human"]
+    selection_scope: Literal["full_frozen_sample"]
+    latest_review_imported_at: datetime
+    reviews: tuple[ImportedHumanReview, ...]
+
+    @field_validator(
+        "sample_sha256",
+        "initial_reviews_sha256",
+        "remainder_reviews_sha256",
+    )
+    @classmethod
+    def validate_hashes(cls, value: str) -> str:
+        return _validate_sha256(value)
+
+    @field_validator("latest_review_imported_at")
+    @classmethod
+    def validate_latest_review_imported_at(cls, value: datetime) -> datetime:
+        return _require_aware(value)
+
+    @model_validator(mode="after")
+    def validate_review_universe(self) -> FullHumanReviewArtifact:
+        _validate_imported_review_sequence(self.reviews, expected_size=50)
+        return self
+
+
 class HumanReviewMetrics(BaseModel):
     model_config = _ARTIFACT_CONFIG
 
@@ -512,6 +599,52 @@ class HumanReviewEvaluationReport(BaseModel):
     eligible_for_full_pilot_gate: Literal[False]
     metrics: HumanReviewMetrics
     disagreements: tuple[str, ...]
+
+
+class FullHumanReviewMetrics(BaseModel):
+    model_config = _ARTIFACT_CONFIG
+
+    sample_size: int
+    positive_label_count: int
+    confusion: ConfusionCounts
+    human_actionable_precision: float | None
+    bounded_sample_recall: float | None
+    precision_wilson_lower_bound_95: float | None
+    human_abstention_rate: float
+    human_label_coverage: float
+    matcher_actionable_coverage: float
+    recommended_false_admissions: int
+
+
+class FullHumanReviewEvaluationReport(BaseModel):
+    model_config = _ARTIFACT_CONFIG
+
+    schema_version: Literal["pilot-human-review-full-report/v1"]
+    sample_sha256: str
+    human_reviews_sha256: str
+    predictions_sha256: str
+    profile_slug: str
+    profile_version: int
+    selection_scope: Literal["full_frozen_sample"]
+    target_actionable_precision: float
+    confidence_level: float = Field(ge=0.95, le=0.95)
+    eligible_for_full_pilot_gate: bool
+    gate_failures: tuple[str, ...]
+    metrics: FullHumanReviewMetrics
+    disagreements: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _ParsedPdfReviewRow:
+    row_number: int
+    source_record_id: str
+    reviewed_subject: str
+    reviewed_amount: Decimal | None
+    reviewed_currency: str | None
+    checked_execution_and_deadline: str
+    label: BlindLabelName
+    reason: str
+    eligibility_notes: str
 
 
 def canonical_artifact_sha256(value: object) -> str:
@@ -1018,6 +1151,480 @@ def render_remaining_human_review_markdown(
     return "\n".join(lines) + "\n"
 
 
+def import_remaining_human_review_pdf(
+    sample: PilotSampleArtifact,
+    completed: HumanReviewArtifact,
+    shortlist_report: PilotEvaluationReport,
+    *,
+    blank_packet: bytes,
+    document: bytes,
+    source_document_name: str,
+    imported_at: datetime,
+) -> HumanReviewRemainderArtifact:
+    _require_aware(imported_at)
+    if Path(source_document_name).suffix.casefold() != ".pdf":
+        raise ArtifactValidationError("human review source document must be a PDF file")
+    packet = build_remaining_human_review_packet(sample, completed, shortlist_report)
+    expected_blank = render_remaining_human_review_markdown(sample, packet).encode("utf-8")
+    if blank_packet != expected_blank:
+        raise ArtifactValidationError(
+            "blank remainder packet does not match the generated complement"
+        )
+
+    page_texts, official_links = _read_human_review_pdf(document)
+    reviewed_on, rows, declared_counts = _parse_human_review_pdf(page_texts)
+    if len(rows) != len(packet.sample_ids):
+        raise ArtifactValidationError(
+            f"human review PDF row count {len(rows)} does not match remainder 35"
+        )
+
+    item_by_id = {item.sample_id: item for item in sample.items}
+    expected_items = [item_by_id[sample_id] for sample_id in packet.sample_ids]
+    expected_source_ids = [item.source_record_id for item in expected_items]
+    if [row.source_record_id for row in rows] != expected_source_ids:
+        raise ArtifactValidationError(
+            "human review PDF does not match the exact remainder universe/order"
+        )
+    expected_urls = {item.source_url for item in expected_items}
+    if (
+        len(official_links) != 35
+        or len(set(official_links)) != 35
+        or set(official_links) != expected_urls
+    ):
+        raise ArtifactValidationError(
+            "human review PDF official hyperlinks do not match the exact remainder"
+        )
+
+    actual_counts = {label: 0 for label in ("relevant", "not_relevant", "insufficient_evidence")}
+    reviews: list[ImportedHumanReview] = []
+    for row, sample_id, item in zip(rows, packet.sample_ids, expected_items, strict=True):
+        if row.reviewed_amount != item.amount or row.reviewed_currency != item.currency:
+            raise ArtifactValidationError(f"amount mismatch for remainder row {row.row_number}")
+        if _normalized_review_text(row.reviewed_subject) != _normalized_review_text(item.title):
+            raise ArtifactValidationError(f"subject mismatch for remainder row {row.row_number}")
+        actual_counts[row.label] += 1
+        reviews.append(
+            ImportedHumanReview(
+                row_number=row.row_number,
+                sample_id=sample_id,
+                source_record_id=item.source_record_id,
+                source_url=item.source_url,
+                record_version_id=item.record_version_id,
+                record_version=item.record_version,
+                raw_sha256=item.raw_sha256,
+                label=row.label,
+                reviewed_subject=row.reviewed_subject,
+                reviewed_amount=row.reviewed_amount,
+                reviewed_currency=row.reviewed_currency,
+                checked_execution_and_deadline=row.checked_execution_and_deadline,
+                reason=row.reason,
+                eligibility_notes=row.eligibility_notes,
+            )
+        )
+    if actual_counts != declared_counts:
+        raise ArtifactValidationError("declared label counts do not match human review PDF rows")
+
+    return HumanReviewRemainderArtifact(
+        schema_version="pilot-human-review-remainder-filled/v1",
+        sample_sha256=packet.sample_sha256,
+        blank_packet_sha256=canonical_artifact_sha256(blank_packet),
+        completed_reviews_sha256=packet.completed_reviews_sha256,
+        shortlist_report_sha256=packet.shortlist_report_sha256,
+        source_document_sha256=canonical_artifact_sha256(document),
+        source_document_name=source_document_name,
+        source_page_count=len(page_texts),
+        embedded_official_link_count=len(official_links),
+        profile_slug=packet.profile_slug,
+        profile_version=packet.profile_version,
+        labeler_kind="human",
+        reviewed_on=reviewed_on,
+        imported_at=imported_at,
+        selection_scope="remaining_unreviewed_frozen_sample",
+        reviews=tuple(reviews),
+    )
+
+
+def merge_human_reviews(
+    sample: PilotSampleArtifact,
+    initial: HumanReviewArtifact,
+    remainder: HumanReviewRemainderArtifact,
+) -> FullHumanReviewArtifact:
+    sample_hash = canonical_artifact_sha256(sample)
+    if initial.sample_sha256 != sample_hash or remainder.sample_sha256 != sample_hash:
+        raise ArtifactValidationError("human review sample hash mismatch")
+    if remainder.completed_reviews_sha256 != canonical_artifact_sha256(initial):
+        raise ArtifactValidationError("remainder does not reference the completed initial reviews")
+    if (
+        initial.profile_slug != remainder.profile_slug
+        or initial.profile_version != remainder.profile_version
+        or sample.profile_slug != initial.profile_slug
+    ):
+        raise ArtifactValidationError("human review profile mismatch")
+
+    try:
+        _validate_imported_review_sequence(initial.reviews, expected_size=15)
+        _validate_imported_review_sequence(remainder.reviews, expected_size=35)
+    except ValueError as error:
+        raise ArtifactValidationError("human reviews do not form the expected partition") from error
+    initial_by_id = {review.sample_id: review for review in initial.reviews}
+    remainder_by_id = {review.sample_id: review for review in remainder.reviews}
+    sample_ids = [item.sample_id for item in sample.items]
+    if set(initial_by_id) & set(remainder_by_id) or set(initial_by_id) | set(
+        remainder_by_id
+    ) != set(sample_ids):
+        raise ArtifactValidationError(
+            "initial and remainder reviews do not partition frozen sample"
+        )
+
+    item_by_id = {item.sample_id: item for item in sample.items}
+    ordered: list[ImportedHumanReview] = []
+    for row_number, sample_id in enumerate(sample_ids, start=1):
+        review = initial_by_id.get(sample_id) or remainder_by_id[sample_id]
+        if not _review_matches_sample_item(review, item_by_id[sample_id]):
+            raise ArtifactValidationError(f"human review lineage mismatch for {sample_id}")
+        ordered.append(review.model_copy(update={"row_number": row_number}))
+
+    return FullHumanReviewArtifact(
+        schema_version="pilot-human-reviews-full/v1",
+        sample_sha256=sample_hash,
+        initial_reviews_sha256=canonical_artifact_sha256(initial),
+        remainder_reviews_sha256=canonical_artifact_sha256(remainder),
+        profile_slug=initial.profile_slug,
+        profile_version=initial.profile_version,
+        labeler_kind="human",
+        selection_scope="full_frozen_sample",
+        latest_review_imported_at=max(initial.imported_at, remainder.imported_at),
+        reviews=tuple(ordered),
+    )
+
+
+def evaluate_full_human_review(
+    sample: PilotSampleArtifact,
+    reviews: FullHumanReviewArtifact,
+    predictions: PilotPredictionArtifact,
+    *,
+    target_actionable_precision: float = 0.8,
+) -> FullHumanReviewEvaluationReport:
+    sample_hash = canonical_artifact_sha256(sample)
+    if reviews.sample_sha256 != sample_hash or predictions.sample_sha256 != sample_hash:
+        raise ArtifactValidationError("sample hash mismatch across full human-review artifacts")
+    if (
+        reviews.profile_slug != predictions.profile_slug
+        or reviews.profile_version != predictions.profile_version
+        or sample.profile_slug != reviews.profile_slug
+    ):
+        raise ArtifactValidationError("profile mismatch in full human-review evaluation")
+    if predictions.generated_at >= reviews.latest_review_imported_at:
+        raise ArtifactValidationError(
+            "full human-review metrics require predictions frozen before review import"
+        )
+    if not 0 < target_actionable_precision <= 1:
+        raise ArtifactValidationError("target actionable precision must be in (0, 1]")
+
+    items = {item.sample_id: item for item in sample.items}
+    predictions_by_id = {prediction.sample_id: prediction for prediction in predictions.predictions}
+    review_ids = [review.sample_id for review in reviews.reviews]
+    if review_ids != [item.sample_id for item in sample.items] or set(predictions_by_id) != set(
+        items
+    ):
+        raise ArtifactValidationError("full human review does not cover the exact sample universe")
+
+    tp = fp = fn = tn = abstentions = matcher_actionable = recommended_false = 0
+    disagreements: list[str] = []
+    actionable = {"recommended", "review"}
+    for review in reviews.reviews:
+        item = items[review.sample_id]
+        prediction = predictions_by_id[review.sample_id]
+        if not _review_matches_sample_item(review, item) or (
+            prediction.record_version_id != item.record_version_id
+            or prediction.record_version != item.record_version
+        ):
+            raise ArtifactValidationError(
+                f"full human review lineage mismatch for {review.sample_id}"
+            )
+        is_actionable = prediction.decision in actionable
+        matcher_actionable += int(is_actionable)
+        if review.label == "insufficient_evidence":
+            abstentions += 1
+            continue
+        if review.label == "relevant":
+            if is_actionable:
+                tp += 1
+            else:
+                fn += 1
+                disagreements.append(review.sample_id)
+        elif is_actionable:
+            fp += 1
+            disagreements.append(review.sample_id)
+            recommended_false += int(prediction.decision == "recommended")
+        else:
+            tn += 1
+
+    total = len(reviews.reviews)
+    precision_denominator = tp + fp
+    recall_denominator = tp + fn
+    precision = tp / precision_denominator if precision_denominator else None
+    precision_lower = (
+        _wilson_lower_bound(tp, precision_denominator) if precision_denominator else None
+    )
+    coverage = (total - abstentions) / total
+    gate_failures: list[str] = []
+    if coverage < 1:
+        gate_failures.append("incomplete_human_label_coverage")
+    if precision_lower is None:
+        gate_failures.append("actionable_precision_undefined")
+    elif precision_lower < target_actionable_precision:
+        gate_failures.append("precision_confidence_below_target")
+    if recommended_false:
+        gate_failures.append("recommended_false_admissions")
+
+    return FullHumanReviewEvaluationReport(
+        schema_version="pilot-human-review-full-report/v1",
+        sample_sha256=sample_hash,
+        human_reviews_sha256=canonical_artifact_sha256(reviews),
+        predictions_sha256=canonical_artifact_sha256(predictions),
+        profile_slug=reviews.profile_slug,
+        profile_version=reviews.profile_version,
+        selection_scope="full_frozen_sample",
+        target_actionable_precision=target_actionable_precision,
+        confidence_level=0.95,
+        eligible_for_full_pilot_gate=not gate_failures,
+        gate_failures=tuple(gate_failures),
+        metrics=FullHumanReviewMetrics(
+            sample_size=total,
+            positive_label_count=tp + fn,
+            confusion=ConfusionCounts(
+                true_positive=tp,
+                false_positive=fp,
+                false_negative=fn,
+                true_negative=tn,
+            ),
+            human_actionable_precision=precision,
+            bounded_sample_recall=tp / recall_denominator if recall_denominator else None,
+            precision_wilson_lower_bound_95=precision_lower,
+            human_abstention_rate=abstentions / total,
+            human_label_coverage=coverage,
+            matcher_actionable_coverage=matcher_actionable / total,
+            recommended_false_admissions=recommended_false,
+        ),
+        disagreements=tuple(disagreements),
+    )
+
+
+def _read_human_review_pdf(document: bytes) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    if not document.startswith(b"%PDF-"):
+        raise ArtifactValidationError("human review document is not a valid PDF")
+    if len(document) > _MAX_HUMAN_REVIEW_PDF_BYTES:
+        raise ArtifactValidationError("human review PDF exceeds the 2 MiB safety limit")
+    try:
+        reader = PdfReader(BytesIO(document), strict=True)
+        if reader.is_encrypted:
+            raise ArtifactValidationError("encrypted human review PDF is not supported")
+        if not 1 <= len(reader.pages) <= _MAX_HUMAN_REVIEW_PDF_PAGES:
+            raise ArtifactValidationError("human review PDF page count is outside the safety limit")
+        page_texts = tuple(
+            page.extract_text(extraction_mode="layout") or "" for page in reader.pages
+        )
+        official_links: list[str] = []
+        for page in reader.pages:
+            for annotation_ref in page.get("/Annots", ()):
+                annotation = annotation_ref.get_object()
+                action = annotation.get("/A")
+                uri = action.get("/URI") if action is not None else None
+                if uri is not None:
+                    official_links.append(str(uri))
+    except PyPdfError as error:
+        raise ArtifactValidationError("human review document is not a valid PDF") from error
+    if not page_texts or any(not text.strip() for text in page_texts):
+        raise ArtifactValidationError("human review PDF contains an empty or unreadable page")
+    return page_texts, tuple(official_links)
+
+
+def _parse_human_review_pdf(
+    page_texts: tuple[str, ...],
+) -> tuple[date, tuple[_ParsedPdfReviewRow, ...], dict[str, int]]:
+    full_text = "\n".join(page_texts)
+    reviewed_on_match = re.search(r"Дата ревью:\s*(\d{2}\.\d{2}\.\d{4})", full_text)
+    if reviewed_on_match is None:
+        raise ArtifactValidationError("human review PDF date is missing or invalid")
+    reviewed_on = datetime.strptime(reviewed_on_match.group(1), "%d.%m.%Y").date()
+    counts_match = re.search(
+        r"Итог:\s*relevant\s*[—-]\s*(\d+)\s*;\s*"
+        r"not_relevant\s*[—-]\s*(\d+)\s*;\s*"
+        r"insufficient_evidence\s*[—-]\s*(\d+)",
+        full_text,
+    )
+    if counts_match is None:
+        raise ArtifactValidationError("human review PDF declared label counts are missing")
+    declared_counts = dict(
+        zip(
+            ("relevant", "not_relevant", "insufficient_evidence"),
+            (int(value) for value in counts_match.groups()),
+            strict=True,
+        )
+    )
+    rows = tuple(row for page_text in page_texts for row in _parse_pdf_table_page(page_text))
+    if [row.row_number for row in rows] != list(range(1, len(rows) + 1)):
+        raise ArtifactValidationError("human review PDF row numbers must be contiguous and ordered")
+    return reviewed_on, rows, declared_counts
+
+
+def _parse_pdf_table_page(page_text: str) -> tuple[_ParsedPdfReviewRow, ...]:
+    lines = page_text.splitlines()
+    header_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if "Закупка" in line
+            and "Предмет / НМЦК" in line
+            and "Место / срок / label" in line
+            and "Причина / требования" in line
+        ),
+        None,
+    )
+    if header_index is None:
+        raise ArtifactValidationError("human review PDF table header is missing")
+    first_data_line = next(
+        (line for line in lines[header_index + 1 :] if re.match(r"\s*\d+\s+\d{19}\s+\S", line)),
+        None,
+    )
+    first_data_match = (
+        re.match(r"\s*(\d+)\s+(\d{19})\s+(\S)", first_data_line)
+        if first_data_line is not None
+        else None
+    )
+    label_starts = [line.index("Label:") for line in lines if "Label:" in line]
+    reason_starts = [line.index("Причина:") for line in lines if "Причина:" in line]
+    if first_data_match is None or not label_starts or not reason_starts:
+        raise ArtifactValidationError("human review PDF table geometry is invalid")
+    boundaries = (
+        first_data_match.start(2),
+        first_data_match.start(3),
+        min(label_starts),
+        min(reason_starts),
+    )
+    if list(boundaries) != sorted(boundaries) or len(set(boundaries)) != 4:
+        raise ArtifactValidationError("human review PDF table geometry is ambiguous")
+
+    raw_rows: list[tuple[int, tuple[str, str, str, str]]] = []
+    current_number: int | None = None
+    current_columns: list[list[str]] = [[], [], [], []]
+
+    def finish_current() -> None:
+        nonlocal current_number, current_columns
+        if current_number is None:
+            return
+        raw_rows.append(
+            (
+                current_number,
+                cast(
+                    tuple[str, str, str, str],
+                    tuple(_join_pdf_column(column) for column in current_columns),
+                ),
+            )
+        )
+        current_number = None
+        current_columns = [[], [], [], []]
+
+    for line in lines[header_index + 1 :]:
+        if "Human review — «Чистая территория»" in line:
+            break
+        first_cell = line[: boundaries[0]].strip()
+        if re.fullmatch(r"\d{1,2}", first_cell):
+            finish_current()
+            current_number = int(first_cell)
+        if current_number is None:
+            continue
+        values = (
+            line[boundaries[0] : boundaries[1]].strip(),
+            line[boundaries[1] : boundaries[2]].strip(),
+            line[boundaries[2] : boundaries[3]].strip(),
+            line[boundaries[3] :].strip(),
+        )
+        for column, value in zip(current_columns, values, strict=True):
+            if value:
+                column.append(value)
+    finish_current()
+
+    parsed: list[_ParsedPdfReviewRow] = []
+    allowed_labels = {"relevant", "not_relevant", "insufficient_evidence"}
+    for row_number, columns in raw_rows:
+        source_column, subject_column, place_column, reason_column = columns
+        source_match = re.search(r"\b(\d{19})\b", source_column)
+        if source_match is None:
+            raise ArtifactValidationError(f"source ID missing in PDF row {row_number}")
+        reviewed_subject, amount_separator, amount_text = subject_column.rpartition("НМЦК:")
+        if not amount_separator or not reviewed_subject.strip():
+            raise ArtifactValidationError(f"subject or amount missing in PDF row {row_number}")
+        reviewed_amount, reviewed_currency = _parse_reviewed_amount(amount_text.strip(), row_number)
+        checked_text, label_separator, label_text = place_column.rpartition("Label:")
+        raw_label = label_text.strip()
+        if not label_separator or raw_label not in allowed_labels or not checked_text.strip():
+            raise ArtifactValidationError(
+                f"place/deadline or label invalid in PDF row {row_number}"
+            )
+        reason_text, eligibility_separator, eligibility_text = reason_column.partition(
+            "Опыт / лицензии:"
+        )
+        reason = reason_text.removeprefix("Причина:").strip()
+        if (
+            not eligibility_separator
+            or not reason
+            or not eligibility_text.strip()
+            or not reason_text.startswith("Причина:")
+        ):
+            raise ArtifactValidationError(f"reason or requirements missing in PDF row {row_number}")
+        parsed.append(
+            _ParsedPdfReviewRow(
+                row_number=row_number,
+                source_record_id=source_match.group(1),
+                reviewed_subject=reviewed_subject.strip(),
+                reviewed_amount=reviewed_amount,
+                reviewed_currency=reviewed_currency,
+                checked_execution_and_deadline=checked_text.strip(),
+                label=cast(BlindLabelName, raw_label),
+                reason=reason,
+                eligibility_notes=eligibility_text.strip(),
+            )
+        )
+    return tuple(parsed)
+
+
+def _normalized_review_text(value: str) -> str:
+    return re.sub(r"[\W_]+", "", value.casefold())
+
+
+def _join_pdf_column(parts: list[str]) -> str:
+    joined = " ".join(parts).strip()
+    return re.sub(r"(?<=\w)-\s+(?=\w)", "-", joined)
+
+
+def _review_matches_sample_item(
+    review: ImportedHumanReview,
+    item: PilotSampleItem,
+) -> bool:
+    return (
+        review.source_record_id == item.source_record_id
+        and review.source_url == item.source_url
+        and review.record_version_id == item.record_version_id
+        and review.record_version == item.record_version
+        and review.raw_sha256 == item.raw_sha256
+        and review.reviewed_amount == item.amount
+        and review.reviewed_currency == item.currency
+    )
+
+
+def _wilson_lower_bound(successes: int, total: int) -> float:
+    if total <= 0 or successes < 0 or successes > total:
+        raise ArtifactValidationError("Wilson interval requires 0 <= successes <= total")
+    z = 1.96
+    proportion = successes / total
+    denominator = 1 + z**2 / total
+    centre = proportion + z**2 / (2 * total)
+    margin = z * sqrt(proportion * (1 - proportion) / total + z**2 / (4 * total**2))
+    return (centre - margin) / denominator
+
+
 def _escape_markdown_cell(value: str) -> str:
     return " ".join(value.replace("|", "&#124;").split())
 
@@ -1311,6 +1918,21 @@ def _require_unique_sample_ids(values: tuple[Any, ...]) -> None:
         raise ValueError("artifact contains duplicate sample IDs")
 
 
+def _validate_imported_review_sequence(
+    reviews: tuple[ImportedHumanReview, ...],
+    *,
+    expected_size: int | None = None,
+) -> None:
+    if expected_size is not None and len(reviews) != expected_size:
+        raise ValueError(f"human review must contain exactly {expected_size} rows")
+    _require_unique_sample_ids(reviews)
+    source_ids = [review.source_record_id for review in reviews]
+    if len(source_ids) != len(set(source_ids)):
+        raise ValueError("human review contains duplicate source record IDs")
+    if [review.row_number for review in reviews] != list(range(1, len(reviews) + 1)):
+        raise ValueError("human review row numbers must be contiguous and ordered")
+
+
 def _load[ArtifactModel: BaseModel](
     path: Path,
     model: type[ArtifactModel],
@@ -1346,12 +1968,30 @@ def main() -> None:
     import_human.add_argument("blank_packet", type=Path)
     import_human.add_argument("document", type=Path)
     import_human.add_argument("--output", required=True, type=Path)
+    import_remainder_pdf = commands.add_parser("import-human-remainder-pdf")
+    import_remainder_pdf.add_argument("sample", type=Path)
+    import_remainder_pdf.add_argument("completed_reviews", type=Path)
+    import_remainder_pdf.add_argument("report", type=Path)
+    import_remainder_pdf.add_argument("blank_packet", type=Path)
+    import_remainder_pdf.add_argument("document", type=Path)
+    import_remainder_pdf.add_argument("--imported-at", required=True)
+    import_remainder_pdf.add_argument("--output", required=True, type=Path)
+    merge_human = commands.add_parser("merge-human")
+    merge_human.add_argument("sample", type=Path)
+    merge_human.add_argument("initial_reviews", type=Path)
+    merge_human.add_argument("remainder_reviews", type=Path)
+    merge_human.add_argument("--output", required=True, type=Path)
     evaluate_human = commands.add_parser("evaluate-human")
     evaluate_human.add_argument("sample", type=Path)
     evaluate_human.add_argument("human_reviews", type=Path)
     evaluate_human.add_argument("predictions", type=Path)
     evaluate_human.add_argument("shortlist_report", type=Path)
     evaluate_human.add_argument("--output", type=Path)
+    evaluate_human_full = commands.add_parser("evaluate-human-full")
+    evaluate_human_full.add_argument("sample", type=Path)
+    evaluate_human_full.add_argument("human_reviews", type=Path)
+    evaluate_human_full.add_argument("predictions", type=Path)
+    evaluate_human_full.add_argument("--output", type=Path)
     args = parser.parse_args()
     sample = _load(args.sample, PilotSampleArtifact)
     if args.command == "review":
@@ -1383,6 +2023,27 @@ def main() -> None:
         )
         _write_json(args.output, human_review_artifact)
         return
+    if args.command == "import-human-remainder-pdf":
+        imported_at = datetime.fromisoformat(args.imported_at)
+        human_review_remainder = import_remaining_human_review_pdf(
+            sample,
+            _load(args.completed_reviews, HumanReviewArtifact),
+            _load(args.report, PilotEvaluationReport),
+            blank_packet=args.blank_packet.read_bytes(),
+            document=args.document.read_bytes(),
+            source_document_name=args.document.name,
+            imported_at=imported_at,
+        )
+        _write_json(args.output, human_review_remainder)
+        return
+    if args.command == "merge-human":
+        full_human_reviews = merge_human_reviews(
+            sample,
+            _load(args.initial_reviews, HumanReviewArtifact),
+            _load(args.remainder_reviews, HumanReviewRemainderArtifact),
+        )
+        _write_json(args.output, full_human_reviews)
+        return
     if args.command == "evaluate-human":
         human_report = evaluate_human_review(
             sample,
@@ -1394,6 +2055,23 @@ def main() -> None:
             print(json.dumps(human_report.model_dump(mode="json"), ensure_ascii=False, indent=2))
         else:
             _write_json(args.output, human_report)
+        return
+    if args.command == "evaluate-human-full":
+        full_human_report = evaluate_full_human_review(
+            sample,
+            _load(args.human_reviews, FullHumanReviewArtifact),
+            _load(args.predictions, PilotPredictionArtifact),
+        )
+        if args.output is None:
+            print(
+                json.dumps(
+                    full_human_report.model_dump(mode="json"),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        else:
+            _write_json(args.output, full_human_report)
         return
 
     labels = _load(args.labels, BlindLabelArtifact)

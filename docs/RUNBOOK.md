@@ -133,19 +133,34 @@ Frozen artifacts лежат в `evals/cleaning_pilot_2026-08-16/`. Predictions �
   /tmp/human-reviews.json \
   evals/cleaning_pilot_2026-08-16/predictions.json \
   evals/cleaning_pilot_2026-08-16/report.json --output /tmp/human-report.json
+.venv/bin/python -m tenderpulse.pilot_eval import-human-remainder-pdf \
+  evals/cleaning_pilot_2026-08-16/sample.json \
+  evals/cleaning_pilot_2026-08-16/human-reviews.json \
+  evals/cleaning_pilot_2026-08-16/report.json \
+  evals/cleaning_pilot_2026-08-16/HUMAN_REVIEW_REMAINING_35.md \
+  evals/cleaning_pilot_2026-08-16/HUMAN_REVIEW_REMAINING_35_filled.pdf \
+  --imported-at 2026-08-16T18:00:00+00:00 --output /tmp/human-reviews-remainder.json
+.venv/bin/python -m tenderpulse.pilot_eval merge-human \
+  evals/cleaning_pilot_2026-08-16/sample.json \
+  evals/cleaning_pilot_2026-08-16/human-reviews.json \
+  /tmp/human-reviews-remainder.json --output /tmp/human-reviews-full.json
+.venv/bin/python -m tenderpulse.pilot_eval evaluate-human-full \
+  evals/cleaning_pilot_2026-08-16/sample.json \
+  /tmp/human-reviews-full.json \
+  evals/cleaning_pilot_2026-08-16/predictions.json --output /tmp/human-report-full.json
 ```
 
 Сравнивайте `/tmp` с tracked current artifacts. `null` precision/recall означает отсутствие
-положительных labels/denominator в этой bounded выборке, а не нулевое качество. Human gate
-требует независимой выборки минимум 50 notices; заполненный 15-row `HUMAN_REVIEW.md`
-закрывает shortlist handoff, но не заменяет full-pilot evidence.
-Файл `HUMAN_REVIEW_REMAINING_35.md` нужно заполнять без просмотра `labels.json`,
-`predictions*.json` и `report*.json`. Он даёт полную 50-record coverage вместе с первыми 15,
-но не гарантирует достаточный positive denominator.
+положительных labels/denominator, а не нулевое качество. Initial 15-row packet закрывает только
+shortlist handoff; заполненный PDF complement даёт полную 50-record coverage, но один positive label
+не обеспечивает достаточную статистическую уверенность для full-pilot gate.
 Импорт fail-loud при лишней/пустой строке, дубле, неизвестном label, amount/URL/universe
 расхождении или prediction snapshot, созданном после review. `shortlist_*` метрики нельзя
 использовать как full-pilot или market-quality claim. CLI создаёт file evidence; он не пишет
 reviewer enrichment в canonical records и не создаёт account DB revisions.
+PDF import работает offline, принимает не более 2 MiB и 20 страниц, отклоняет encrypted/unreadable
+container и требует exact 35 links/rows/amounts. Full report не интерпретирует point precision 100%
+как пройденный gate: 95% Wilson lower bound должен быть не ниже configured target 80%.
 
 ## Alerts и webhook
 

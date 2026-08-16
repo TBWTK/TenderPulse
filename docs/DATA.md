@@ -85,6 +85,12 @@ updated: 2026-08-16
 17. Remainder generator вычитает 15 imported IDs из frozen 50 и fail-loud, если sample/hash/
     profile/shortlist lineage расходится. Output содержит 35 source-fact rows и пустые reviewer fields;
     union первого и второго packets равен всей sample universe.
+18. PDF review adapter сохраняет exact source SHA и извлекает только внешний human evidence. Embedded
+    official links, IDs/order, amount/currency и обязательные text fields проверяются против remainder
+    packet/frozen sample; reviewer geography/deadline/requirements не становятся canonical facts.
+19. Full human artifact объединяет immutable initial/remainder artifacts по exact sample order и хранит
+    hashes обоих parents. Full report связан с pre-existing predictions и отдельно хранит point estimate
+    и confidence lower bound, чтобы один positive label не выдавался за доказанные 100% качества.
 
 ## Frozen agent-assisted pilot artifacts — 16.08.2026
 
@@ -103,10 +109,16 @@ updated: 2026-08-16
   hashes; `human-report.json` SHA-256 `f2dc3641…209`: `TP=1`, `TN=14`, `FP=FN=0`, coverage 100%.
 - `HUMAN_REVIEW_REMAINING_35.md` SHA-256 `6cde292f…05dff`: воспроизводимый complement
   к первым 15; 35 unique rows, все label/evidence cells пусты.
+- `HUMAN_REVIEW_REMAINING_35_filled.pdf` SHA-256 `3e27c7b2…bc0b`: exact 5-page user bytes,
+  35 embedded official links и declared labels `0/35/0`;
+- `human-reviews-remainder.json` SHA-256 `7b697fc1…7c78`: PDF enrichment + exact frozen lineage;
+- `human-reviews-full.json` SHA-256 `de2582d8…a563`: immutable merge 15 + 35 в sample order;
+- `human-report-full.json` SHA-256 `b9a31273…3c48`: `TP=1`, `TN=49`, `FP=FN=0`, coverage 100%,
+  point precision/recall 100%, Wilson lower bound 20,65%, `eligible_for_full_pilot_gate=false`.
 
-Human report не закрывает full pilot gate: shortlist имеет размер 15 и отобран по
-agent/matcher priorities. Его `shortlist_actionable_precision=1.0` и `shortlist_recall=1.0` описывают
-только эти 15 строк; `eligible_for_full_pilot_gate=false` является частью schema.
+Shortlist report не закрывает full pilot gate из-за selection bias. Full-50 report снимает coverage gap,
+но не positive-denominator gap: один `relevant` даёт point estimate 100%, однако 95% lower bound 20,65%.
+`eligible_for_full_pilot_gate=false` является частью schema, а не текстовой оговоркой.
 
 Tracked sample не содержит source bytes: raw SHA/run/version делают происхождение проверяемым, но
 полный RSS остаётся в MinIO/PostgreSQL. RSS не дал region/deadline/classifications для этих 50 records;

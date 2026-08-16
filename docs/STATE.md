@@ -9,45 +9,25 @@ updated: 2026-08-16
 
 ## Active objective
 
-Подготовить blind packet ровно для оставшихся 35 из frozen 50 ЕИС notices. Пакет строится из
-sample и exact 15-row human artifact, не показывает agent/matcher outcomes и оставляет все решения
-пустыми. Первые 15 и новые 35 должны давать точно всю frozen universe без дублей.
+Импортировать полученный 5-page PDF с оценками оставшихся 35 закупок как неизменяемое внешнее
+human evidence, точно связать его с ранее размеченными 15 и frozen sample/predictions, затем выпустить
+полный 50-record human report. Полная разметка не должна автоматически означать прохождение pilot gate:
+вывод обязан учитывать размер positive denominator и явно показывать статистическую неопределённость.
 
 ## Acceptance criteria
 
-- [x] Generator вычитает exact 15 reviewed `sample_id` из frozen 50: remainder содержит 35 unique IDs,
-  пересечение пусто, а union равен sample universe; любое lineage/hash/profile mismatch fail-loud.
-- [x] Markdown показывает только official link, title, amount и RSS unknown из sample; matcher
-  decision/score/reasons, agent labels/notes/confidence и прежние human labels отсутствуют.
-- [x] Файл содержит 35 пустых строк с labels `relevant / not_relevant / insufficient_evidence`, полями
-  географии/deadline, причины и requirements/licenses; ни одно решение не предзаполнено.
-- [x] Failing tests предшествуют generator; tracked Markdown воспроизводится byte-for-byte,
-  focused/full tests, lint/mypy, audits, secret scan и Git checkpoint проходят.
-- [x] Parser принимает только полностью заполненную 15-row Markdown-таблицу с допустимыми labels,
-  непустыми причинами и без дублей; пустая/лишняя/неизвестная строка fail-loud.
-- [x] Импорт совпадает с точным universe и порядком tracked `HUMAN_REVIEW.md`, привязывает каждую оценку
-  к `sample_id`, `record_version_id`, `record_version`, raw SHA и точной profile version.
-- [x] Artifact хранит SHA-256 полученного документа, дату review/import и reviewer-provided evidence text;
-  утверждения из неофициальных карточек не мутируют canonical procurement facts.
-- [x] Отчёт сравнивает 15 human labels с уже замороженными matcher predictions, хранит input hashes,
-  confusion/coverage и явно маркирует precision/recall как `shortlist_only`, не как pilot gate.
-- [x] Failing tests предшествуют коду; focused/full pytest, lint/mypy, artifact reproduction, docs audits,
-  Docker/dbt и Git checkpoint проходят.
-- [x] `EisRssQuery` передаёт проверенную bounded `searchString` и `morphology=on` только на фиксированный
-  официальный RSS URL; пустые/control/слишком длинные строки отклоняются до HTTP.
-- [x] Один versioned discovery-owner детерминированно выбирает не более трёх service phrases на профиль,
-  дедуплицирует их и fail-loud при нарушении глобального лимита.
-- [x] Live ingestion создаёт отдельный auditable run для каждой profile/query pair и сохраняет exact
-  profile slug/version, strategy version, date/limit/search parameters и raw SHA; ошибка одного запроса
-  видима и не скрывает результаты независимых запросов.
-- [x] Human review append-only хранит account, exact profile/record versions, raw SHA, label, reason,
-  note, revision и timestamps; stale/cross-company mutations fail closed.
-- [x] Отдельная company-страница `/reviews` показывает только исходные факты и official link, но не
-  matcher decision/score/reasons до фиксации оценки; форма доступна и адаптивна.
-- [x] Human labels и pilot precision не сгенерированы системой. Будущий документ импортируется только
-  после получения и проверки его schema/universe; отсутствие документа остаётся явным gap.
-- [x] Failing tests предшествуют production code; full pytest/coverage, lint/mypy, migrations, dbt,
-  rebuilt Docker, responsive browser inspection, bounded live ЕИС smoke, audits и Git checkpoint проходят.
+- [x] Exact PDF bytes сохранены с SHA-256 `3e27c7b2…bc0b`; adapter проверяет PDF magic/encryption,
+  дату `16.08.2026`, 35 contiguous rows, declared counts `0/35/0` и 35 official ЕИС hyperlinks.
+- [x] Каждая PDF-строка fail-loud связывается по source ID/order с exact remainder packet и проверяет
+  amount/currency, допустимый label, непустые place/deadline, reason и requirements/licenses.
+- [x] Typed remainder artifact хранит source/blank/completed/report hashes и exact record/raw lineage;
+  PDF enrichment остаётся reviewer evidence и не мутирует canonical procurement facts или DB reviews.
+- [x] Merge требует непересекающиеся 15 + 35 и ровно всю frozen 50; duplicate/missing/stale profile,
+  sample, prediction или source-document state отклоняется.
+- [x] Full report показывает `TP=1, TN=49, FP=FN=0`, point precision/recall отдельно от 95% Wilson lower
+  bound; `eligible_for_full_pilot_gate=false`, пока lower bound не доказывает целевые 80%.
+- [ ] Failing tests предшествуют implementation; tracked artifacts воспроизводятся byte-for-byte,
+  focused/full tests, lint/mypy, docs/IMMUNE audits, secret scan и Git checkpoint проходят.
 
 ## Current verified state
 
@@ -117,11 +97,23 @@ sample и exact 15-row human artifact, не показывает agent/matcher o
   Ruff/format/strict mypy, project-control/IMMUNE audits, diff и secret scan проходят.
 - Verified remainder checkpoint `b8b170c21c277e30381f6967d7b62d2058f750de` опубликован в
   `origin/codex/ui-redesign`; direct remote-ref check вернул тот же hash.
+- Полученный PDF сохранён byte-for-byte с SHA-256 `3e27c7b2…bc0b`; `pdfinfo`, text extraction и render
+  всех пяти страниц подтвердили readable table, 35 rows, 35 official links и labels `0/35/0`.
+- Offline typed import проверил PDF bounds/encryption, date/counts, exact IDs/order/links/amounts,
+  profile/record/raw lineage. Reviewer place/deadline/reason/requirements сохранены только в eval artifact.
+- Full merge содержит exact 50 sample IDs в sample order: 1 `relevant`, 49 `not_relevant`, 0 abstention.
+  Frozen matcher: `TP=1`, `TN=49`, `FP=FN=0`, actionable coverage 2%, disagreements 0.
+- Point precision/recall равны 100%, но 95% Wilson lower bound precision — `0.206543`; report фиксирует
+  `precision_confidence_below_target` и `eligible_for_full_pilot_gate=false` при target 80%.
+- Fail-first PDF/full-50 suite остановился на `ImportError: FullHumanReviewArtifact`; после реализации
+  focused suite проходит `46` tests. Full suite — `254` tests, `84.01%` branch coverage; lint/mypy проходят.
+- Rebuilt Compose установил `pypdf 6.16.1`; API/worker/PostgreSQL/MinIO healthy, init завершён с `0`,
+  `GET /api/health` вернул `{"status":"ok"}`. dbt skipped: schema/marts/data contract не менялись.
 
 ## Changed areas
 
-- Affected: pilot eval remainder schema/generator/CLI, exact source/packet/report/lineage hashes, tracked
-  blind human-review packet, documentation and tests.
+- Affected: PDF review adapter/dependency, typed remainder/full artifacts, confidence-aware eval/CLI,
+  immutable pilot evidence, security/runbook/data/quality/state docs and tests.
 - Not affected: canonical raw/SCD2 and PostgreSQL human-review revisions, matcher weights/decisions,
   source ingestion, API/UI, GigaChat, credentials, notifications and public deployment.
 
@@ -144,18 +136,22 @@ sample и exact 15-row human artifact, не показывает agent/matcher o
 - Remainder определяется set difference frozen sample и exact imported reviews, а не новым поиском или
   ранжированием. Рендерер получает только sample и typed packet, поэтому не имеет доступа к labels и
   predictions; полная coverage сама по себе не доказывает качество без достаточных positive labels.
+- PDF является внешним human evidence, не procurement attachment: parser работает offline, bounded
+  `2 MiB/20 pages`, проверяет embedded official links/layout и не выполняет embedded content.
+- Gate использует pre-existing matcher snapshot и 95% Wilson lower bound precision. При текущих данных
+  point estimate описателен; даже 1/1 success не удовлетворяет target 80% с confidence 95%.
 
 ## Next exact step
 
-Пользователь заполняет дату и четыре пустых поля во всех 35 строках
-`evals/cleaning_pilot_2026-08-16/HUMAN_REVIEW_REMAINING_35.md`, не открывая agent artifacts; после
-возврата документа — fail-first импорт, exact merge с первыми 15 и пересчёт метрик на frozen 50.
+Не меняя matcher policy, собирать следующие последовательные bounded ЕИС windows и независимо размечать
+все matcher-actionable records до достаточного denominator. При отсутствии FP минимум 16/16 TP нужен,
+чтобы 95% Wilson lower bound превысил 80%; любой FP увеличит требуемую выборку.
 
 ## Blockers
 
-- 35-row packet готов; следующий шаг заблокирован только отсутствующими human labels пользователя.
-- Full human pilot quality остаётся заблокировано до заполнения всей frozen 50 и достаточного
-  positive denominator.
+- Импорт и full-50 coverage закрыты; blocker качества — positive/actionable denominator `1`.
+- Закрытый пилот также всё ещё требует 14-day reliability, extraction/alert/recovery evidence,
+  company eligibility facts и реальные participate/reject/defer outcomes.
 
 ## Non-goals
 
@@ -164,6 +160,8 @@ sample и exact 15-row human artifact, не показывает agent/matcher o
 - Менять matcher по одному 15-row shortlist без доказанного повторяемого класса ошибок.
 - Предзаполнять новые human labels, reasons, geography, deadlines или requirements.
 - Считать создание blank packet закрытием 50-record human pilot gate.
+- Подтверждать юридическую корректность reviewer assertions или считать адрес заказчика canonical местом работ.
+- Менять matcher под этот документ до доказательства повторяемого класса FP/FN.
 - Автоматически scraping-ить HTML карточки/вложения ЕИС без нового machine-readable source contract.
 - Считать source search рекомендацией, менять matcher под желаемую метрику или скрывать unknown.
 - Начинать 14-дневный reliability run, public deployment, production auth/RLS, alerts channels или
@@ -221,3 +219,10 @@ tracked Markdown SHA-256 `6cde292f5cd43a6d26c6502681bb4ac48a2a2190c522431e4e3991
 воспроизводится byte-for-byte. Full suite — `250` tests, `84.99%` branch coverage;
 Ruff/format/strict mypy, project-control/IMMUNE audits, `git diff --check` и secret scan проходят.
 Implementation checkpoint `b8b170c21c277e30381f6967d7b62d2058f750de` подтверждён на remote branch.
+
+Full-50 PDF fail-first 16.08.2026 остановил collection с
+`ImportError: FullHumanReviewArtifact`. Current `tests/test_pilot_eval.py` проходит `46` tests; three
+tracked JSON artifacts воспроизводятся byte-for-byte из exact PDF/sample/parents/predictions. Full suite —
+`254` tests, `84.01%` branch coverage; Ruff/format/strict mypy проходят. Rebuilt Docker runtime содержит
+`pypdf 6.16.1`, все long-running services healthy, init — `0`, API health — `ok`. dbt skipped because
+DB schema/marts не затронуты; `uv lock --check` проходит.

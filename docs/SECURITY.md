@@ -32,6 +32,7 @@ payloads, пользовательские файлы/поля, LLM output и UR
 | Alert duplication | transactional outbox + stable webhook `Idempotency-Key` + attempt history | receiver must implement deduplication |
 | Webhook secret/SSRF | opt-in config only, HTTPS validation, destination stored only as SHA-256, no response body | host operator controls egress target; query-token rotation is external |
 | XML entity attack | DTD/entity resolution disabled, ZIP size/member limits | parser/library vulnerabilities |
+| Malicious review PDF | offline `pypdf`, ≤2 MiB/≤20 pages, encrypted/unreadable reject, no embedded-code execution, exact link/row contract | parser/library vulnerability; CLI remains trusted-operator only |
 
 ## Deployment boundary
 

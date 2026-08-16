@@ -9,11 +9,10 @@ updated: 2026-08-16
 
 ## Вывод о достаточности контекста
 
-`sufficient` для profile-aware ЕИС discovery и human-review infrastructure. Пользователь поручил
-реализацию и сообщил, что позже передаст готовый документ ревью. Профиль/source/matching contracts
-версионированы; официальный bounded source доступен. Формат и labels будущего документа неизвестны,
-поэтому текущий этап готовит immutable review contour, но не импортирует ground truth и не закрывает
-human pilot quality gate.
+`sufficient` для импорта и оценки full-50 human relevance diagnostic. Полученный PDF содержит
+оставшиеся 35 заполненных строк; exact bytes, пять страниц и embedded official links доступны.
+Профиль/source/matching contracts и frozen predictions версионированы. Контекста недостаточно только
+для утверждения ≥80% precision: в полной human-разметке найден ровно один positive label.
 
 ## Источники и доступность контекста
 
@@ -24,15 +23,15 @@ human pilot quality gate.
 | Company catalog | confirmed | cleaning + office supply evals | real fit ещё не измерен | label real-company sample |
 | Current data | confirmed | PostgreSQL inspection 16.08.2026 | legacy history сохранена | retain shared lineage |
 | Scheduled ingestion | confirmed | Docker worker + live run log | 14-day reliability неизвестна | pilot run ledger |
-| Attachments | unknown | `docs/DATA.md`, no adapter/code | unsafe scraping/format expansion | official contract review before adapter |
+| Procurement attachments | unknown | `docs/DATA.md`, no source adapter/code | unsafe scraping/format expansion | official contract review before adapter |
 | UI defect | confirmed | browser 390/768/1024/1280 | subjective pilot feedback ещё нет | pilot observation |
 | Cleaning profile facts | confirmed | user message + local DB v2 16.08.2026 | нет | collect missing operational evidence |
-| Keywords/exclusions | inferred | synthetic eval + 15-row human diagnostic | full human precision неизвестна | independent ≥50 review |
+| Keywords/exclusions | inferred | synthetic eval + full-50 human diagnostic | positive coverage insufficient | collect relevant cases |
 | Licences/experience | unknown | user explicitly supplied no facts | legal/eligibility error | keep unknown; verify per tender |
 | Budget semantics | confirmed | typed matcher tests + v2 500k–25m profile | нет для deterministic contract | validate on labeled sample |
-| Real relevance sample | confirmed | frozen 50-record ЕИС sample + agent labels | no positive denominator | human review 15 priorities |
+| Real relevance sample | confirmed | frozen 50-record ЕИС sample + full human labels | один positive denominator | расширить positive-case evidence |
 | Profile discovery | confirmed | official form parameters + six-query live worker run | RSS detail fields sparse | retain bounded query/run lineage |
-| Human review document | confirmed | exact SHA + 15-row typed import 16.08.2026 | shortlist selection bias remains | expand to independent ≥50 sample |
+| Human review document | confirmed | 15-row Markdown + 35-row PDF typed imports 16.08.2026 | один positive label | collect additional relevant cases |
 
 Допустимые статусы: `confirmed`, `inferred`, `unknown`, `not applicable`.
 
@@ -77,6 +76,10 @@ Airflow и attachment scraping без official contract.
 - Полученный `HUMAN_REVIEW_filled.md` совпал с exact 15-row packet/order/amount/URL и был
   обогащён frozen `sample_id`, record UUID/version/raw SHA. Исходный SHA — `ac65fbdb…c45`;
   таблица содержит 1 `relevant`, 14 `not_relevant`, 0 abstention.
+- Полученный 5-page PDF SHA `3e27c7b2…bc0b` содержит exact complement 35/35, 35 official ЕИС links
+  и labels `0 relevant / 35 not_relevant / 0 insufficient_evidence`. Merge даёт frozen 50 без дублей.
+- Full comparison с pre-existing matcher snapshot: `TP=1`, `TN=49`, `FP=FN=0`; point precision/recall
+  100%, но 95% Wilson lower bound precision `20,65%`, поэтому 80%-gate остаётся failed.
 - Pre-existing matcher snapshot даёт на этих 15 строках `TP=1`, `TN=14`, `FP=FN=0`; код жёстко
   маркирует отчёт `eligible_for_full_pilot_gate=false`. Reviewer сверял часть facts по
   сторонним открытым карточкам из-за нестабильной ЕИС; это evidence не мутирует canonical data.
@@ -145,16 +148,16 @@ credential secret scan and opt-in bounded live ЕИС smoke.
 
 ## Открытые вопросы и блокеры
 
-15-record human handoff закрыт, но full pilot quality заблокировано до независимой human-разметки
-минимум 50 notices с достаточным positive denominator. Также нужны документы/факты опыта
+Full-50 human handoff закрыт, но quality заблокировано до выборки с достаточным positive denominator:
+единственный positive не доказывает целевые 80% precision. Также нужны документы/факты опыта
 компании для eligibility. Official attachment contract остаётся explicit unknown; adapter запрещён
 без bounded machine-readable semantics.
 
 ## Решение о поставке
 
-`accepted for local pre-pilot`: профиль, matching contract, agent-assisted evaluation и 15-row human
-diagnostic имеют exact local evidence. Это не `production-ready` и не подтверждение ≥80% precision на
-реальной компании: полученная human-выборка мала и selection-biased.
+`accepted for local pre-pilot`: профиль, matching contract и full-50 human diagnostic имеют exact local
+evidence. Это не `production-ready` и не подтверждение ≥80% precision: positive denominator равен одному,
+а confidence lower bound явно ниже target.
 
 ## Решение о начале
 

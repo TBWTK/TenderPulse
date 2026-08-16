@@ -139,7 +139,7 @@ coverage `1/15`. `shortlist_actionable_precision=1.0` and `shortlist_recall=1.0`
 15 selected records. The selection used agent/matcher priorities and does not satisfy the independent
 ≥50-notice human pilot gate; the report encodes that prohibition instead of relying on prose.
 
-### Remaining-35 blind handoff — active evidence
+### Remaining-35 blind handoff — complete
 
 | Требование / риск | Evidence | Проверка | Ожидаемый результат | Статус |
 | --- | --- | --- | --- | --- |
@@ -148,8 +148,24 @@ coverage `1/15`. `shortlist_actionable_precision=1.0` and `shortlist_recall=1.0`
 | Empty form | structural test | 35 Markdown rows | four empty reviewer cells per row | passing |
 | Reproducibility | tracked snapshot | generator output comparison | byte-for-byte equality, fixed SHA | passing |
 
-Packet creation is not human evidence: full gate remains blocked until the 35 rows are actually reviewed,
-imported and combined with the first 15. Even then, insufficient actionable positives remain a possible gap.
+Packet creation alone is not human evidence. Полученный PDF импортирован и объединён ниже; отдельный
+handoff contract сохранён, чтобы не смешивать procedural blindness с итоговыми metrics.
+
+### Full-50 PDF human review — acceptance plan
+
+| Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- | --- |
+| Exact source | immutable PDF + hash/render | supplied 5-page PDF | bytes/hash + visual inspection | SHA fixed; 5 readable pages | passing |
+| PDF contract | parser negative tests | PDF fixture/mutations | container, row/link/count/field checks | invalid or ambiguous input fails loud | passing |
+| Exact remainder | typed import eval | PDF + frozen sample/artifacts | 35-way ID/order/amount/lineage join | exact complement, no canonical mutation | passing |
+| Full merge | set/lineage tests | initial 15 + remainder 35 | disjoint union/profile/hash checks | exact frozen 50 | passing |
+| Honest quality | statistical eval | full human labels + frozen predictions | confusion + Wilson lower bound | point metrics shown; 80% gate not overstated | passing |
+| Reproduction | CLI + snapshots | tracked inputs/artifacts | regenerate and compare | byte-for-byte equality | passing |
+
+Evidence 16.08.2026: PDF SHA `3e27c7b2…bc0b`, 5 readable pages, 35 unique rows/official links,
+labels `0 relevant / 35 not_relevant / 0 insufficient_evidence`. Full 50 gives `TP=1`, `TN=49`,
+`FP=FN=0`, human coverage 100% and matcher actionable coverage 2%. Point precision/recall are 100%,
+but 95% Wilson lower bound precision is 20,65%; `precision_confidence_below_target` keeps the gate closed.
 
 | Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
 | --- | --- | --- | --- | --- | --- |

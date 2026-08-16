@@ -59,10 +59,11 @@ TenderPulse превращает ограниченные, регулярно о
 - Только итоговое pilot-решение `go` открывает Production v1; полный contract находится в
   [текущем состоянии](STATE.md), а evidence map — в [качестве](QUALITY.md).
 
-Agent-assisted pre-evaluation зафиксировал 50 real ЕИС records и сформировал 15-record packet.
-Владелец продукта разметил все 15 строк: единственный клининговый lot matcher оставил
-в `review`, а 14 непрофильных отверг. Это полезный scoped diagnostic, но не доказательство целевых
-80% precision: shortlist мал и отобран с участием matcher/agent priorities.
+Agent-assisted pre-evaluation зафиксировал 50 real ЕИС records. Владелец продукта сначала разметил
+15-record shortlist, затем оставшиеся 35: итог — 1 `relevant` и 49 `not_relevant`. Matcher оставил
+единственный клининговый lot в `review` и отверг остальные (`TP=1`, `TN=49`). Point precision/recall
+равны 100%, но 95% Wilson lower bound precision — только 20,65%; целевые 80% ещё не доказаны из-за
+единственного positive label.
 
 ### Сохранённая foundation MVP 1.0
 

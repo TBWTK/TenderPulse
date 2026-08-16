@@ -13,17 +13,23 @@ from pydantic import ValidationError
 from tenderpulse.pilot_eval import (
     ArtifactValidationError,
     BlindLabelArtifact,
+    FullHumanReviewArtifact,
+    FullHumanReviewEvaluationReport,
     HumanReviewArtifact,
     HumanReviewEvaluationReport,
+    HumanReviewRemainderArtifact,
     PilotEvaluationReport,
     PilotPredictionArtifact,
     PilotSampleArtifact,
     build_prediction_artifact,
     build_remaining_human_review_packet,
     canonical_artifact_sha256,
+    evaluate_full_human_review,
     evaluate_human_review,
     evaluate_pilot,
     import_human_review_markdown,
+    import_remaining_human_review_pdf,
+    merge_human_reviews,
     render_human_review_markdown,
     render_remaining_human_review_markdown,
 )
@@ -935,3 +941,151 @@ def test_remaining_human_review_packet_fails_loud_on_unbound_completion(
             mutation(completed),
             shortlist_report,
         )
+
+
+def test_filled_remainder_pdf_import_is_exact_and_reproducible() -> None:
+    sample = PilotSampleArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "sample.json").read_text(encoding="utf-8")
+    )
+    completed = HumanReviewArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews.json").read_text(encoding="utf-8")
+    )
+    shortlist_report = PilotEvaluationReport.model_validate_json(
+        (TRACKED_EVAL_DIR / "report.json").read_text(encoding="utf-8")
+    )
+    source_pdf = TRACKED_EVAL_DIR / "HUMAN_REVIEW_REMAINING_35_filled.pdf"
+
+    imported = import_remaining_human_review_pdf(
+        sample,
+        completed,
+        shortlist_report,
+        blank_packet=(TRACKED_EVAL_DIR / "HUMAN_REVIEW_REMAINING_35.md").read_bytes(),
+        document=source_pdf.read_bytes(),
+        source_document_name=source_pdf.name,
+        imported_at=datetime(2026, 8, 16, 18, 0, tzinfo=UTC),
+    )
+    saved = HumanReviewRemainderArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews-remainder.json").read_text(encoding="utf-8")
+    )
+
+    assert imported == saved
+    assert imported.source_document_sha256 == (
+        "3e27c7b29eb6ae65236d5f87072a3ad1cedd52a4c95058a627b0d3e78623bc0b"
+    )
+    assert imported.reviewed_on.isoformat() == "2026-08-16"
+    assert imported.source_page_count == 5
+    assert imported.embedded_official_link_count == 35
+    assert len(imported.reviews) == 35
+    assert {review.label for review in imported.reviews} == {"not_relevant"}
+    assert imported.reviews[0].source_record_id == "0330200016826000440"
+    assert imported.reviews[0].reviewed_amount == 495078
+    assert "г. Вологда" in imported.reviews[0].checked_execution_and_deadline
+    assert "ниже минимального порога" in imported.reviews[0].reason
+
+
+def test_full_human_review_merges_exact_fifty_and_keeps_gate_honest() -> None:
+    sample = PilotSampleArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "sample.json").read_text(encoding="utf-8")
+    )
+    initial = HumanReviewArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews.json").read_text(encoding="utf-8")
+    )
+    remainder = HumanReviewRemainderArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews-remainder.json").read_text(encoding="utf-8")
+    )
+    predictions = PilotPredictionArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "predictions.json").read_text(encoding="utf-8")
+    )
+
+    merged = merge_human_reviews(sample, initial, remainder)
+    report = evaluate_full_human_review(sample, merged, predictions)
+    saved_merged = FullHumanReviewArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews-full.json").read_text(encoding="utf-8")
+    )
+    saved_report = FullHumanReviewEvaluationReport.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-report-full.json").read_text(encoding="utf-8")
+    )
+
+    assert merged == saved_merged
+    assert report == saved_report
+    assert [review.sample_id for review in merged.reviews] == [
+        item.sample_id for item in sample.items
+    ]
+    assert report.metrics.sample_size == 50
+    assert report.metrics.positive_label_count == 1
+    assert report.metrics.confusion.model_dump() == {
+        "true_positive": 1,
+        "false_positive": 0,
+        "false_negative": 0,
+        "true_negative": 49,
+    }
+    assert report.metrics.human_actionable_precision == 1.0
+    assert report.metrics.bounded_sample_recall == 1.0
+    assert report.metrics.precision_wilson_lower_bound_95 == pytest.approx(0.206543, abs=1e-6)
+    assert report.metrics.human_label_coverage == 1.0
+    assert report.metrics.recommended_false_admissions == 0
+    assert report.eligible_for_full_pilot_gate is False
+    assert report.gate_failures == ("precision_confidence_below_target",)
+
+
+def test_remainder_pdf_import_fails_loud_on_invalid_container_or_embedded_link() -> None:
+    sample = PilotSampleArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "sample.json").read_text(encoding="utf-8")
+    )
+    completed = HumanReviewArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews.json").read_text(encoding="utf-8")
+    )
+    shortlist_report = PilotEvaluationReport.model_validate_json(
+        (TRACKED_EVAL_DIR / "report.json").read_text(encoding="utf-8")
+    )
+    source_pdf = (TRACKED_EVAL_DIR / "HUMAN_REVIEW_REMAINING_35_filled.pdf").read_bytes()
+    kwargs = {
+        "blank_packet": (TRACKED_EVAL_DIR / "HUMAN_REVIEW_REMAINING_35.md").read_bytes(),
+        "source_document_name": "HUMAN_REVIEW_REMAINING_35_filled.pdf",
+        "imported_at": datetime(2026, 8, 16, 18, 0, tzinfo=UTC),
+    }
+
+    with pytest.raises(ArtifactValidationError, match="valid PDF"):
+        import_remaining_human_review_pdf(
+            sample,
+            completed,
+            shortlist_report,
+            document=source_pdf[:100],
+            **kwargs,
+        )
+
+    original_url = (
+        b"https://zakupki.gov.ru/epz/order/notice/zk20/view/common-info.html?"
+        b"regNumber=0330200016826000440"
+    )
+    changed_url = original_url[:-1] + b"9"
+    with pytest.raises(ArtifactValidationError, match="official hyperlinks"):
+        import_remaining_human_review_pdf(
+            sample,
+            completed,
+            shortlist_report,
+            document=source_pdf.replace(original_url, changed_url, 1),
+            **kwargs,
+        )
+
+
+def test_full_human_review_merge_rejects_duplicate_or_stale_remainder() -> None:
+    sample = PilotSampleArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "sample.json").read_text(encoding="utf-8")
+    )
+    initial = HumanReviewArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews.json").read_text(encoding="utf-8")
+    )
+    remainder = HumanReviewRemainderArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews-remainder.json").read_text(encoding="utf-8")
+    )
+
+    duplicate = remainder.model_copy(
+        update={"reviews": (remainder.reviews[0], *remainder.reviews[1:-1], remainder.reviews[0])}
+    )
+    with pytest.raises(ArtifactValidationError, match="partition"):
+        merge_human_reviews(sample, initial, duplicate)
+
+    stale = remainder.model_copy(update={"profile_version": 999})
+    with pytest.raises(ArtifactValidationError, match="profile"):
+        merge_human_reviews(sample, initial, stale)
