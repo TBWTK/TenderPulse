@@ -29,7 +29,7 @@ test-first изменения, не выдавая агентскую разме
   его owner mechanism; спорные случаи остаются explicit review/unknown.
 - [x] Agent-assisted результат явно не закрывает human-labeled gate: сформирован отдельный review packet
   и список минимум 10–15 приоритетных записей для проверки владельцем продукта.
-- [ ] Full test/lint/dbt, Docker health, docs/IMMUNE audit, artifact integrity и secret scan проходят;
+- [x] Full test/lint/dbt, Docker health, docs/IMMUNE audit, artifact integrity и secret scan проходят;
   verified checkpoint отправлен в подтверждённую Git-ветку.
 
 ## Current verified state
@@ -68,6 +68,8 @@ test-first изменения, не выдавая агентскую разме
   Precision/recall равны `null`, потому что в bounded sample нет agent-positive denominator.
 - Reproducible CLI и 15-record blind human packet находятся в
   `evals/cleaning_pilot_2026-08-16/`; agent labels не закрывают human pilot gate.
+- Verified implementation checkpoint `79f22e2a0fce39ce90a427b27d333994145ff625` опубликован в
+  `origin/codex/ui-redesign`; direct remote-ref check вернул тот же hash.
 
 ## Changed areas
 
@@ -101,8 +103,8 @@ test-first изменения, не выдавая агентскую разме
 
 ## Next exact step
 
-Завершить release coherence checks, опубликовать verified checkpoint в подтверждённую Git-ветку и
-передать владельцу 15-record blind packet для следующего human-labeled шага.
+Владелец продукта слепо заполняет 15 строк `evals/cleaning_pilot_2026-08-16/HUMAN_REVIEW.md`; затем
+система сравнивает human labels с frozen agent/matcher artifacts и решает, расширять ли positive sample.
 
 ## Blockers
 
@@ -144,4 +146,5 @@ Pilot eval evidence: fail-first evaluator import ended with `ModuleNotFoundError
 regression first returned `not_relevant`. Current tracked report reproduces byte-for-byte, focused
 pilot/profile/matching suites pass, full suite passes at `85.85%` branch coverage, Ruff/format/strict
 mypy pass, dbt reports `PASS=54 WARN=0 ERROR=0`, rebuilt API/worker/PostgreSQL/MinIO are healthy and
-`GET /api/health` returns `{"status":"ok"}`. Git delivery remains the final unchecked gate.
+`GET /api/health` returns `{"status":"ok"}`. Artifact/secret scans pass; implementation checkpoint
+`79f22e2a0fce39ce90a427b27d333994145ff625` is verified on the remote branch.

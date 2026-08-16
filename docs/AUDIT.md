@@ -123,8 +123,9 @@ contract остаётся explicit unknown; adapter запрещён без boun
 ## Решение о поставке
 
 `accepted for local pre-pilot`: профиль, matching contract и agent-assisted evaluation имеют local
-evidence. Это не `production-ready` и не подтверждение ≥80% precision на реальной компании: sample
-не содержит agent-positive denominator, а human packet ещё не размечен.
+evidence; checkpoint `79f22e2a0fce39ce90a427b27d333994145ff625` подтверждён direct remote-ref
+check. Это не `production-ready` и не подтверждение ≥80% precision на реальной компании: sample не
+содержит agent-positive denominator, а human packet ещё не размечен.
 
 ## Решение о начале
 

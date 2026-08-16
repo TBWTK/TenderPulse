@@ -73,7 +73,7 @@ Git checkpoint `99c9a18` was pushed to `origin/codex/ui-redesign`; a direct `git
 
 ## Закрытый пилот — evidence plan
 
-### Agent-assisted 50-notice pre-evaluation — release pending
+### Agent-assisted 50-notice pre-evaluation — complete
 
 | Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
 | --- | --- | --- | --- | --- | --- |
@@ -83,7 +83,7 @@ Git checkpoint `99c9a18` was pushed to `origin/codex/ui-redesign`; a direct `git
 | Reproducible metrics | unit + artifact eval | frozen labels + matcher snapshot | evaluator CLI/tests | confusion, precision, sample recall, abstention and geo safety | pass |
 | Error mechanism | fail-first regression | prioritized FP/FN classes | focused tests before owner mutation | repeated defect fixed at owner or retained as explicit unknown | pass |
 | Human handoff | review packet | disagreements + low-confidence cases | 10–15 record shortlist | user can approve/correct without reviewing all implementation | pass |
-| Release coherence | full regression + Docker + docs + Git | local/Compose/GitHub | release commands | gates green; artifacts contain no secret/source bytes | planned |
+| Release coherence | full regression + Docker + docs + Git | local/Compose/GitHub | release commands | gates green; artifacts contain no secret/source bytes | pass |
 
 `actionable precision ≥80%` remains a human pilot gate. Agent-assisted metrics are reported with the
 prefix `provisional_agent_`; zero denominator is `unknown`, not 0% or 100%. `Recall` is scoped only to
@@ -95,6 +95,9 @@ Blind labels are `44 not_relevant / 6 insufficient_evidence / 0 relevant`; curre
 coverage `2%`, hard onsite geography false admissions `0`. Precision and recall are `null` because no
 agent-positive denominator exists. Baseline rejected all 50; fail-first real-record regression moved
 the exact cleaning phrase case to review. The generated packet contains 15 diverse records.
+Full suite: `222 passed`, branch coverage `85.85%`; Ruff/format/strict mypy pass; dbt `54/54`; rebuilt
+Compose is healthy. Artifact integrity/leakage/secret scans and both documentation audits pass.
+Checkpoint `79f22e2a0fce39ce90a427b27d333994145ff625` is present in `origin/codex/ui-redesign`.
 
 | Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
 | --- | --- | --- | --- | --- | --- |
