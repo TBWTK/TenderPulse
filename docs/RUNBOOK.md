@@ -118,6 +118,11 @@ Frozen artifacts лежат в `evals/cleaning_pilot_2026-08-16/`. Predictions �
 .venv/bin/python -m tenderpulse.pilot_eval review \
   evals/cleaning_pilot_2026-08-16/sample.json \
   /tmp/report.json --output /tmp/HUMAN_REVIEW.md
+.venv/bin/python -m tenderpulse.pilot_eval review-remainder \
+  evals/cleaning_pilot_2026-08-16/sample.json \
+  evals/cleaning_pilot_2026-08-16/human-reviews.json \
+  evals/cleaning_pilot_2026-08-16/report.json \
+  --output /tmp/HUMAN_REVIEW_REMAINING_35.md
 .venv/bin/python -m tenderpulse.pilot_eval import-human \
   evals/cleaning_pilot_2026-08-16/sample.json \
   evals/cleaning_pilot_2026-08-16/report.json \
@@ -131,9 +136,12 @@ Frozen artifacts лежат в `evals/cleaning_pilot_2026-08-16/`. Predictions �
 ```
 
 Сравнивайте `/tmp` с tracked current artifacts. `null` precision/recall означает отсутствие
-положительных labels/denominator в этой bounded выборке, а не нулевое качество. Human gate закрывается
+положительных labels/denominator в этой bounded выборке, а не нулевое качество. Human gate
 требует независимой выборки минимум 50 notices; заполненный 15-row `HUMAN_REVIEW.md`
 закрывает shortlist handoff, но не заменяет full-pilot evidence.
+Файл `HUMAN_REVIEW_REMAINING_35.md` нужно заполнять без просмотра `labels.json`,
+`predictions*.json` и `report*.json`. Он даёт полную 50-record coverage вместе с первыми 15,
+но не гарантирует достаточный positive denominator.
 Импорт fail-loud при лишней/пустой строке, дубле, неизвестном label, amount/URL/universe
 расхождении или prediction snapshot, созданном после review. `shortlist_*` метрики нельзя
 использовать как full-pilot или market-quality claim. CLI создаёт file evidence; он не пишет

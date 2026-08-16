@@ -82,6 +82,9 @@ updated: 2026-08-16
 16. Filled human packet проверяет 15 exact source IDs/order, amounts, official URLs и явные
     labels, затем обогащает каждую строку `sample_id`/record UUID/version/raw SHA из frozen sample.
     Reviewer text хранится как evidence в import artifact, но не как source-authoritative fact.
+17. Remainder generator вычитает 15 imported IDs из frozen 50 и fail-loud, если sample/hash/
+    profile/shortlist lineage расходится. Output содержит 35 source-fact rows и пустые reviewer fields;
+    union первого и второго packets равен всей sample universe.
 
 ## Frozen agent-assisted pilot artifacts — 16.08.2026
 
@@ -98,6 +101,8 @@ updated: 2026-08-16
   14 `not_relevant`, 0 `insufficient_evidence`;
 - `human-reviews.json` SHA-256 `1aec5fae…152c`: typed import с document/packet/shortlist/profile/record
   hashes; `human-report.json` SHA-256 `f2dc3641…209`: `TP=1`, `TN=14`, `FP=FN=0`, coverage 100%.
+- `HUMAN_REVIEW_REMAINING_35.md` SHA-256 `6cde292f…05dff`: воспроизводимый complement
+  к первым 15; 35 unique rows, все label/evidence cells пусты.
 
 Human report не закрывает full pilot gate: shortlist имеет размер 15 и отобран по
 agent/matcher priorities. Его `shortlist_actionable_precision=1.0` и `shortlist_recall=1.0` описывают

@@ -459,6 +459,34 @@ class HumanReviewArtifact(BaseModel):
         return self
 
 
+class HumanReviewRemainderPacket(BaseModel):
+    model_config = _ARTIFACT_CONFIG
+
+    schema_version: Literal["pilot-human-review-remainder/v1"]
+    sample_sha256: str
+    completed_reviews_sha256: str
+    shortlist_report_sha256: str
+    profile_slug: str = Field(min_length=1)
+    profile_version: int = Field(ge=1)
+    selection_scope: Literal["remaining_unreviewed_frozen_sample"]
+    sample_ids: tuple[str, ...] = Field(min_length=1)
+
+    @field_validator(
+        "sample_sha256",
+        "completed_reviews_sha256",
+        "shortlist_report_sha256",
+    )
+    @classmethod
+    def validate_hashes(cls, value: str) -> str:
+        return _validate_sha256(value)
+
+    @model_validator(mode="after")
+    def validate_sample_ids(self) -> HumanReviewRemainderPacket:
+        if len(self.sample_ids) != len(set(self.sample_ids)):
+            raise ValueError("remainder packet contains duplicate sample IDs")
+        return self
+
+
 class HumanReviewMetrics(BaseModel):
     model_config = _ARTIFACT_CONFIG
 
@@ -852,6 +880,148 @@ def evaluate_human_review(
     )
 
 
+def build_remaining_human_review_packet(
+    sample: PilotSampleArtifact,
+    completed: HumanReviewArtifact,
+    shortlist_report: PilotEvaluationReport,
+) -> HumanReviewRemainderPacket:
+    if len(sample.items) != 50:
+        raise ArtifactValidationError("remainder packet requires the frozen 50-record sample")
+    sample_hash = canonical_artifact_sha256(sample)
+    if completed.sample_sha256 != sample_hash or shortlist_report.sample_sha256 != sample_hash:
+        raise ArtifactValidationError("completed human review sample hash does not match")
+    if completed.shortlist_report_sha256 != canonical_artifact_sha256(shortlist_report):
+        raise ArtifactValidationError("completed reviews do not match the shortlist report")
+    if (
+        completed.profile_slug != shortlist_report.profile_slug
+        or completed.profile_version != shortlist_report.profile_version
+        or sample.profile_slug != completed.profile_slug
+    ):
+        raise ArtifactValidationError("completed human review profile does not match")
+    if len(completed.reviews) != 15:
+        raise ArtifactValidationError("remainder packet requires exactly 15 completed reviews")
+
+    item_by_id = {item.sample_id: item for item in sample.items}
+    completed_ids = [review.sample_id for review in completed.reviews]
+    shortlist_ids = [item.sample_id for item in shortlist_report.human_review_shortlist]
+    if completed_ids != shortlist_ids:
+        raise ArtifactValidationError(
+            "completed review universe/order differs from shortlist report"
+        )
+    for review in completed.reviews:
+        item = item_by_id.get(review.sample_id)
+        if item is None or (
+            review.source_record_id != item.source_record_id
+            or review.source_url != item.source_url
+            or review.record_version_id != item.record_version_id
+            or review.record_version != item.record_version
+            or review.raw_sha256 != item.raw_sha256
+        ):
+            raise ArtifactValidationError(
+                f"completed human review lineage mismatch for {review.sample_id}"
+            )
+
+    completed_set = set(completed_ids)
+    remaining_ids = tuple(
+        item.sample_id for item in sample.items if item.sample_id not in completed_set
+    )
+    sample_ids = {item.sample_id for item in sample.items}
+    if (
+        len(remaining_ids) != 35
+        or set(remaining_ids) & completed_set
+        or set(remaining_ids) | completed_set != sample_ids
+    ):
+        raise ArtifactValidationError(
+            "remainder and completed reviews do not partition frozen sample"
+        )
+    return HumanReviewRemainderPacket(
+        schema_version="pilot-human-review-remainder/v1",
+        sample_sha256=sample_hash,
+        completed_reviews_sha256=canonical_artifact_sha256(completed),
+        shortlist_report_sha256=canonical_artifact_sha256(shortlist_report),
+        profile_slug=completed.profile_slug,
+        profile_version=completed.profile_version,
+        selection_scope="remaining_unreviewed_frozen_sample",
+        sample_ids=remaining_ids,
+    )
+
+
+def render_remaining_human_review_markdown(
+    sample: PilotSampleArtifact,
+    packet: HumanReviewRemainderPacket,
+) -> str:
+    if packet.sample_sha256 != canonical_artifact_sha256(sample):
+        raise ArtifactValidationError("remainder packet does not reference the supplied sample")
+    if sample.profile_slug != packet.profile_slug:
+        raise ArtifactValidationError("remainder packet profile does not match the sample")
+    item_by_id = {item.sample_id: item for item in sample.items}
+    if any(sample_id not in item_by_id for sample_id in packet.sample_ids):
+        raise ArtifactValidationError("remainder packet contains IDs outside the sample")
+
+    lines = [
+        "# Human review packet — оставшиеся 35 закупок «Чистой территории»",
+        "",
+        "Дата ревью: **__.__.2026**.",
+        "",
+        (
+            "Это дополнение к уже размеченным 15 строкам. После заполнения этих 35 "
+            "будет покрыта вся frozen 50-record выборка без дублей."
+        ),
+        "",
+        (
+            "Для каждой строки откройте официальную карточку, проверьте самостоятельный "
+            "клининговый lot, место исполнения, deadline, НМЦК и требования к опыту/лицензиям."
+        ),
+        "",
+        (
+            "Заполните все четыре пустых поля. Label — ровно один из: "
+            "`relevant`, `not_relevant`, `insufficient_evidence`."
+        ),
+        "",
+        "Правило label:",
+        "",
+        (
+            "- `relevant` — закупка является самостоятельным клининговым lot, сумма в диапазоне "
+            "500 000–25 000 000 RUB, а география покрывается напрямую или реалистичным "
+            "подрядчиком; "
+            "явного blocker нет."
+        ),
+        (
+            "- `not_relevant` — неклининговый/комплексный предмет, сумма вне диапазона, "
+            "нереалистичная "
+            "география или подтверждённое непреодолимое требование."
+        ),
+        (
+            "- `insufficient_evidence` — карточка/документы недоступны, противоречивы или не дают "
+            "проверить материальный критерий."
+        ),
+        "",
+        (
+            "RSS не предоставил region/deadline/classifications для этих records; "
+            "`unknown` не является отрицательным фактом. Не открывайте agent labels, predictions "
+            "и report до фиксации всех ответов."
+        ),
+        "",
+        (
+            "| № | Закупка | Предмет | НМЦК | Проверенные место исполнения / окончание "
+            "подачи | Ваш label | Причина | Требования к опыту / лицензиям |"
+        ),
+        "| ---: | --- | --- | ---: | --- | --- | --- | --- |",
+    ]
+    for row_number, sample_id in enumerate(packet.sample_ids, start=1):
+        item = item_by_id[sample_id]
+        amount = f"{item.amount:.2f} {item.currency}" if item.amount is not None else "unknown"
+        lines.append(
+            f"| {row_number} | [{item.source_record_id}]({item.source_url}) | "
+            f"{_escape_markdown_cell(item.title)} | {amount} |  |  |  |  |"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _escape_markdown_cell(value: str) -> str:
+    return " ".join(value.replace("|", "&#124;").split())
+
+
 def _parse_review_date(markdown: str) -> date:
     match = re.search(
         r"^\s*Дата ревью:\s*\*\*(\d{2}\.\d{2}\.\d{4})\*\*\.\s*$",
@@ -1165,6 +1335,11 @@ def main() -> None:
     review.add_argument("sample", type=Path)
     review.add_argument("report", type=Path)
     review.add_argument("--output", required=True, type=Path)
+    review_remainder = commands.add_parser("review-remainder")
+    review_remainder.add_argument("sample", type=Path)
+    review_remainder.add_argument("human_reviews", type=Path)
+    review_remainder.add_argument("report", type=Path)
+    review_remainder.add_argument("--output", required=True, type=Path)
     import_human = commands.add_parser("import-human")
     import_human.add_argument("sample", type=Path)
     import_human.add_argument("report", type=Path)
@@ -1183,6 +1358,17 @@ def main() -> None:
         pilot_report = _load(args.report, PilotEvaluationReport)
         args.output.write_text(
             render_human_review_markdown(sample, pilot_report),
+            encoding="utf-8",
+        )
+        return
+    if args.command == "review-remainder":
+        remainder_packet = build_remaining_human_review_packet(
+            sample,
+            _load(args.human_reviews, HumanReviewArtifact),
+            _load(args.report, PilotEvaluationReport),
+        )
+        args.output.write_text(
+            render_remaining_human_review_markdown(sample, remainder_packet),
             encoding="utf-8",
         )
         return

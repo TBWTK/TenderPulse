@@ -19,11 +19,13 @@ from tenderpulse.pilot_eval import (
     PilotPredictionArtifact,
     PilotSampleArtifact,
     build_prediction_artifact,
+    build_remaining_human_review_packet,
     canonical_artifact_sha256,
     evaluate_human_review,
     evaluate_pilot,
     import_human_review_markdown,
     render_human_review_markdown,
+    render_remaining_human_review_markdown,
 )
 from tenderpulse.profiles import CompanyProfile
 
@@ -856,3 +858,80 @@ def test_human_review_evaluation_rejects_unbound_shortlist_report() -> None:
 
     with pytest.raises(ArtifactValidationError, match="shortlist report"):
         evaluate_human_review(sample, tampered, predictions, shortlist_report)
+
+
+def test_remaining_human_review_packet_is_exact_blind_complement_of_frozen_fifty() -> None:
+    sample = PilotSampleArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "sample.json").read_text(encoding="utf-8")
+    )
+    completed = HumanReviewArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews.json").read_text(encoding="utf-8")
+    )
+    shortlist_report = PilotEvaluationReport.model_validate_json(
+        (TRACKED_EVAL_DIR / "report.json").read_text(encoding="utf-8")
+    )
+
+    packet = build_remaining_human_review_packet(sample, completed, shortlist_report)
+    markdown = render_remaining_human_review_markdown(sample, packet)
+
+    completed_ids = {review.sample_id for review in completed.reviews}
+    remaining_ids = set(packet.sample_ids)
+    assert packet.schema_version == "pilot-human-review-remainder/v1"
+    assert packet.selection_scope == "remaining_unreviewed_frozen_sample"
+    assert len(packet.sample_ids) == len(remaining_ids) == 35
+    assert remaining_ids.isdisjoint(completed_ids)
+    assert remaining_ids | completed_ids == {item.sample_id for item in sample.items}
+    assert markdown == (TRACKED_EVAL_DIR / "HUMAN_REVIEW_REMAINING_35.md").read_text(
+        encoding="utf-8"
+    )
+
+    item_by_id = {item.sample_id: item for item in sample.items}
+    assert all(
+        item_by_id[sample_id].source_record_id in markdown for sample_id in packet.sample_ids
+    )
+    assert all(
+        item_by_id[sample_id].source_record_id not in markdown for sample_id in completed_ids
+    )
+    assert (
+        sum(
+            line.startswith("| ") and line.split("|")[1].strip().isdigit()
+            for line in markdown.splitlines()
+        )
+        == 35
+    )
+    assert markdown.count("|  |  |  |  |") == 35
+    assert "matcher_decision" not in markdown
+    assert "matcher_score" not in markdown
+    assert "priority_reasons" not in markdown
+    assert "Blind domain judgement" not in markdown
+    assert all(review.reason not in markdown for review in completed.reviews)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_error"),
+    [
+        (lambda value: value.model_copy(update={"sample_sha256": "f" * 64}), "sample hash"),
+        (lambda value: value.model_copy(update={"profile_version": 999}), "profile"),
+        (lambda value: value.model_copy(update={"reviews": value.reviews[:-1]}), "15 completed"),
+    ],
+)
+def test_remaining_human_review_packet_fails_loud_on_unbound_completion(
+    mutation: Any,
+    expected_error: str,
+) -> None:
+    sample = PilotSampleArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "sample.json").read_text(encoding="utf-8")
+    )
+    completed = HumanReviewArtifact.model_validate_json(
+        (TRACKED_EVAL_DIR / "human-reviews.json").read_text(encoding="utf-8")
+    )
+    shortlist_report = PilotEvaluationReport.model_validate_json(
+        (TRACKED_EVAL_DIR / "report.json").read_text(encoding="utf-8")
+    )
+
+    with pytest.raises(ArtifactValidationError, match=expected_error):
+        build_remaining_human_review_packet(
+            sample,
+            mutation(completed),
+            shortlist_report,
+        )

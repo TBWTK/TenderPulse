@@ -139,6 +139,18 @@ coverage `1/15`. `shortlist_actionable_precision=1.0` and `shortlist_recall=1.0`
 15 selected records. The selection used agent/matcher priorities and does not satisfy the independent
 ≥50-notice human pilot gate; the report encodes that prohibition instead of relying on prose.
 
+### Remaining-35 blind handoff — active evidence
+
+| Требование / риск | Evidence | Проверка | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- |
+| Exact complement | typed contract | reviewed/remainder set algebra | 15 + 35 = frozen 50, no overlap | passing |
+| Blind output | leakage inspection | rendered Markdown content | no agent/matcher/prior-review output | passing |
+| Empty form | structural test | 35 Markdown rows | four empty reviewer cells per row | passing |
+| Reproducibility | tracked snapshot | generator output comparison | byte-for-byte equality, fixed SHA | passing |
+
+Packet creation is not human evidence: full gate remains blocked until the 35 rows are actually reviewed,
+imported and combined with the first 15. Even then, insufficient actionable positives remain a possible gap.
+
 | Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
 | --- | --- | --- | --- | --- | --- |
 | Реальный company fit | Human-labeled eval | ≥1 реальная компания, ≥50 ЕИС notices | blind label → matcher comparison | actionable precision ≥80%; hard onsite geo false admission = 0 | blocked |

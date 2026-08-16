@@ -95,6 +95,10 @@ flowchart LR
   record-version/raw SHA проверяются до метрик. Matcher snapshot обязан предшествовать
   импорту. Отчёт всегда помечен `agent_matcher_prioritized_shortlist` и
   `eligible_for_full_pilot_gate=false`: 15 целевых строк не доказывают рыночную precision/recall.
+- Remainder packet строится только как complement exact reviewed IDs к frozen sample: 15 + 35
+  обязаны partition-ировать все 50 IDs. Generator читает из sample только official URL,
+  title и amount, а все reviewer fields оставляет пустыми; labels/predictions/report не являются
+  input рендеринга. Так полная coverage не создаёт label leakage.
 - Human review — account-authorized append-only revision stream, связанный с exact profile version,
   record version и raw SHA. Review UI читает canonical source facts, но не matcher output; stale identity
   отклоняется, а исправление создаёт следующую revision вместо перезаписи.

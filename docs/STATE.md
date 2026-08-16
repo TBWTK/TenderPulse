@@ -9,12 +9,20 @@ updated: 2026-08-16
 
 ## Active objective
 
-Согласовать с владельцем продукта следующий human-quality protocol: независимые ≥50 ЕИС notices
-с достаточным actionable-positive denominator. 15-row document уже импортирован и доказан как scoped
-diagnostic; новые labels не генерировать от имени пользователя и не менять matcher по малой смещённой выборке.
+Подготовить blind packet ровно для оставшихся 35 из frozen 50 ЕИС notices. Пакет строится из
+sample и exact 15-row human artifact, не показывает agent/matcher outcomes и оставляет все решения
+пустыми. Первые 15 и новые 35 должны давать точно всю frozen universe без дублей.
 
 ## Acceptance criteria
 
+- [x] Generator вычитает exact 15 reviewed `sample_id` из frozen 50: remainder содержит 35 unique IDs,
+  пересечение пусто, а union равен sample universe; любое lineage/hash/profile mismatch fail-loud.
+- [x] Markdown показывает только official link, title, amount и RSS unknown из sample; matcher
+  decision/score/reasons, agent labels/notes/confidence и прежние human labels отсутствуют.
+- [x] Файл содержит 35 пустых строк с labels `relevant / not_relevant / insufficient_evidence`, полями
+  географии/deadline, причины и requirements/licenses; ни одно решение не предзаполнено.
+- [x] Failing tests предшествуют generator; tracked Markdown воспроизводится byte-for-byte,
+  focused/full tests, lint/mypy, audits, secret scan и Git checkpoint проходят.
 - [x] Parser принимает только полностью заполненную 15-row Markdown-таблицу с допустимыми labels,
   непустыми причинами и без дублей; пустая/лишняя/неизвестная строка fail-loud.
 - [x] Импорт совпадает с точным universe и порядком tracked `HUMAN_REVIEW.md`, привязывает каждую оценку
@@ -100,11 +108,18 @@ diagnostic; новые labels не генерировать от имени по
 - Rebuilt Docker API/worker/PostgreSQL/MinIO healthy, init завершён с `0`, API health — `{"status":"ok"}`.
 - Verified human-review checkpoint `c1439f93ea7a8fa345b3877529fe661f24939814` опубликован в
   `origin/codex/ui-redesign`; direct remote-ref check вернул тот же hash.
+- Remainder generator проверяет sample/completed-review/shortlist hashes, exact profile и lineage,
+  затем строит 35 unique IDs как непересекающееся дополнение к первым 15; union равен frozen 50.
+- `HUMAN_REVIEW_REMAINING_35.md` содержит только official URL, title и amount из sample, а 35 наборов
+  reviewer fields пусты. SHA-256 `6cde292f…05dff` воспроизводится byte-for-byte через CLI.
+- Fail-first remainder suite остановился на `ImportError: HumanReviewRemainderPacket`; после реализации
+  focused suite проходит `42` tests. Full suite — `250` tests, `84.99%` branch coverage;
+  Ruff/format/strict mypy, project-control/IMMUNE audits, diff и secret scan проходят.
 
 ## Changed areas
 
-- Affected: pilot eval schema/parser/CLI, exact source/packet/report/lineage hashes, scoped metrics, tracked
-  human-review artifacts, documentation and tests.
+- Affected: pilot eval remainder schema/generator/CLI, exact source/packet/report/lineage hashes, tracked
+  blind human-review packet, documentation and tests.
 - Not affected: canonical raw/SCD2 and PostgreSQL human-review revisions, matcher weights/decisions,
   source ingestion, API/UI, GigaChat, credentials, notifications and public deployment.
 
@@ -124,23 +139,29 @@ diagnostic; новые labels не генерировать от имени по
   явные table labels/reasons после exact join; prose не меняет matcher/canonical facts.
 - File-based pilot artifact и account-authorized DB review — разные projections. Этот import не создаёт
   operational revisions и не переносит third-party reviewer facts в canonical source state.
+- Remainder определяется set difference frozen sample и exact imported reviews, а не новым поиском или
+  ранжированием. Рендерер получает только sample и typed packet, поэтому не имеет доступа к labels и
+  predictions; полная coverage сама по себе не доказывает качество без достаточных positive labels.
 
 ## Next exact step
 
-Согласовать sampling/review protocol для независимых ≥50 notices и минимального числа
-actionable positives, затем сформировать новый blind packet без matcher output.
+Пользователь заполняет дату и четыре пустых поля во всех 35 строках
+`evals/cleaning_pilot_2026-08-16/HUMAN_REVIEW_REMAINING_35.md`, не открывая agent artifacts; после
+возврата документа — fail-first импорт, exact merge с первыми 15 и пересчёт метрик на frozen 50.
 
 ## Blockers
 
-- Импорт и 15-row diagnostic не заблокированы и завершены.
-- Full human pilot quality заблокировано до согласования/получения независимой выборки ≥50 notices
-  и достаточного positive denominator.
+- 35-row packet готов; следующий шаг заблокирован только отсутствующими human labels пользователя.
+- Full human pilot quality остаётся заблокировано до заполнения всей frozen 50 и достаточного
+  positive denominator.
 
 ## Non-goals
 
 - Выдумывать, дополнять или исправлять human review за пользователя.
 - Переносить географию, deadlines и requirements из reviewer document в canonical source data.
 - Менять matcher по одному 15-row shortlist без доказанного повторяемого класса ошибок.
+- Предзаполнять новые human labels, reasons, geography, deadlines или requirements.
+- Считать создание blank packet закрытием 50-record human pilot gate.
 - Автоматически scraping-ить HTML карточки/вложения ЕИС без нового machine-readable source contract.
 - Считать source search рекомендацией, менять matcher под желаемую метрику или скрывать unknown.
 - Начинать 14-дневный reliability run, public deployment, production auth/RLS, alerts channels или
@@ -191,3 +212,9 @@ invalid label/amount/universe/row-count и unbound shortlist-report cases. Full 
 даёт `TP=1`, `TN=14`, `FP=FN=0`, но `eligible_for_full_pilot_gate=false`. dbt завершён
 с `PASS=71 WARN=0 ERROR=0`; rebuilt Compose здоров, init вышел с `0`, API health — `ok`.
 Implementation checkpoint `c1439f93ea7a8fa345b3877529fe661f24939814` подтверждён на remote branch.
+
+Remaining-35 fail-first 16.08.2026 остановил collection с
+`ImportError: HumanReviewRemainderPacket`. Current `tests/test_pilot_eval.py` проходит `42` tests;
+tracked Markdown SHA-256 `6cde292f5cd43a6d26c6502681bb4ac48a2a2190c522431e4e3991a2f7e05dff`
+воспроизводится byte-for-byte. Full suite — `250` tests, `84.99%` branch coverage;
+Ruff/format/strict mypy, project-control/IMMUNE audits, `git diff --check` и secret scan проходят.
