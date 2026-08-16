@@ -35,6 +35,7 @@ def _profile_payload() -> dict[str, object]:
         "participation_constraints": [" Требуется выезд инженера ", "требуется выезд инженера"],
         "min_amount": "100000",
         "max_amount": "5000000",
+        "review_above_amount": "1000000",
     }
 
 
@@ -64,6 +65,7 @@ def test_company_profile_normalizes_and_deduplicates_user_input() -> None:
     assert profile.participation_constraints == ("Требуется выезд инженера",)
     assert profile.min_amount == Decimal("100000")
     assert profile.max_amount == Decimal("5000000")
+    assert profile.review_above_amount == Decimal("1000000")
 
 
 @pytest.mark.parametrize(
@@ -79,6 +81,8 @@ def test_company_profile_normalizes_and_deduplicates_user_input() -> None:
             {"service_regions": ["RU-MOW"], "excluded_regions": ["RU-MOW"]},
             "service_regions and excluded_regions",
         ),
+        ({"review_above_amount": "50000"}, "review_above_amount cannot be below min_amount"),
+        ({"review_above_amount": "6000000"}, "review_above_amount cannot exceed max_amount"),
     ],
 )
 def test_company_profile_rejects_unusable_matching_input(
@@ -108,4 +112,7 @@ def test_two_mvp21_profiles_cover_cleaning_and_office_supply() -> None:
     assert cleaning.delivery_mode is ServiceDeliveryMode.ONSITE
     assert office.delivery_mode is ServiceDeliveryMode.ONSITE
     assert cleaning.service_regions == office.service_regions == ("RU-MOW", "RU-MOS")
-    assert cleaning.contractors_allowed is office.contractors_allowed is False
+    assert cleaning.contractors_allowed is True
+    assert office.contractors_allowed is False
+    assert cleaning.min_amount == Decimal("500000")
+    assert cleaning.max_amount == Decimal("25000000")

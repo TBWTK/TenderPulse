@@ -78,10 +78,12 @@ DIAGNOSTIC_LABELS = {
     "unknown_amount": "сумма не найдена",
     "unknown_deadline": "срок подачи не найден",
     "unknown_location": "место исполнения не найдено",
+    "qualification_review_required": "нужно подтвердить квалификацию и опыт",
     "deadline_passed": "срок подачи истёк",
     "negative_keyword": "обнаружено стоп-слово",
     "geography_out_of_scope": "регион вне зоны работы",
     "geography_excluded": "регион явно исключён",
+    "amount_out_of_range": "сумма вне диапазона компании",
 }
 REGION_LABELS = {
     "RU-MOW": "Москва",

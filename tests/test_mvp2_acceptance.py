@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from tenderpulse.api import create_app
 from tenderpulse.bootstrap import seed_demo
-from tenderpulse.domain.matching import BlockerCode, MatchDecision, TenderMatcher
+from tenderpulse.domain.matching import BlockerCode, GapCode, MatchDecision, TenderMatcher
 from tenderpulse.persistence.models import Base
 from tenderpulse.persistence.repository import ProcurementRepository
 from tenderpulse.profiles import load_mvp2_legacy_test_profiles
@@ -72,7 +72,8 @@ def test_seeded_russian_vertical_slice_covers_four_sectors_and_geography() -> No
     )
     assert it_remote.decision is MatchDecision.RECOMMENDED
     assert landscaping.decision is MatchDecision.RECOMMENDED
-    assert cleaning.decision is MatchDecision.RECOMMENDED
+    assert cleaning.decision is MatchDecision.REVIEW
+    assert GapCode.QUALIFICATION_REVIEW_REQUIRED in cleaning.gaps
 
 
 def test_profile_change_and_fifth_company_survive_reseed_and_use_same_pipeline() -> None:

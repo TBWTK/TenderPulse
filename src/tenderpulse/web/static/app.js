@@ -205,6 +205,7 @@ const profileFields = (data) => ({
   participation_constraints: splitValues(data.get('participation_constraints'), /\r?\n/),
   min_amount: String(data.get('min_amount')).trim() || null,
   max_amount: String(data.get('max_amount')).trim() || null,
+  review_above_amount: String(data.get('review_above_amount')).trim() || null,
 });
 
 const profilePanel = document.querySelector('#profile');

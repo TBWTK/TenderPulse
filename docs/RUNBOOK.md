@@ -51,6 +51,11 @@ Company navigation не содержит selector, `/companies/new` и `/data`; 
 получает `403`. В MVP 2.1 operator UI не имеет отдельного выданного account и schedule принадлежит
 worker. API кроме `/api/health` требует session; unsafe запросы дополнительно требуют CSRF header/cookie.
 
+Budget bounds в профиле являются eligibility boundary. Полностью известная сумма вне диапазона получает
+`not_relevant`; неизвестная сумма — `review`. Необязательный `review_above_amount` задаёт сумму, выше
+которой неизвестный опыт/квалификация требуют ручной проверки. Он не подтверждает и не отменяет
+юридические требования конкретной закупки.
+
 Основная очередь содержит `recommended` и `review`; `not_relevant`/`expired` находятся в audit и не
 получают AI/alert actions. Alert создаётся только для `recommended` и сохраняет profile/record version,
 score/reasons, region, deadline, official URL и raw SHA.

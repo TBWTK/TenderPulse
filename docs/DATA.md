@@ -132,3 +132,15 @@ flowchart LR
 
 Foreign records MVP 1.0 физически сохраняются как историческое evidence, но `current Russian product`
 выбирает только российский source scope. Удаление raw/history не требуется и не подменяет projection rule.
+
+## Pilot-candidate profile facts
+
+`src/tenderpulse/mvp21_profiles.json` владеет fresh-install default для двух account profiles. Для
+`cleaning-moscow` подтверждены только данные владельца продукта: «Чистая территория», Москва, service
+regions `RU-MOW/RU-MOS`, onsite cleaning, contractors allowed и contract range 500 000–25 000 000 RUB.
+Keywords, exclusions и participation constraints — проверяемая matching-гипотеза. Лицензии и фактический
+опыт остаются `unknown`; UI/API versioning сохраняет последующие подтверждения отдельной immutable version.
+Для cleaning pilot candidate `review_above_amount=1 000 000 RUB` является conservatively configured
+manual-review trigger по результатам проверки [ПП РФ №2571](https://government.ru/docs/all/138738/),
+а не автоматическим юридическим заключением. `OKPD2 81.29` не используется как широкий prefix;
+сезонная уборка ограничена `81.29.12`, специализированный pest control исключён.

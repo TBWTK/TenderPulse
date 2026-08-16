@@ -61,6 +61,14 @@ flowchart LR
   dbt и alerts не скрывают foreign records собственными эвристиками.
 - `domain.geography` — один typed owner ISO `RU-*`, delivery mode и reach assessment. Matcher может
   вернуть geography reason, risk (`review`) или blocker (`not_relevant`); unknown не становится match.
+- `CompanyProfile.min_amount/max_amount` задают eligibility boundary: если все lot amounts известны и
+  ни один не попадает в диапазон, matcher возвращает typed budget blocker. Если при заданной границе
+  сумма полностью или частично unknown и нет доказанного подходящего lot, решение не выше `review`.
+  Неизвестная сумма не подменяется нулём; mixed lots допускают участие, если хотя бы один lot подходит.
+- `CompanyProfile.review_above_amount` — generic business threshold для неизвестной квалификации. Если
+  все подходящие по бюджету lots выше порога, matcher добавляет `qualification_review_required` и не
+  поднимает решение выше `review`. Владелец правила — typed profile field; matcher не распознаёт право
+  из свободного текста и не объявляет наличие лицензии/опыта.
 - Тендерная страница читает последний extraction attempt только для текущей record version. Payload migration
   добавляет явный coverage status старым attempts, не превращая отсутствие evidence в `not_present`.
 - `ProductAnalytics` — единая typed projection для API и страницы аналитики. Decision/coverage/distribution

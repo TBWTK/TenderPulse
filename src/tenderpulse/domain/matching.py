@@ -30,6 +30,7 @@ class GapCode(StrEnum):
     UNKNOWN_AMOUNT = "unknown_amount"
     UNKNOWN_DEADLINE = "unknown_deadline"
     UNKNOWN_LOCATION = "unknown_location"
+    QUALIFICATION_REVIEW_REQUIRED = "qualification_review_required"
     DEADLINE_PASSED = "deadline_passed"
 
 
@@ -37,6 +38,7 @@ class BlockerCode(StrEnum):
     NEGATIVE_KEYWORD = "negative_keyword"
     GEOGRAPHY_OUT_OF_SCOPE = "geography_out_of_scope"
     GEOGRAPHY_EXCLUDED = "geography_excluded"
+    AMOUNT_OUT_OF_RANGE = "amount_out_of_range"
 
 
 class MatchReason(BaseModel):
@@ -152,10 +154,22 @@ class TenderMatcher:
             blockers.append(BlockerCode.GEOGRAPHY_OUT_OF_SCOPE)
 
         amounts = [lot.amount for lot in record.lots if lot.amount is not None]
+        has_unknown_amount = any(lot.amount is None for lot in record.lots)
+        budget_bounded = profile.min_amount is not None or profile.max_amount is not None
         if not amounts:
             gaps.append(GapCode.UNKNOWN_AMOUNT)
-        elif any(profile.accepts_amount(amount) for amount in amounts):
-            add_reason("budget", "0.05", (str(amount) for amount in amounts))
+        else:
+            accepted_amounts = [amount for amount in amounts if profile.accepts_amount(amount)]
+            if accepted_amounts:
+                add_reason("budget", "0.05", (str(amount) for amount in accepted_amounts))
+                if profile.review_above_amount is not None and all(
+                    amount > profile.review_above_amount for amount in accepted_amounts
+                ):
+                    gaps.append(GapCode.QUALIFICATION_REVIEW_REQUIRED)
+            elif has_unknown_amount:
+                gaps.append(GapCode.UNKNOWN_AMOUNT)
+            elif budget_bounded:
+                blockers.append(BlockerCode.AMOUNT_OUT_OF_RANGE)
 
         if record.deadline_at is None:
             gaps.append(GapCode.UNKNOWN_DEADLINE)
@@ -176,6 +190,8 @@ class TenderMatcher:
                     GeographyStatus.TRAVEL_COVERAGE,
                     GeographyStatus.UNKNOWN,
                 }
+                or (budget_bounded and GapCode.UNKNOWN_AMOUNT in gaps)
+                or GapCode.QUALIFICATION_REVIEW_REQUIRED in gaps
                 else MatchDecision.RECOMMENDED
             )
         elif score >= Decimal("0.30"):

@@ -85,7 +85,7 @@ def test_missing_optional_facts_are_visible_gaps(it_notice: ProcurementRecord) -
 
     assert GapCode.UNKNOWN_AMOUNT in recommendation.gaps
     assert GapCode.UNKNOWN_DEADLINE in recommendation.gaps
-    assert recommendation.decision is MatchDecision.RECOMMENDED
+    assert recommendation.decision is MatchDecision.REVIEW
 
 
 def test_expired_notice_is_not_recommended(it_notice: ProcurementRecord) -> None:

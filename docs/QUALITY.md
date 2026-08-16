@@ -34,6 +34,41 @@ RSS cycle ingested `25` bounded records. Authenticated cleaning/office HTTP jour
 access. Browser DOM inspection at 390/768/1024/1280 px reports no overflow/offscreen controls, and nearest
 deadlines contain only actionable decisions.
 
+## Cleaning pilot-candidate onboarding — active evidence plan
+
+| Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |
+| --- | --- | --- | --- | --- | --- |
+| Confirmed profile facts | profile contract | `mvp21_profiles.json` | `tests/test_mvp21_profiles.py` | Москва/МО, contractors, 500k–25m совпадают с вводом пользователя | passing |
+| Cleaning relevance breadth | parameterized business eval | synthetic ЕИС notices | ≥5 cleaning scenarios | premises/territory/seasonal scopes classify as expected | passing |
+| False-positive boundaries | adversarial business eval | product-only/specialized fixtures | ≥5 negative/review scenarios | unrelated/special scopes blocked; uncertainty reviewed | passing |
+| Budget eligibility | unit + API contract | in/out/unknown/mixed amount fixtures | matcher/blocker serialization | out of range blocks; unknown remains gap/review | passing |
+| Geography via contractors | business eval | Москва/МО/другой регион | matcher evidence | direct region recommended; contractor region review | passing |
+| Legal unknown honesty | content/contract review | profile constraints + typed threshold | source audit + matcher/UI label | no invented licence; >1m unknown experience requires review | passing |
+| Versioned local onboarding | authenticated E2E + restart | Docker PostgreSQL | GET v1 → PUT v2 → restart → history | v1 retained, v2 active and account-bound | passing |
+| Regression and Git delivery | full release chain | local + Compose + GitHub | test/lint/dbt/health/audit/push | gates green, secrets absent, remote checkpoint visible | pending push |
+
+Fail-first order: business scenarios/profile facts → budget state machine/API label → implementation →
+authorized profile-version journey → full regression/Docker/Git. Synthetic fixtures prove the contract,
+not real-market precision; the ≥50 human-labeled pilot gate remains separate below.
+
+Fail-first evidence 16.08.2026: `.venv/bin/pytest tests/test_mvp21_profiles.py tests/test_matching.py -q`
+reports `12 failed`. Failures independently expose the old contractor/budget/profile facts, missing `9061`
+yard classification, absent stop phrases, absent typed amount blocker/UI label and guessed recommendation
+for unknown amount. Existing unrelated tests still pass; production code was unchanged for this run.
+
+Second fail-first evidence: after independent domain review, `7 failed` prove absence of the structured
+`review_above_amount`, qualification gap/label, UI round-trip and bounds validation. Final focused suite:
+`45 passed`. Full suite: `191 passed`, branch coverage `86.14%`; Ruff/format/strict mypy pass. Legal source
+review used [ПП РФ №2571](https://government.ru/docs/all/138738/) as a manual-review trigger only; the
+product does not claim a legal eligibility decision.
+
+Local Docker evidence: authorized `PUT` created cleaning profile v2 with budget `500000..25000000`,
+contractors enabled and threshold `1000000`; history returns v1/v2 and restart preserves v2. Rebuilt
+services are healthy, dbt reports `PASS=54 WARN=0 ERROR=0`, and the immediate ЕИС cycle ingested 25
+bounded records. Browser inspection at 1280/768/390 px shows all budget controls, readable help text and
+the two-version history without clipping. The current 30-record queue yields 1 `review`, 29
+`not_relevant` and 0 fabricated recommendations; real precision remains unclaimed.
+
 ## Закрытый пилот — evidence plan
 
 | Требование / риск | Evidence | Среда | Проверка | Ожидаемый результат | Статус |

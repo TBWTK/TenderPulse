@@ -33,6 +33,7 @@ def test_dashboard_javascript_projects_every_company_profile_field() -> None:
         "participation_constraints",
         "min_amount",
         "max_amount",
+        "review_above_amount",
     ):
         assert f"data.get('{field}')" in source
 

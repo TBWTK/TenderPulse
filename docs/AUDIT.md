@@ -9,10 +9,10 @@ updated: 2026-08-16
 
 ## Вывод о достаточности контекста
 
-`sufficient` для MVP 2.1. Пользователь поручил реализацию после review, приняв рекомендованные границы:
-локальные invitation accounts вместо public registration, два account-visible профиля, server GigaChat
-credential, localhost, deferred notification expansion и existing worker вместо Airflow. Automatic
-attachments остаются contract-gated; неизвестный официальный download contract не блокирует auth/UI/RSS.
+`sufficient` для synthetic onboarding cleaning pilot candidate. Пользователь подтвердил название,
+Москву, услуги, service regions Москва/МО, допустимость подрядчиков и бюджет 500 тыс.–25 млн рублей;
+системе поручено сформировать рабочие keywords/exclusions и осторожные требования. Юридические лицензии
+и реальные labeled notices неизвестны, поэтому legal claims и pilot precision остаются отдельными gates.
 
 ## Источники и доступность контекста
 
@@ -25,6 +25,11 @@ attachments остаются contract-gated; неизвестный официа
 | Scheduled ingestion | confirmed | Docker worker + live run log | 14-day reliability неизвестна | pilot run ledger |
 | Attachments | unknown | `docs/DATA.md`, no adapter/code | unsafe scraping/format expansion | official contract review before adapter |
 | UI defect | confirmed | browser 390/768/1024/1280 | subjective pilot feedback ещё нет | pilot observation |
+| Cleaning profile facts | confirmed | user message + local DB v2 16.08.2026 | нет | collect missing operational evidence |
+| Keywords/exclusions | inferred | business eval + narrow classifier contract | real false positives неизвестны | human-label ≥50 notices |
+| Licences/experience | unknown | user explicitly supplied no facts | legal/eligibility error | keep unknown; verify per tender |
+| Budget semantics | confirmed | typed matcher tests + v2 500k–25m profile | нет для deterministic contract | validate on labeled sample |
+| Real relevance sample | unknown | examples not supplied | precision unmeasured | collect/label ≥50 ЕИС notices |
 
 Допустимые статусы: `confirmed`, `inferred`, `unknown`, `not applicable`.
 
@@ -44,6 +49,17 @@ password recovery, social OAuth, GigaChat BYOK, Telegram/email, public deploymen
 Airflow и attachment scraping без official contract.
 
 ## Аудит реализованного состояния
+
+- Cleaning pilot candidate записан как immutable v2: Москва/МО, подрядчики допустимы, договоры
+  500 тыс.–25 млн рублей. Seed и local DB согласованы, v1/history сохранены после restart.
+- Matcher fail-closed блокирует полностью известные суммы вне диапазона, сохраняет неизвестную сумму
+  как `review` и требует ручной проверки квалификации выше 1 млн рублей. Последнее — product trigger,
+  а не юридическое заключение.
+- Пять positive/actionable и пять explicit negative scenarios, contractor geography и mixed/unknown
+  budgets закреплены deterministic tests. На текущих 30 live records нет выдуманной рекомендации:
+  1 `review`, 29 `not_relevant`.
+- Форма профиля проверена browser inspection на 1280/768/390 px; порог опыта, бюджет и история версий
+  доступны без обрезания.
 
 - Миграция `0008_local_accounts` вводит отдельные authority для account, access credential и server
   session. Company context выводится из session binding, а не из query selector.
@@ -94,12 +110,13 @@ credential secret scan and opt-in bounded live ЕИС smoke.
 
 ## Открытые вопросы и блокеры
 
-MVP 2.1 не заблокирован. Для закрытого пилота нужны реальная компания и human-labeled выборка. Official
+Synthetic onboarding не заблокирован. Для закрытого пилота нужны документы компании и human-labeled выборка. Official
 attachment contract остаётся explicit unknown; adapter запрещён без bounded machine-readable semantics.
 
 ## Решение о поставке
 
-`accepted for local pre-pilot`: все критерии MVP 2.1 имеют evidence. Это не `production-ready` и не
+`accepted for local pre-pilot`: профиль и matching contract имеют local evidence; Git push проверяется
+отдельным release gate. Это не `production-ready` и не
 подтверждение ≥80% precision на реальной компании; эти gates принадлежат следующему этапу.
 
 ## Решение о начале

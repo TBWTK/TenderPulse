@@ -40,6 +40,7 @@ class CompanyProfile(BaseModel):
     participation_constraints: tuple[str, ...] = ()
     min_amount: Decimal | None = Field(default=None, ge=0)
     max_amount: Decimal | None = Field(default=None, ge=0)
+    review_above_amount: Decimal | None = Field(default=None, ge=0)
 
     @field_validator("name")
     @classmethod
@@ -137,6 +138,18 @@ class CompanyProfile(BaseModel):
             and self.min_amount > self.max_amount
         ):
             raise ValueError("min_amount cannot exceed max_amount")
+        if (
+            self.review_above_amount is not None
+            and self.min_amount is not None
+            and self.review_above_amount < self.min_amount
+        ):
+            raise ValueError("review_above_amount cannot be below min_amount")
+        if (
+            self.review_above_amount is not None
+            and self.max_amount is not None
+            and self.review_above_amount > self.max_amount
+        ):
+            raise ValueError("review_above_amount cannot exceed max_amount")
         overlap = set(self.service_regions) & set(self.excluded_regions)
         if overlap:
             raise ValueError("service_regions and excluded_regions cannot overlap")

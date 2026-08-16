@@ -9,90 +9,99 @@ updated: 2026-08-16
 
 ## Active objective
 
-Подготовить закрытый пилот TenderPulse на одной реальной российской компании: согласовать профиль,
-разметить bounded-выборку ЕИС и измерить практическую точность actionable-рекомендаций.
+Онбордить предоставленный владельцем продукта pilot-candidate профиль «Чистая территория» и доказать
+на deterministic scenarios, что бюджет, география, подрядчики, стоп-направления и unknown-требования
+дают объяснимые решения до начала разметки реальных закупок ЕИС.
 
 ## Acceptance criteria
 
-MVP 2.1 — verified:
-
-- [x] Неавторизованный HTML-запрос перенаправляется на `/login`, API отвечает `401`; валидный local
-  access code создаёт server-side session, неверный код не раскрывает account, logout отзывает session.
-- [x] Access codes хешируются с обязательным secret pepper, не сохраняются в Git/log/URL/browser
-  storage; cookie имеет `HttpOnly`, `SameSite`, ограниченный lifetime, а unsafe API защищены CSRF.
-- [x] Два account привязаны каждый к одной компании; чужой profile slug не переключает контекст и
-  отвечает `404`/`403`. Shared procurement data не становится tenant-owned.
-- [x] В account-контуре доступны только `Чистая территория` и `Офисное снабжение`; второй профиль
-  покрывает мебель, канцелярию, принтеры/МФУ и расходники и исключает разработку ПО.
-- [x] Company user видит обзор, тендеры, аналитику, свой профиль и logout; глобальный selector,
-  создание чужих компаний и операторский раздел данных отсутствуют.
-- [x] Обзор ограничен первичными KPI и следующим шагом; history/data-quality/outcomes аналитики
-  раскрываются вторично и не используют пользовательский жаргон SCD2.
-- [x] На viewport 390, 768, 1024 и 1280 px нет horizontal overflow, offscreen controls и тесной
-  трёхколоночной history card на промежуточной ширине.
-- [x] Docker worker выполняет bounded ЕИС RSS cycle сразу и затем каждый час, сохраняет run evidence,
-  продолжает работу после failed cycle и не вызывает TED/USAspending.
-- [x] Automatic attachment adapter не заявлен без официального безопасного contract; manual XML/ZIP,
-  official link и явный `unknown` сохранены.
-- [x] Telegram/email/webhook expansion и public deployment остаются planned; существующие in-app и
-  webhook contracts не деградировали.
-- [x] Изменение реализовано test-first; `172` tests и branch coverage `86.07%`, Ruff/format/strict mypy,
-  `54` dbt tests, rebuilt Docker, live ЕИС cycle, restart и browser acceptance прошли.
-- [x] Два local-demo code подготовлены вне Git для передачи пользователю; реализация оформляется
-  восстановимым Git checkpoint без ложного заявления об обновлении remote/default branch.
+- [x] Профиль сохраняет подтверждённые пользователем факты: Москва, работа в Москве и Московской
+  области, подрядчики допустимы, бюджет договора от 500 000 до 25 000 000 RUB.
+- [x] Рабочие positive keywords/classifications покрывают уборку помещений, офисов, дворов и территорий,
+  ежедневный/генеральный клининг, санитарное содержание, мойку окон и сезонную/снежную уборку.
+- [x] Stop-направления блокируют отдельные поставки товаров, ремонт/строительство, озеленение, охрану,
+  обращение с опасными/медицинскими/радиоактивными отходами и специализированный pest control.
+- [x] Неизвестные лицензии не превращаются в правовой факт: профиль явно требует проверки документации,
+  а специальные допуски/опыт/персонал считаются tender-specific до подтверждения.
+- [x] Москва/МО в диапазоне до 1 млн рублей рекомендуются по предмету; свыше порога неизвестный опыт
+  переводит решение в `review`. Иной регион получает `review` с contractor evidence.
+- [x] Все известные суммы вне диапазона создают typed budget blocker и `not_relevant`; неизвестная сумма
+  при заданном budget range остаётся explicit gap и `review`.
+- [x] Минимум пять positive и пять negative/uncertain synthetic scenarios покрыты business evals;
+  fixtures не объявляются доказательством реальной precision.
+- [x] Текущая local DB получает новую immutable version cleaning-profile через authorized API, старая
+  версия сохраняется, а restart не откатывает пользовательский профиль seed-ом.
+- [ ] Full test/lint/dbt, Docker health/restart, authenticated browser/HTTP smoke, docs audit и secret
+  scan проходят; checkpoint отправлен в GitHub по подтверждённой пользователем Git-authority.
 
 ## Current verified state
 
-- Миграция `0008_local_accounts` владеет accounts, keyed-hash credentials и revocable sessions;
-  CSRF и account/profile authorization применяются на сервере.
-- Account visibility принадлежит bindings: `cleaning-moscow` и `office-supply-moscow`. Legacy profile
-  versions и procurement lineage сохранены, но не доступны company accounts.
-- Ближайшие сроки аналитики включают только `recommended`/`review`, а rejected records не создают
-  ложный actionable backlog.
-- Штатные Compose-образы собраны; API, worker, PostgreSQL и MinIO healthy. Worker получил `25` записей
-  из официального ЕИС RSS с TLS verification и повторил цикл после restart.
-- Browser acceptance прошёл на 390/768/1024/1280 px; реальные cleaning/office login и cross-company
-  denial проверены через HTTP journey.
+- MVP 2.1 закрыт checkpoint `36a6eb6`: два local account, tenant isolation, спокойный responsive UI и
+  automatic bounded ЕИС RSS прошли `172` tests, `86.07%` branch coverage и `54` dbt tests.
+- Пользователь подтвердил название, город, услуги, service regions, contractor policy и budget range
+  16.08.2026; keywords, exclusions и requirements поручено сформировать системе.
+- Seed и current DB v2 теперь совпадают с подтверждёнными фактами; DB history сохраняет v1 и v2, а
+  restart API/worker не откатывает active version bootstrap-ом.
+- Fail-first suite подтверждает gap: `12 failed` по параметрам профиля, дворовой уборке, пяти exclusions,
+  contractor geography, двум out-of-range суммам, unknown amount и отсутствующему UI label.
+- Независимый domain audit выявил риск широкого `OKPD2 81.29`, одиночных stems и неизвестного опыта;
+  второй fail-first gate дал `7 failed` до появления typed review threshold.
+- Реализация использует узкие фразы/`81.29.12`, budget blocker и `review_above_amount=1 000 000`;
+  focused suite проходит `45` tests, full suite — `191` tests с `86.14%` branch coverage.
+- Ruff, форматирование и strict mypy проходят; dbt завершил `PASS=54 WARN=0 ERROR=0`. Rebuilt Compose
+  показывает healthy API/worker/PostgreSQL/MinIO, immediate worker cycle получил 25 записей ЕИС.
+- Browser inspection формы v2 на 1280/768/390 px подтвердил доступность всех трёх budget controls,
+  сохранённые значения, отсутствие обрезания и доступную историю из двух версий.
+- Текущая bounded live-очередь честно содержит `1 review` и `29 not_relevant`, без искусственно
+  сгенерированных `recommended`; качество на реальном рынке ещё не измерено.
+- Реальные подходящие/неподходящие закупки и подтверждённые лицензии пользователем не предоставлены.
 
 ## Changed areas
 
-- Auth/session schema, profile visibility, API/page authorization, analytics projection, UI/navigation,
-  worker defaults/resilience, Docker/env, documentation and test/eval evidence changed coherently.
-- Canonical procurement, raw/history lineage, organization/outcome authority and source adapters were
-  preserved; only their authorized product projection changed.
+- Affected: business profile authority, matching budget contract, blocker API/UI labels, synthetic
+  capability evals, local versioned profile state, analytics diagnostics, docs, Docker smoke and Git.
+- Not affected: auth/session schema, procurement/raw/SCD2 models, source adapters, GigaChat extraction,
+  office account, notification transports and public deployment.
 
 ## Decisions made
 
-- MVP 2.1 — local pre-pilot hardening, а не доказательство ценности на реальной компании.
-- Один company account владеет одной profile lineage; notices/raw/history общие, рекомендации и alerts
-  вычисляются только в разрешённом profile context.
-- Self-registration, password recovery, social login, public deployment и PostgreSQL RLS не входят в этап.
-- Airflow не добавляется: schedule принадлежит одному наблюдаемому Docker worker.
-- Telegram/email и автоматические attachments отложены до выбора канала и подтверждения source contract.
-- Физическое удаление legacy evidence, полная выгрузка ЕИС и автоматическая подача заявок запрещены.
-
-## Non-goals
-
-- Self-registration, password recovery, social login, public deployment и PostgreSQL RLS.
-- Telegram/email delivery, Airflow, automatic attachment scraping и автоматическая подача заявок.
-- Доказательство pilot precision, 14-дневной надёжности или production readiness.
+- Профиль считается pilot candidate, а не доказанной реальной юридической компанией.
+- Подрядчики расширяют географию только до `review`; они не доказывают наличие исполнителя.
+- Budget range — eligibility boundary для известных сумм, а не только scoring bonus.
+- Unknown amount и unknown legal requirements остаются видимыми; система не угадывает допуск.
+- `review_above_amount` — общий typed owner ручной квалификационной проверки, а не hardcoded проверка
+  имени cleaning-profile или парсинг свободного текста. Для pilot candidate порог равен 1 млн рублей.
+- Обычный клининг не получает выдуманную лицензию. Опасные отходы и специализированные pest-control
+  работы исключаются до отдельного юридического/операционного подтверждения.
+- Seed-файл владеет fresh-install default; работающая БД получает следующую version через штатный API,
+  чтобы не перезаписывать историю или возможные пользовательские изменения bootstrap-ом.
 
 ## Next exact step
 
-Получить от владельца продукта одну реальную компанию и её ограничения, затем составить и вслепую
-разметить первые 50 notices ЕИС для pilot precision gate.
+Создать локальный Git checkpoint, отправить `codex/ui-redesign` в GitHub, проверить remote ref и затем
+закрыть последний release criterion. После delivery — разметить не менее 50 реальных извещений ЕИС.
 
 ## Blockers
 
-- Реальная компания и human labels ещё не предоставлены; это блокирует пилотную валидацию, но не MVP 2.1.
+- Нет блокера для synthetic onboarding. Human-labeled 50-notice precision gate и юридическая проверка
+  требований остаются blocked до реальной выборки и документов компании.
+
+## Non-goals
+
+- Юридическое заключение о лицензиях, допусках или соответствии 44-ФЗ/223-ФЗ.
+- Заявление о precision/recall на реальных закупках или начало 14-дневного reliability run.
+- Изменение office profile, auth, alerts, attachment ingestion или production deployment.
+- Автоматическое привлечение подрядчика или подача заявки.
 
 ## Verification
 
 ```bash
+.venv/bin/pytest tests/test_mvp21_profiles.py tests/test_matching.py -q
 make test
 make lint
 make dbt-test
 docker compose config --quiet
+docker compose up --build -d
 docker compose ps -a
 git diff --check
 python3 /Users/tbwtk/.codex/skills/project-control/scripts/project_control.py audit .
